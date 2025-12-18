@@ -9,13 +9,14 @@ export type Profile = {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'technician' | 'client';
+  role: 'super_admin' | 'admin' | 'technician' | 'client';
   phone?: string;
   avatar_url?: string;
   client_id?: string;
   is_active: boolean;
   cpf?: string;
   cargo?: string;
+  permissions?: Record<string, boolean>;
   created_at: string;
 };
 

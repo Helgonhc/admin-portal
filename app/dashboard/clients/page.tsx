@@ -5,12 +5,14 @@ import { supabase, Client } from '../../../lib/supabase';
 import { 
   Plus, Search, Edit, Trash2, Eye, Loader2, Building2, 
   Globe, Lock, Users, MessageCircle, Phone, Mail, MapPin,
-  Navigation, Unlock, UserPlus, Upload, Image, X
+  Navigation, Unlock, UserPlus, Upload, Image, X, Shield
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 export default function ClientsPage() {
+  const { can, isAdmin } = usePermissions();
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -509,10 +511,12 @@ export default function ClientsPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Carteira de Clientes</h1>
           <p className="text-sm text-gray-500">{clients.length} clientes cadastrados</p>
         </div>
-        <button onClick={() => openModal()} className="btn btn-primary w-full sm:w-auto">
-          <Plus size={18} />
-          <span>Novo Cliente</span>
-        </button>
+        {can('can_create_clients') && (
+          <button onClick={() => openModal()} className="btn btn-primary w-full sm:w-auto">
+            <Plus size={18} />
+            <span>Novo Cliente</span>
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -560,12 +564,16 @@ export default function ClientsPage() {
                   )}
                 </div>
                 <div className="flex gap-0.5 sm:gap-1 flex-shrink-0">
-                  <button onClick={() => openModal(client)} className="p-1 sm:p-1.5 hover:bg-gray-100 rounded text-gray-500">
-                    <Edit size={14} className="sm:w-4 sm:h-4" />
-                  </button>
-                  <button onClick={() => handleDelete(client)} className="p-1 sm:p-1.5 hover:bg-red-50 rounded text-red-500">
-                    <Trash2 size={14} className="sm:w-4 sm:h-4" />
-                  </button>
+                  {can('can_edit_clients') && (
+                    <button onClick={() => openModal(client)} className="p-1 sm:p-1.5 hover:bg-gray-100 rounded text-gray-500">
+                      <Edit size={14} className="sm:w-4 sm:h-4" />
+                    </button>
+                  )}
+                  {can('can_delete_clients') && (
+                    <button onClick={() => handleDelete(client)} className="p-1 sm:p-1.5 hover:bg-red-50 rounded text-red-500">
+                      <Trash2 size={14} className="sm:w-4 sm:h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
