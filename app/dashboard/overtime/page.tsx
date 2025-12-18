@@ -25,7 +25,7 @@ export default function OvertimePage() {
   });
   const [saving, setSaving] = useState(false);
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   useEffect(() => {
     loadData();

@@ -341,7 +341,7 @@ export default function SettingsPage() {
     }
   }
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn">

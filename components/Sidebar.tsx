@@ -63,7 +63,7 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   // Carregar configurações da empresa
   useEffect(() => {

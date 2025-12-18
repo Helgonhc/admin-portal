@@ -29,7 +29,7 @@ export default function UsersPage() {
   });
   const [saving, setSaving] = useState(false);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   useEffect(() => {
     if (isAdmin) {
@@ -323,7 +323,7 @@ export default function UsersPage() {
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-2">
-                        {(user.role === 'admin' || user.role === 'technician') && (
+                        {(user.role === 'super_admin' || user.role === 'admin' || user.role === 'technician') && (
                           <button
                             onClick={() => router.push(`/dashboard/users/${user.id}/permissions`)}
                             className="p-2 hover:bg-indigo-50 rounded-lg text-indigo-600"

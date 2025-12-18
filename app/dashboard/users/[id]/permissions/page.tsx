@@ -106,7 +106,7 @@ export default function UserPermissionsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
 
   useEffect(() => {
     if (isAdmin && userId) {
@@ -231,7 +231,7 @@ export default function UserPermissionsPage() {
             <Shield className="text-indigo-600" />
             Permissões de {user.full_name}
           </h1>
-          <p className="text-gray-500">{user.email} • {user.role === 'admin' ? 'Administrador' : 'Técnico'}</p>
+          <p className="text-gray-500">{user.email} • {user.role === 'super_admin' ? 'Super Admin' : user.role === 'admin' ? 'Administrador' : 'Técnico'}</p>
         </div>
       </div>
 

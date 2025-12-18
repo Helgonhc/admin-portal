@@ -41,8 +41,8 @@ export const useAuthStore = create<AuthState>()(
               .eq('id', data.user.id)
               .single();
 
-            // Verificar se é admin ou técnico
-            if (profile && (profile.role === 'admin' || profile.role === 'technician')) {
+            // Verificar se é super_admin, admin ou técnico
+            if (profile && (profile.role === 'super_admin' || profile.role === 'admin' || profile.role === 'technician')) {
               set({ 
                 user: data.user, 
                 profile, 
@@ -94,7 +94,7 @@ export const useAuthStore = create<AuthState>()(
             .eq('id', session.user.id)
             .single();
 
-          if (profile && (profile.role === 'admin' || profile.role === 'technician')) {
+          if (profile && (profile.role === 'super_admin' || profile.role === 'admin' || profile.role === 'technician')) {
             set({ 
               user: session.user, 
               profile, 

@@ -153,7 +153,15 @@ export default function LoginPage() {
           <p className="text-amber-800 text-sm text-center">
             ⚠️ Este portal é exclusivo para <strong>técnicos</strong> e <strong>administradores</strong>.
             <br />
-            Clientes devem acessar o <a href="#" className="text-indigo-600 underline">Portal do Cliente</a>.
+            Clientes devem acessar o{' '}
+            <a 
+              href="https://chameiapp-portal.vercel.app/login" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-indigo-600 font-semibold underline hover:text-indigo-800"
+            >
+              Portal do Cliente
+            </a>.
           </p>
         </div>
 

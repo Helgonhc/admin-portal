@@ -17,7 +17,7 @@ export default function OvertimeDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
 
-  const isAdmin = profile?.role === 'admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   useEffect(() => {
     loadEntry();
