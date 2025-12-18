@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase, Profile } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/authStore';
 import { Plus, Search, Edit, Trash2, Loader2, UserCog, Shield, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function UsersPage() {
+  const router = useRouter();
   const { profile: currentUser } = useAuthStore();
   const [users, setUsers] = useState<Profile[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -321,6 +323,15 @@ export default function UsersPage() {
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-2">
+                        {(user.role === 'admin' || user.role === 'technician') && (
+                          <button
+                            onClick={() => router.push(`/dashboard/users/${user.id}/permissions`)}
+                            className="p-2 hover:bg-indigo-50 rounded-lg text-indigo-600"
+                            title="Gerenciar Permissões"
+                          >
+                            <Shield size={18} />
+                          </button>
+                        )}
                         <button
                           onClick={() => openModal(user)}
                           className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
