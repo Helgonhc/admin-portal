@@ -5,7 +5,7 @@ import { supabase, Client } from '../../../lib/supabase';
 import { 
   Plus, Search, Edit, Trash2, Eye, Loader2, Building2, 
   Globe, Lock, Users, MessageCircle, Phone, Mail, MapPin,
-  Navigation, Unlock, UserPlus
+  Navigation, Unlock, UserPlus, Upload, Image, X
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -41,6 +41,10 @@ export default function ClientsPage() {
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   
+  // Upload de logo
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  
   // Modal de Portal
   const [portalModalVisible, setPortalModalVisible] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
@@ -67,6 +71,85 @@ export default function ClientsPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Upload de logo do cliente
+  async function handleLogoUpload(file: File) {
+    if (!file) return;
+    
+    // Validar tipo
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione uma imagem válida');
+      return;
+    }
+    
+    // Validar tamanho (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Imagem muito grande. Máximo 2MB');
+      return;
+    }
+    
+    setUploadingLogo(true);
+    
+    try {
+      // Gerar nome único
+      const fileExt = file.name.split('.').pop();
+      const fileName = `client-logos/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      
+      // Upload para Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('os-photos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) throw error;
+      
+      // Pegar URL pública
+      const { data: urlData } = supabase.storage
+        .from('os-photos')
+        .getPublicUrl(fileName);
+      
+      setFormData(prev => ({ ...prev, client_logo_url: urlData.publicUrl }));
+      toast.success('Logo enviada com sucesso!');
+    } catch (error: any) {
+      console.error('Erro no upload:', error);
+      toast.error('Erro ao enviar logo: ' + error.message);
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+  
+  // Handlers de drag and drop
+  function handleDrag(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  }
+  
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleLogoUpload(e.dataTransfer.files[0]);
+    }
+  }
+  
+  function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files[0]) {
+      handleLogoUpload(e.target.files[0]);
+    }
+  }
+  
+  function removeLogo() {
+    setFormData(prev => ({ ...prev, client_logo_url: '' }));
   }
 
   // Busca automática de CNPJ (BrasilAPI)
@@ -799,19 +882,88 @@ export default function ClientsPage() {
                 </div>
               </div>
 
-              {/* Logo do Cliente */}
-              <div>
-                <label className="label">URL do Logo</label>
-                <input
-                  type="text"
-                  value={formData.client_logo_url}
-                  onChange={(e) => setFormData({ ...formData, client_logo_url: e.target.value })}
-                  className="input"
-                  placeholder="https://..."
-                />
-                {formData.client_logo_url && (
-                  <img src={formData.client_logo_url} alt="Logo" className="mt-2 h-12 sm:h-16 object-contain rounded" />
+              {/* Logo do Cliente - Upload */}
+              <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4">
+                <h4 className="font-semibold text-gray-700 mb-2 sm:mb-3 text-sm sm:text-base">🖼️ Logo do Cliente</h4>
+                
+                {formData.client_logo_url ? (
+                  // Preview da logo
+                  <div className="relative inline-block">
+                    <img 
+                      src={formData.client_logo_url} 
+                      alt="Logo do cliente" 
+                      className="h-24 sm:h-32 max-w-full object-contain rounded-lg border-2 border-indigo-200 bg-white p-2"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeLogo}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-lg"
+                    >
+                      <X size={16} />
+                    </button>
+                    <p className="text-xs text-gray-500 mt-2">Clique no X para remover</p>
+                  </div>
+                ) : (
+                  // Área de upload com drag and drop
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    className={`relative border-2 border-dashed rounded-xl p-6 sm:p-8 text-center transition-all cursor-pointer
+                      ${dragActive 
+                        ? 'border-indigo-500 bg-indigo-50' 
+                        : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+                      }
+                      ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}
+                    `}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileInput}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={uploadingLogo}
+                    />
+                    
+                    {uploadingLogo ? (
+                      <div className="flex flex-col items-center">
+                        <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-2" />
+                        <p className="text-sm text-gray-600">Enviando logo...</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-3">
+                          <Upload className="w-7 h-7 sm:w-8 sm:h-8 text-indigo-500" />
+                        </div>
+                        <p className="text-sm sm:text-base font-medium text-gray-700 mb-1">
+                          Arraste uma imagem aqui
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          ou clique para selecionar
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-gray-400 mt-2">
+                          PNG, JPG ou WEBP • Máximo 2MB
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
+                
+                {/* Campo de URL alternativo */}
+                <div className="mt-3">
+                  <label className="text-xs text-gray-500 flex items-center gap-1 mb-1">
+                    <Globe size={12} />
+                    Ou cole uma URL direta:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.client_logo_url}
+                    onChange={(e) => setFormData({ ...formData, client_logo_url: e.target.value })}
+                    className="input text-sm"
+                    placeholder="https://exemplo.com/logo.png"
+                  />
+                </div>
               </div>
             </div>
             <div className="p-3 sm:p-6 border-t bg-gray-50 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sticky bottom-0">
