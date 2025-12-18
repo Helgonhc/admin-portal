@@ -63,16 +63,30 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        // Limpar estado ANTES de fazer signOut
+        // 1. Fazer signOut no Supabase PRIMEIRO (isso limpa a sessão do Supabase)
+        await supabase.auth.signOut({ scope: 'global' });
+        
+        // 2. Limpar estado do Zustand
         set({ user: null, profile: null, isAuthenticated: false, isLoading: false });
         
-        // Limpar localStorage manualmente
+        // 3. Limpar TODOS os storages relacionados
         if (typeof window !== 'undefined') {
+          // Limpar nosso storage
           localStorage.removeItem('admin-auth-storage');
+          
+          // Limpar storage do Supabase (pode ter vários nomes)
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.includes('supabase') || key.includes('sb-'))) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(key => localStorage.removeItem(key));
+          
+          // Limpar sessionStorage também
+          sessionStorage.clear();
         }
-        
-        // Fazer signOut no Supabase
-        await supabase.auth.signOut();
       },
 
       loadProfile: async () => {
@@ -91,17 +105,9 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
-        // Verificar se já foi feito logout (localStorage limpo)
-        if (typeof window !== 'undefined') {
-          const stored = localStorage.getItem('admin-auth-storage');
-          if (!stored) {
-            set({ user: null, profile: null, isAuthenticated: false, isLoading: false });
-            return;
-          }
-        }
-        
         set({ isLoading: true });
         
+        // Verificar se existe sessão válida no Supabase
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
@@ -122,6 +128,7 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
+        // Não há sessão válida - limpar tudo
         set({ user: null, profile: null, isAuthenticated: false, isLoading: false });
       },
 
