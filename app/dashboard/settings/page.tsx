@@ -55,7 +55,10 @@ export default function SettingsPage() {
     phone: '',
     cpf: '',
     cargo: '',
+    avatar_url: '',
   });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Company - usando nomes das colunas reais da tabela app_config
   const [companyData, setCompanyData] = useState({
@@ -104,10 +107,14 @@ export default function SettingsPage() {
         phone: profile.phone || '',
         cpf: profile.cpf || '',
         cargo: profile.cargo || '',
+        avatar_url: profile.avatar_url || '',
       });
     }
-    loadCompanySettings();
-    loadChecklists();
+    // Só carregar dados da empresa se for admin
+    if (profile?.role === 'admin' || profile?.role === 'super_admin') {
+      loadCompanySettings();
+      loadChecklists();
+    }
   }, [profile]);
 
   async function loadCompanySettings() {
@@ -293,6 +300,49 @@ export default function SettingsPage() {
     }
   }
 
+  // Upload de foto de perfil do usuário
+  async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('A imagem deve ter no máximo 2MB');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar-${profile?.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('os-photos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('os-photos')
+        .getPublicUrl(filePath);
+
+      setProfileData({ ...profileData, avatar_url: publicUrl });
+      toast.success('Foto enviada com sucesso!');
+    } catch (error: any) {
+      toast.error('Erro ao enviar foto: ' + error.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   async function saveProfile() {
     setSaving(true);
     try {
@@ -303,6 +353,7 @@ export default function SettingsPage() {
           phone: profileData.phone,
           cpf: profileData.cpf,
           cargo: profileData.cargo,
+          avatar_url: profileData.avatar_url,
         })
         .eq('id', profile?.id);
 
@@ -534,8 +585,55 @@ export default function SettingsPage() {
       {/* Profile Tab */}
       {activeTab === 'profile' && (
         <div className="card">
-          <h3 className="font-semibold text-gray-800 mb-4">👤 Informações Pessoais</h3>
+          <h3 className="font-semibold text-gray-800 mb-4">👤 Meu Perfil</h3>
           <div className="space-y-4">
+            {/* Foto de Perfil */}
+            <div className="flex items-center gap-4 pb-4 border-b">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full border-2 border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center">
+                  {profileData.avatar_url ? (
+                    <img 
+                      src={profileData.avatar_url} 
+                      alt="Avatar" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="text-gray-400" size={32} />
+                  )}
+                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </div>
+              <div>
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="btn btn-secondary mb-1"
+                >
+                  {uploadingAvatar ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <Camera size={18} />
+                  )}
+                  {uploadingAvatar ? 'Enviando...' : 'Alterar Foto'}
+                </button>
+                <p className="text-xs text-gray-500">JPG, PNG. Máximo 2MB.</p>
+                {profileData.avatar_url && (
+                  <button
+                    onClick={() => setProfileData({ ...profileData, avatar_url: '' })}
+                    className="text-xs text-red-600 hover:underline"
+                  >
+                    Remover foto
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="label">Nome Completo</label>
