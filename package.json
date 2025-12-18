@@ -9,20 +9,21 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.1.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "colorthief": "^2.6.0",
+    "date-fns": "^3.0.6",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "lucide-react": "^0.303.0",
     "next": "14.0.4",
+    "qrcode.react": "^3.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@supabase/supabase-js": "^2.39.0",
-    "@supabase/ssr": "^0.1.0",
-    "zustand": "^4.4.7",
-    "date-fns": "^3.0.6",
     "react-hot-toast": "^2.4.1",
-    "lucide-react": "^0.303.0",
-    "recharts": "^2.10.3",
     "react-signature-canvas": "^1.0.6",
-    "jspdf": "^2.5.1",
-    "html2canvas": "^1.4.1",
-    "qrcode.react": "^3.1.0"
+    "recharts": "^2.10.3",
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@types/node": "^20.10.5",

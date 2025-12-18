@@ -64,6 +64,7 @@ export default function SettingsPage() {
     phone: '',
     email: '',
     logo_url: '',
+    primary_color: '#4f46e5',
     // Campos de endereço separados (existem na tabela)
     zip_code: '',
     street: '',
@@ -75,6 +76,7 @@ export default function SettingsPage() {
   });
   const [configId, setConfigId] = useState<string | null>(null);
   const [searchingCEP, setSearchingCEP] = useState(false);
+  const [extractingColor, setExtractingColor] = useState(false);
 
   // Notifications
   const [notificationSettings, setNotificationSettings] = useState({
@@ -122,6 +124,7 @@ export default function SettingsPage() {
         phone: data.phone || '',
         email: data.email || '',
         logo_url: data.logo_url || '',
+        primary_color: data.primary_color || '#4f46e5',
         zip_code: data.zip_code || '',
         street: data.street || '',
         number: data.number || '',
@@ -130,6 +133,89 @@ export default function SettingsPage() {
         city: data.city || '',
         state: data.state || '',
       });
+    }
+  }
+
+  // Função para extrair cor da logo automaticamente
+  async function extractColorFromLogo() {
+    if (!companyData.logo_url) {
+      toast.error('Faça upload de uma logo primeiro');
+      return;
+    }
+
+    setExtractingColor(true);
+    try {
+      const img = new window.Image();
+      img.crossOrigin = 'Anonymous';
+      
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('Canvas não suportado'));
+              return;
+            }
+
+            const size = 50;
+            canvas.width = size;
+            canvas.height = size;
+            ctx.drawImage(img, 0, 0, size, size);
+
+            const imageData = ctx.getImageData(0, 0, size, size).data;
+            const colorCounts: { [key: string]: number } = {};
+            
+            for (let i = 0; i < imageData.length; i += 4) {
+              const r = imageData[i];
+              const g = imageData[i + 1];
+              const b = imageData[i + 2];
+              const a = imageData[i + 3];
+              
+              if (a < 128) continue;
+              const brightness = (r + g + b) / 3;
+              if (brightness > 240 || brightness < 15) continue;
+              const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+              if (saturation < 30) continue;
+              
+              const qr = Math.round(r / 32) * 32;
+              const qg = Math.round(g / 32) * 32;
+              const qb = Math.round(b / 32) * 32;
+              
+              const key = `${qr},${qg},${qb}`;
+              colorCounts[key] = (colorCounts[key] || 0) + 1;
+            }
+            
+            let maxCount = 0;
+            let dominantColor = null;
+            
+            for (const [color, count] of Object.entries(colorCounts)) {
+              if (count > maxCount) {
+                maxCount = count;
+                dominantColor = color;
+              }
+            }
+            
+            if (dominantColor) {
+              const [r, g, b] = dominantColor.split(',').map(Number);
+              const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+              setCompanyData({ ...companyData, primary_color: hex });
+              toast.success(`Cor extraída: ${hex}`);
+            } else {
+              toast.error('Não foi possível extrair uma cor dominante');
+            }
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        };
+        img.onerror = () => reject(new Error('Erro ao carregar imagem'));
+        img.src = companyData.logo_url;
+      });
+    } catch (error) {
+      toast.error('Erro ao extrair cor da logo');
+    } finally {
+      setExtractingColor(false);
     }
   }
 
@@ -574,6 +660,69 @@ export default function SettingsPage() {
                   className="input mt-1"
                   placeholder="https://..."
                 />
+              </div>
+            </div>
+
+            {/* Cor Principal da Empresa */}
+            <div className="border-t pt-4 mt-4">
+              <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                <Palette size={18} />
+                Cor Principal
+              </h4>
+              <p className="text-xs text-gray-500 mb-3">
+                A cor principal será usada em botões, menus e destaques do portal. 
+                Você pode extrair automaticamente da logo ou escolher manualmente.
+              </p>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={companyData.primary_color}
+                    onChange={(e) => setCompanyData({ ...companyData, primary_color: e.target.value })}
+                    className="w-12 h-12 rounded-lg cursor-pointer border-2 border-gray-200"
+                  />
+                  <div>
+                    <input
+                      type="text"
+                      value={companyData.primary_color}
+                      onChange={(e) => setCompanyData({ ...companyData, primary_color: e.target.value })}
+                      className="input w-28 text-center font-mono text-sm"
+                      placeholder="#000000"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={extractColorFromLogo}
+                  disabled={extractingColor || !companyData.logo_url}
+                  className="btn btn-secondary"
+                  title="Extrair cor dominante da logo automaticamente"
+                >
+                  {extractingColor ? (
+                    <Loader2 className="animate-spin" size={18} />
+                  ) : (
+                    <Palette size={18} />
+                  )}
+                  Extrair da Logo
+                </button>
+              </div>
+              {/* Preview da cor */}
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-gray-500">Preview:</span>
+                <div 
+                  className="px-4 py-2 rounded-lg text-white text-sm font-medium"
+                  style={{ backgroundColor: companyData.primary_color }}
+                >
+                  Botão Exemplo
+                </div>
+                <div 
+                  className="px-3 py-1 rounded-full text-xs font-semibold"
+                  style={{ 
+                    backgroundColor: `${companyData.primary_color}20`,
+                    color: companyData.primary_color 
+                  }}
+                >
+                  Badge Exemplo
+                </div>
               </div>
             </div>
 
