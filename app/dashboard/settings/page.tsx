@@ -41,15 +41,16 @@ export default function SettingsPage() {
     cargo: '',
   });
 
-  // Company
+  // Company - usando nomes das colunas reais da tabela app_config
   const [companyData, setCompanyData] = useState({
     company_name: '',
-    company_cnpj: '',
-    company_phone: '',
-    company_email: '',
-    company_address: '',
-    company_logo: '',
+    cnpj: '',
+    phone: '',
+    email: '',
+    address: '',
+    logo_url: '',
   });
+  const [configId, setConfigId] = useState<string | null>(null);
 
   // Notifications
   const [notificationSettings, setNotificationSettings] = useState({
@@ -90,13 +91,14 @@ export default function SettingsPage() {
       .single();
     
     if (data) {
+      setConfigId(data.id);
       setCompanyData({
         company_name: data.company_name || '',
-        company_cnpj: data.company_cnpj || '',
-        company_phone: data.company_phone || '',
-        company_email: data.company_email || '',
-        company_address: data.company_address || '',
-        company_logo: data.company_logo || '',
+        cnpj: data.cnpj || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        address: data.address || '',
+        logo_url: data.logo_url || '',
       });
     }
   }
@@ -111,24 +113,24 @@ export default function SettingsPage() {
 
   // Busca automática de CNPJ
   async function handleCNPJSearch() {
-    const cnpj = companyData.company_cnpj.replace(/\D/g, '');
-    if (cnpj.length !== 14) {
+    const cnpjClean = companyData.cnpj.replace(/\D/g, '');
+    if (cnpjClean.length !== 14) {
       toast.error('Digite um CNPJ válido com 14 dígitos');
       return;
     }
 
     setSearchingCNPJ(true);
     try {
-      const data = await fetchCNPJ(cnpj);
+      const data = await fetchCNPJ(cnpjClean);
       if (data) {
         setCompanyData({
           ...companyData,
           company_name: data.razao_social || data.nome_fantasia || companyData.company_name,
-          company_phone: data.ddd_telefone_1 ? `(${data.ddd_telefone_1.substring(0, 2)}) ${data.ddd_telefone_1.substring(2)}` : companyData.company_phone,
-          company_email: data.email || companyData.company_email,
-          company_address: data.logradouro 
+          phone: data.ddd_telefone_1 ? `(${data.ddd_telefone_1.substring(0, 2)}) ${data.ddd_telefone_1.substring(2)}` : companyData.phone,
+          email: data.email || companyData.email,
+          address: data.logradouro 
             ? `${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''} - ${data.bairro}, ${data.municipio}/${data.uf} - CEP: ${data.cep}`
-            : companyData.company_address,
+            : companyData.address,
         });
         toast.success('Dados do CNPJ carregados!');
       } else {
@@ -168,19 +170,12 @@ export default function SettingsPage() {
   async function saveCompany() {
     setSaving(true);
     try {
-      // Primeiro, verificar se já existe um registro
-      const { data: existing } = await supabase
-        .from('app_config')
-        .select('id')
-        .limit(1)
-        .single();
-
-      if (existing) {
-        // Atualizar registro existente
+      if (configId) {
+        // Atualizar registro existente usando o ID salvo
         const { error } = await supabase
           .from('app_config')
           .update(companyData)
-          .eq('id', existing.id);
+          .eq('id', configId);
         
         if (error) throw error;
       } else {
@@ -241,7 +236,7 @@ export default function SettingsPage() {
         .from('os-photos')
         .getPublicUrl(filePath);
 
-      setCompanyData({ ...companyData, company_logo: publicUrl });
+      setCompanyData({ ...companyData, logo_url: publicUrl });
       toast.success('Logo enviada com sucesso!');
     } catch (error: any) {
       console.error('Erro ao fazer upload:', error);
@@ -461,9 +456,9 @@ export default function SettingsPage() {
               <label className="label">Logo da Empresa</label>
               <div className="flex items-start gap-4">
                 <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50">
-                  {companyData.company_logo ? (
+                  {companyData.logo_url ? (
                     <img 
-                      src={companyData.company_logo} 
+                      src={companyData.logo_url} 
                       alt="Logo" 
                       className="w-full h-full object-contain"
                     />
@@ -495,9 +490,9 @@ export default function SettingsPage() {
                     PNG, JPG ou GIF. Máximo 2MB.<br/>
                     A logo aparecerá no menu lateral do portal.
                   </p>
-                  {companyData.company_logo && (
+                  {companyData.logo_url && (
                     <button
-                      onClick={() => setCompanyData({ ...companyData, company_logo: '' })}
+                      onClick={() => setCompanyData({ ...companyData, logo_url: '' })}
                       className="text-xs text-red-600 hover:underline mt-1"
                     >
                       Remover logo
@@ -510,8 +505,8 @@ export default function SettingsPage() {
                 <label className="text-xs text-gray-500">Ou cole a URL da imagem:</label>
                 <input
                   type="text"
-                  value={companyData.company_logo}
-                  onChange={(e) => setCompanyData({ ...companyData, company_logo: e.target.value })}
+                  value={companyData.logo_url}
+                  onChange={(e) => setCompanyData({ ...companyData, logo_url: e.target.value })}
                   className="input mt-1"
                   placeholder="https://..."
                 />
@@ -524,8 +519,8 @@ export default function SettingsPage() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={companyData.company_cnpj}
-                    onChange={(e) => setCompanyData({ ...companyData, company_cnpj: e.target.value })}
+                    value={companyData.cnpj}
+                    onChange={(e) => setCompanyData({ ...companyData, cnpj: e.target.value })}
                     className="input flex-1"
                     placeholder="00.000.000/0000-00"
                   />
@@ -561,8 +556,8 @@ export default function SettingsPage() {
                 <label className="label">Telefone</label>
                 <input
                   type="text"
-                  value={companyData.company_phone}
-                  onChange={(e) => setCompanyData({ ...companyData, company_phone: e.target.value })}
+                  value={companyData.phone}
+                  onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
                   className="input"
                 />
               </div>
@@ -570,8 +565,8 @@ export default function SettingsPage() {
                 <label className="label">E-mail</label>
                 <input
                   type="email"
-                  value={companyData.company_email}
-                  onChange={(e) => setCompanyData({ ...companyData, company_email: e.target.value })}
+                  value={companyData.email}
+                  onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
                   className="input"
                 />
               </div>
@@ -580,8 +575,8 @@ export default function SettingsPage() {
               <label className="label">Endereço</label>
               <input
                 type="text"
-                value={companyData.company_address}
-                onChange={(e) => setCompanyData({ ...companyData, company_address: e.target.value })}
+                value={companyData.address}
+                onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
                 className="input"
               />
             </div>
