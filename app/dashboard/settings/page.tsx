@@ -23,6 +23,22 @@ async function fetchCNPJ(cnpj: string) {
   }
 }
 
+// Função para buscar CEP na ViaCEP
+async function fetchCEP(cep: string) {
+  const cleanCEP = cep.replace(/\D/g, '');
+  if (cleanCEP.length !== 8) return null;
+  
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.erro) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export default function SettingsPage() {
   const { profile, setProfile } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'notifications' | 'checklists'>('profile');
@@ -47,10 +63,18 @@ export default function SettingsPage() {
     cnpj: '',
     phone: '',
     email: '',
-    address: '',
     logo_url: '',
+    // Campos de endereço separados (existem na tabela)
+    zip_code: '',
+    street: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    state: '',
   });
   const [configId, setConfigId] = useState<string | null>(null);
+  const [searchingCEP, setSearchingCEP] = useState(false);
 
   // Notifications
   const [notificationSettings, setNotificationSettings] = useState({
@@ -97,8 +121,14 @@ export default function SettingsPage() {
         cnpj: data.cnpj || '',
         phone: data.phone || '',
         email: data.email || '',
-        address: data.address || '',
         logo_url: data.logo_url || '',
+        zip_code: data.zip_code || '',
+        street: data.street || '',
+        number: data.number || '',
+        complement: data.complement || '',
+        neighborhood: data.neighborhood || '',
+        city: data.city || '',
+        state: data.state || '',
       });
     }
   }
@@ -128,9 +158,13 @@ export default function SettingsPage() {
           company_name: data.razao_social || data.nome_fantasia || companyData.company_name,
           phone: data.ddd_telefone_1 ? `(${data.ddd_telefone_1.substring(0, 2)}) ${data.ddd_telefone_1.substring(2)}` : companyData.phone,
           email: data.email || companyData.email,
-          address: data.logradouro 
-            ? `${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''} - ${data.bairro}, ${data.municipio}/${data.uf} - CEP: ${data.cep}`
-            : companyData.address,
+          zip_code: data.cep || companyData.zip_code,
+          street: data.logradouro || companyData.street,
+          number: data.numero || companyData.number,
+          complement: data.complemento || companyData.complement,
+          neighborhood: data.bairro || companyData.neighborhood,
+          city: data.municipio || companyData.city,
+          state: data.uf || companyData.state,
         });
         toast.success('Dados do CNPJ carregados!');
       } else {
@@ -140,6 +174,36 @@ export default function SettingsPage() {
       toast.error('Erro ao buscar CNPJ');
     } finally {
       setSearchingCNPJ(false);
+    }
+  }
+
+  // Busca automática de CEP
+  async function handleCEPSearch() {
+    const cepClean = companyData.zip_code.replace(/\D/g, '');
+    if (cepClean.length !== 8) {
+      toast.error('Digite um CEP válido com 8 dígitos');
+      return;
+    }
+
+    setSearchingCEP(true);
+    try {
+      const data = await fetchCEP(cepClean);
+      if (data) {
+        setCompanyData({
+          ...companyData,
+          street: data.logradouro || companyData.street,
+          neighborhood: data.bairro || companyData.neighborhood,
+          city: data.localidade || companyData.city,
+          state: data.uf || companyData.state,
+        });
+        toast.success('Endereço carregado!');
+      } else {
+        toast.error('CEP não encontrado');
+      }
+    } catch (error) {
+      toast.error('Erro ao buscar CEP');
+    } finally {
+      setSearchingCEP(false);
     }
   }
 
@@ -571,15 +635,135 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-            <div>
-              <label className="label">Endereço</label>
-              <input
-                type="text"
-                value={companyData.address}
-                onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                className="input"
-              />
+            {/* Endereço com busca por CEP */}
+            <div className="border-t pt-4 mt-4">
+              <h4 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                <MapPin size={18} />
+                Endereço
+              </h4>
+              
+              <div className="grid md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="label">CEP</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={companyData.zip_code}
+                      onChange={(e) => setCompanyData({ ...companyData, zip_code: e.target.value })}
+                      className="input flex-1"
+                      placeholder="00000-000"
+                      maxLength={9}
+                    />
+                    <button
+                      onClick={handleCEPSearch}
+                      disabled={searchingCEP}
+                      className="btn btn-secondary whitespace-nowrap"
+                      title="Buscar endereço pelo CEP"
+                    >
+                      {searchingCEP ? (
+                        <Loader2 className="animate-spin" size={18} />
+                      ) : (
+                        <Search size={18} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label">Rua/Logradouro</label>
+                  <input
+                    type="text"
+                    value={companyData.street}
+                    onChange={(e) => setCompanyData({ ...companyData, street: e.target.value })}
+                    className="input"
+                    placeholder="Nome da rua"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <label className="label">Número</label>
+                  <input
+                    type="text"
+                    value={companyData.number}
+                    onChange={(e) => setCompanyData({ ...companyData, number: e.target.value })}
+                    className="input"
+                    placeholder="123"
+                  />
+                </div>
+                <div>
+                  <label className="label">Complemento</label>
+                  <input
+                    type="text"
+                    value={companyData.complement}
+                    onChange={(e) => setCompanyData({ ...companyData, complement: e.target.value })}
+                    className="input"
+                    placeholder="Sala, Apto..."
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label">Bairro</label>
+                  <input
+                    type="text"
+                    value={companyData.neighborhood}
+                    onChange={(e) => setCompanyData({ ...companyData, neighborhood: e.target.value })}
+                    className="input"
+                    placeholder="Nome do bairro"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="label">Cidade</label>
+                  <input
+                    type="text"
+                    value={companyData.city}
+                    onChange={(e) => setCompanyData({ ...companyData, city: e.target.value })}
+                    className="input"
+                    placeholder="Nome da cidade"
+                  />
+                </div>
+                <div>
+                  <label className="label">Estado</label>
+                  <select
+                    value={companyData.state}
+                    onChange={(e) => setCompanyData({ ...companyData, state: e.target.value })}
+                    className="input"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="AC">AC</option>
+                    <option value="AL">AL</option>
+                    <option value="AP">AP</option>
+                    <option value="AM">AM</option>
+                    <option value="BA">BA</option>
+                    <option value="CE">CE</option>
+                    <option value="DF">DF</option>
+                    <option value="ES">ES</option>
+                    <option value="GO">GO</option>
+                    <option value="MA">MA</option>
+                    <option value="MT">MT</option>
+                    <option value="MS">MS</option>
+                    <option value="MG">MG</option>
+                    <option value="PA">PA</option>
+                    <option value="PB">PB</option>
+                    <option value="PR">PR</option>
+                    <option value="PE">PE</option>
+                    <option value="PI">PI</option>
+                    <option value="RJ">RJ</option>
+                    <option value="RN">RN</option>
+                    <option value="RS">RS</option>
+                    <option value="RO">RO</option>
+                    <option value="RR">RR</option>
+                    <option value="SC">SC</option>
+                    <option value="SP">SP</option>
+                    <option value="SE">SE</option>
+                    <option value="TO">TO</option>
+                  </select>
+                </div>
+              </div>
             </div>
+
             <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
               <p className="text-sm text-indigo-800">
                 💡 O nome e logo da empresa aparecerão no menu lateral do portal, substituindo "Portal Admin".
