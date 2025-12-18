@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
+import { usePermissions } from '../hooks/usePermissions';
 import {
   LayoutDashboard,
   Users,
@@ -30,20 +31,24 @@ import {
   FileCheck,
 } from 'lucide-react';
 
+// Menu items com permissões necessárias
+// permission: null = todos podem ver
+// permission: 'admin_only' = só admin
+// permission: 'nome_permissao' = verifica permissão específica
 const menuItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Clientes', href: '/dashboard/clients', icon: Building2 },
-  { name: 'Equipamentos', href: '/dashboard/equipments', icon: Wrench },
-  { name: 'Ordens de Serviço', href: '/dashboard/orders', icon: ClipboardList },
-  { name: 'Chamados', href: '/dashboard/tickets', icon: Ticket },
-  { name: 'Orçamentos', href: '/dashboard/quotes', icon: Calculator },
-  { name: 'Contratos', href: '/dashboard/maintenance', icon: FileCheck },
-  { name: 'Agenda', href: '/dashboard/agenda', icon: Calendar },
-  { name: 'Banco de Horas', href: '/dashboard/overtime', icon: Clock },
-  { name: 'Estoque', href: '/dashboard/inventory', icon: Package },
-  { name: 'Chat', href: '/dashboard/chat', icon: MessageSquare },
-  { name: 'Notificações', href: '/dashboard/notifications', icon: Bell },
-  { name: 'Baixar App', href: '/dashboard/download', icon: Download },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: null },
+  { name: 'Clientes', href: '/dashboard/clients', icon: Building2, permission: 'can_view_all_clients' },
+  { name: 'Equipamentos', href: '/dashboard/equipments', icon: Wrench, permission: 'can_view_all_clients' }, // Vinculado a clientes
+  { name: 'Ordens de Serviço', href: '/dashboard/orders', icon: ClipboardList, permission: null },
+  { name: 'Chamados', href: '/dashboard/tickets', icon: Ticket, permission: null },
+  { name: 'Orçamentos', href: '/dashboard/quotes', icon: Calculator, permission: 'can_view_all_clients' }, // Vinculado a clientes
+  { name: 'Contratos', href: '/dashboard/maintenance', icon: FileCheck, permission: 'can_view_all_clients' }, // Vinculado a clientes
+  { name: 'Agenda', href: '/dashboard/agenda', icon: Calendar, permission: null },
+  { name: 'Banco de Horas', href: '/dashboard/overtime', icon: Clock, permission: null },
+  { name: 'Estoque', href: '/dashboard/inventory', icon: Package, permission: 'can_manage_inventory' },
+  { name: 'Chat', href: '/dashboard/chat', icon: MessageSquare, permission: null },
+  { name: 'Notificações', href: '/dashboard/notifications', icon: Bell, permission: null },
+  { name: 'Baixar App', href: '/dashboard/download', icon: Download, permission: null },
 ];
 
 const adminItems = [
@@ -59,11 +64,10 @@ interface AppConfig {
 export default function Sidebar() {
   const pathname = usePathname();
   const { profile, logout } = useAuthStore();
+  const { can, isAdmin } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
-
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
   // Carregar configurações da empresa
   useEffect(() => {
@@ -118,6 +122,10 @@ export default function Sidebar() {
       {/* Menu */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
+          // Verificar permissão - se tem permission definida, verificar; se não, mostrar para todos
+          const hasPermission = item.permission === null || can(item.permission as any);
+          if (!hasPermission) return null;
+          
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link

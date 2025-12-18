@@ -16,6 +16,9 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // Verificar permissão de acesso
+  const canViewClients = can('can_view_all_clients');
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
   const [saving, setSaving] = useState(false);
@@ -499,6 +502,18 @@ export default function ClientsPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  // Verificar permissão de acesso à página
+  if (!canViewClients) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <Shield className="w-16 h-16 text-gray-300 mb-4" />
+        <h2 className="text-xl font-bold text-gray-600">Acesso Restrito</h2>
+        <p className="text-gray-500 mt-2">Você não tem permissão para acessar esta página.</p>
+        <p className="text-sm text-gray-400 mt-1">Entre em contato com um administrador.</p>
       </div>
     );
   }

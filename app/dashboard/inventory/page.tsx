@@ -261,6 +261,18 @@ export default function InventoryPage() {
     );
   }
 
+  // Verificar permissão de acesso à página
+  if (!can('can_manage_inventory')) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <Package className="w-16 h-16 text-gray-300 mb-4" />
+        <h2 className="text-xl font-bold text-gray-600">Acesso Restrito</h2>
+        <p className="text-gray-500 mt-2">Você não tem permissão para acessar o estoque.</p>
+        <p className="text-sm text-gray-400 mt-1">Entre em contato com um administrador.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
