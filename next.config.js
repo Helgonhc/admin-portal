@@ -4,9 +4,15 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: '*.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'xgcpfxzlzretwsjhvbtt.supabase.co',
       },
     ],
+    // Permitir qualquer domínio (alternativa ao **)
+    unoptimized: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
