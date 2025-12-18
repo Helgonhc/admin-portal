@@ -56,9 +56,11 @@ export default function UsersPage() {
   async function loadData() {
     try {
       const [usersRes, clientsRes] = await Promise.all([
+        // Buscar apenas super_admin, admin e technician (NÃO clientes)
         supabase
           .from('profiles')
           .select('*, clients(name)')
+          .in('role', ['super_admin', 'admin', 'technician'])
           .order('full_name'),
         supabase.from('clients').select('id, name').eq('is_active', true).order('name'),
       ]);
@@ -77,6 +79,7 @@ export default function UsersPage() {
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       user.email?.toLowerCase().includes(search.toLowerCase());
+    // Filtrar apenas por roles de staff (não cliente)
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -304,9 +307,9 @@ export default function UsersPage() {
           className="input w-full sm:w-48"
         >
           <option value="all">Todos os tipos</option>
+          <option value="super_admin">Super Admins</option>
           <option value="admin">Administradores</option>
           <option value="technician">Técnicos</option>
-          <option value="client">Clientes</option>
         </select>
       </div>
 
@@ -447,9 +450,9 @@ export default function UsersPage() {
                     className="input"
                   >
                     {isSuperAdmin && <option value="admin">👑 Administrador</option>}
+                    {isSuperAdmin && <option value="admin">👑 Administrador</option>}
                     {!isSuperAdmin && currentUser?.role === 'admin' && <option value="admin">👑 Administrador</option>}
                     <option value="technician">🔧 Técnico</option>
-                    <option value="client">👤 Cliente</option>
                   </select>
                 </div>
                 <div>
@@ -463,21 +466,7 @@ export default function UsersPage() {
                   />
                 </div>
               </div>
-              {formData.role === 'client' && (
-                <div>
-                  <label className="label">Empresa</label>
-                  <select
-                    value={formData.client_id}
-                    onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-                    className="input"
-                  >
-                    <option value="">Selecione uma empresa</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>{client.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">CPF</label>
