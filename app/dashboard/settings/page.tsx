@@ -168,14 +168,30 @@ export default function SettingsPage() {
   async function saveCompany() {
     setSaving(true);
     try {
-      const { error } = await supabase
+      // Primeiro, verificar se já existe um registro
+      const { data: existing } = await supabase
         .from('app_config')
-        .upsert({
-          id: 1,
-          ...companyData,
-        });
+        .select('id')
+        .limit(1)
+        .single();
 
-      if (error) throw error;
+      if (existing) {
+        // Atualizar registro existente
+        const { error } = await supabase
+          .from('app_config')
+          .update(companyData)
+          .eq('id', existing.id);
+        
+        if (error) throw error;
+      } else {
+        // Criar novo registro
+        const { error } = await supabase
+          .from('app_config')
+          .insert(companyData);
+        
+        if (error) throw error;
+      }
+
       toast.success('Configurações da empresa salvas!');
       
       // Recarregar a página para atualizar o sidebar
