@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../../lib/supabase';
 import { useAuthStore } from '../../../../store/authStore';
+import { usePermissions } from '../../../../hooks/usePermissions';
 import { 
   ArrowLeft, Trash2, Loader2, Building2, Phone, Mail, MapPin, 
   FileText, Wrench, Ticket, Edit, Save, User, Hash, Users,
@@ -16,6 +17,7 @@ export default function ClientDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const { profile } = useAuthStore();
+  const { isAdmin, can } = usePermissions();
   const [client, setClient] = useState<any>(null);
   const [stats, setStats] = useState({ orders: 0, tickets: 0, equipments: 0, users: 0 });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
@@ -342,9 +344,11 @@ export default function ClientDetailsPage() {
             <p className="text-xs sm:text-sm text-gray-500 truncate">{client.cnpj_cpf || 'Sem documento'}</p>
           </div>
         </div>
-        <button onClick={() => setIsEditing(!isEditing)} className="btn btn-secondary flex-shrink-0 text-xs sm:text-sm">
-          <Edit size={16} className="sm:w-[18px] sm:h-[18px]" /> <span className="hidden sm:inline">{isEditing ? 'Cancelar' : 'Editar'}</span>
-        </button>
+        {can('can_edit_clients') && (
+          <button onClick={() => setIsEditing(!isEditing)} className="btn btn-secondary flex-shrink-0 text-xs sm:text-sm">
+            <Edit size={16} className="sm:w-[18px] sm:h-[18px]" /> <span className="hidden sm:inline">{isEditing ? 'Cancelar' : 'Editar'}</span>
+          </button>
+        )}
         <span className={`badge flex-shrink-0 ${client.is_active ? 'badge-success' : 'badge-danger'}`}>
           {client.is_active ? 'Ativo' : 'Inativo'}
         </span>
@@ -374,21 +378,23 @@ export default function ClientDetailsPage() {
         </Link>
       </div>
 
-      {/* Botões de Portal */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-        <button onClick={handleOpenPortalModal} className="py-2 sm:py-3 px-2 sm:px-4 border-2 border-orange-400 text-orange-600 hover:bg-orange-50 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm">
-          <Globe size={16} className="sm:w-5 sm:h-5" /> Liberar Portal <Lock size={12} className="sm:w-4 sm:h-4" />
-        </button>
-        <Link href={`/dashboard/clients/${params.id}/users`} className="py-2 sm:py-3 px-2 sm:px-4 border-2 border-purple-400 text-purple-600 hover:bg-purple-50 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm">
-          <Users size={16} className="sm:w-5 sm:h-5" /> 👥 Usuários ({stats.users})
-        </Link>
-        <button onClick={handleTogglePortalBlock} className={`py-2 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm ${
-          client.portal_blocked ? 'bg-red-600 text-white hover:bg-red-700' : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
-        }`}>
-          {client.portal_blocked ? <Unlock size={16} className="sm:w-5 sm:h-5" /> : <Lock size={16} className="sm:w-5 sm:h-5" />}
-          {client.portal_blocked ? '🔓 Desbloquear' : '🔒 Bloquear'}
-        </button>
-      </div>
+      {/* Botões de Portal - SÓ ADMIN PODE VER */}
+      {isAdmin && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+          <button onClick={handleOpenPortalModal} className="py-2 sm:py-3 px-2 sm:px-4 border-2 border-orange-400 text-orange-600 hover:bg-orange-50 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm">
+            <Globe size={16} className="sm:w-5 sm:h-5" /> Liberar Portal <Lock size={12} className="sm:w-4 sm:h-4" />
+          </button>
+          <Link href={`/dashboard/clients/${params.id}/users`} className="py-2 sm:py-3 px-2 sm:px-4 border-2 border-purple-400 text-purple-600 hover:bg-purple-50 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm">
+            <Users size={16} className="sm:w-5 sm:h-5" /> 👥 Usuários ({stats.users})
+          </Link>
+          <button onClick={handleTogglePortalBlock} className={`py-2 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm ${
+            client.portal_blocked ? 'bg-red-600 text-white hover:bg-red-700' : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
+          }`}>
+            {client.portal_blocked ? <Unlock size={16} className="sm:w-5 sm:h-5" /> : <Lock size={16} className="sm:w-5 sm:h-5" />}
+            {client.portal_blocked ? '🔓 Desbloquear' : '🔒 Bloquear'}
+          </button>
+        </div>
+      )}
 
       {/* Indicador de Bloqueio */}
       {client.portal_blocked && (
@@ -595,7 +601,9 @@ export default function ClientDetailsPage() {
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-gray-800">👥 Usuários Vinculados</h3>
-            <Link href={`/dashboard/clients/${params.id}/users`} className="text-sm text-indigo-600 hover:underline">Gerenciar</Link>
+            {isAdmin && (
+              <Link href={`/dashboard/clients/${params.id}/users`} className="text-sm text-indigo-600 hover:underline">Gerenciar</Link>
+            )}
           </div>
           <div className="space-y-2">
             {users.map((user) => (
@@ -622,12 +630,14 @@ export default function ClientDetailsPage() {
         <p className="text-gray-600">Cliente desde {new Date(client.created_at).toLocaleDateString('pt-BR')}</p>
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-wrap gap-3">
-        <button onClick={handleDelete} disabled={processing} className="btn btn-danger">
-          <Trash2 size={20} /> Excluir Cliente
-        </button>
-      </div>
+      {/* Actions - SÓ ADMIN PODE EXCLUIR */}
+      {isAdmin && (
+        <div className="flex flex-wrap gap-3">
+          <button onClick={handleDelete} disabled={processing} className="btn btn-danger">
+            <Trash2 size={20} /> Excluir Cliente
+          </button>
+        </div>
+      )}
 
       {/* Modal de Portal */}
       {portalModalVisible && (

@@ -10,11 +10,12 @@ import { Shield } from 'lucide-react';
 const adminOnlyPages = ['/dashboard/users', '/dashboard/settings'];
 
 // Páginas que requerem permissões específicas
-const permissionPages: Record<string, string> = {
+// Pode ser string (uma permissão) ou array (qualquer uma das permissões)
+const permissionPages: Record<string, string | string[]> = {
   '/dashboard/clients': 'can_view_all_clients',
-  '/dashboard/equipments': 'can_view_all_clients',
-  '/dashboard/quotes': 'can_view_all_clients',
-  '/dashboard/maintenance': 'can_view_all_clients',
+  '/dashboard/equipments': 'can_create_equipments',
+  '/dashboard/quotes': ['can_create_quotes', 'can_view_financials'], // Criar OU ver valores
+  '/dashboard/maintenance': 'can_view_financials',
   '/dashboard/inventory': 'can_manage_inventory',
 };
 
@@ -44,9 +45,17 @@ export default function DashboardLayout({
   
   // Verificar permissão específica da página
   const requiredPermission = Object.entries(permissionPages).find(([page]) => pathname?.startsWith(page))?.[1];
-  const hasPermission = requiredPermission 
-    ? isAdmin || (profile?.permissions as any)?.[requiredPermission] === true
-    : true;
+  let hasPermission = true;
+  if (requiredPermission) {
+    if (isAdmin) {
+      hasPermission = true;
+    } else if (Array.isArray(requiredPermission)) {
+      // Se for array, verifica se tem QUALQUER uma das permissões
+      hasPermission = requiredPermission.some(p => (profile?.permissions as any)?.[p] === true);
+    } else {
+      hasPermission = (profile?.permissions as any)?.[requiredPermission] === true;
+    }
+  }
 
   if (isLoading) {
     return (

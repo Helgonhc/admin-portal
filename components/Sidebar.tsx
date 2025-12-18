@@ -35,14 +35,15 @@ import {
 // permission: null = todos podem ver
 // permission: 'admin_only' = só admin
 // permission: 'nome_permissao' = verifica permissão específica
+// permission: ['perm1', 'perm2'] = verifica se tem QUALQUER uma das permissões
 const menuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: null },
   { name: 'Clientes', href: '/dashboard/clients', icon: Building2, permission: 'can_view_all_clients' },
-  { name: 'Equipamentos', href: '/dashboard/equipments', icon: Wrench, permission: 'can_view_all_clients' }, // Vinculado a clientes
+  { name: 'Equipamentos', href: '/dashboard/equipments', icon: Wrench, permission: 'can_create_equipments' },
   { name: 'Ordens de Serviço', href: '/dashboard/orders', icon: ClipboardList, permission: null },
   { name: 'Chamados', href: '/dashboard/tickets', icon: Ticket, permission: null },
-  { name: 'Orçamentos', href: '/dashboard/quotes', icon: Calculator, permission: 'can_view_all_clients' }, // Vinculado a clientes
-  { name: 'Contratos', href: '/dashboard/maintenance', icon: FileCheck, permission: 'can_view_all_clients' }, // Vinculado a clientes
+  { name: 'Orçamentos', href: '/dashboard/quotes', icon: Calculator, permission: ['can_create_quotes', 'can_view_financials'] }, // Criar OU ver valores
+  { name: 'Contratos', href: '/dashboard/maintenance', icon: FileCheck, permission: 'can_view_financials' }, // Só quem pode ver financeiro
   { name: 'Agenda', href: '/dashboard/agenda', icon: Calendar, permission: null },
   { name: 'Banco de Horas', href: '/dashboard/overtime', icon: Clock, permission: null },
   { name: 'Estoque', href: '/dashboard/inventory', icon: Package, permission: 'can_manage_inventory' },
@@ -122,8 +123,16 @@ export default function Sidebar() {
       {/* Menu */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
-          // Verificar permissão - se tem permission definida, verificar; se não, mostrar para todos
-          const hasPermission = item.permission === null || can(item.permission as any);
+          // Verificar permissão - suporta null, string ou array de strings
+          let hasPermission = true;
+          if (item.permission !== null) {
+            if (Array.isArray(item.permission)) {
+              // Se for array, verifica se tem QUALQUER uma das permissões
+              hasPermission = item.permission.some(p => can(p as any));
+            } else {
+              hasPermission = can(item.permission as any);
+            }
+          }
           if (!hasPermission) return null;
           
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');

@@ -8,6 +8,7 @@ interface Permissions {
   can_create_orders: boolean;
   can_create_clients: boolean;
   can_create_equipments: boolean;
+  can_create_quotes: boolean;        // NOVO: Criar orçamentos (sem ver valores)
   can_edit_own_orders: boolean;
   can_edit_all_orders: boolean;
   can_edit_clients: boolean;
@@ -18,7 +19,7 @@ interface Permissions {
   can_assign_orders: boolean;
   can_manage_inventory: boolean;
   can_generate_reports: boolean;
-  can_view_financials: boolean;
+  can_view_financials: boolean;      // Ver valores, aprovar, enviar orçamentos
 }
 
 // Permissões padrão para TÉCNICOS (restritivas)
@@ -30,6 +31,7 @@ const defaultPermissions: Permissions = {
   can_create_orders: true,         // Pode criar OS
   can_create_clients: false,       // NÃO pode criar clientes
   can_create_equipments: false,    // NÃO pode criar equipamentos
+  can_create_quotes: true,         // PODE criar orçamentos (coleta info no campo)
   can_edit_own_orders: true,       // Pode editar suas próprias OS
   can_edit_all_orders: false,      // NÃO pode editar OS de outros
   can_edit_clients: false,         // NÃO pode editar clientes
@@ -40,7 +42,7 @@ const defaultPermissions: Permissions = {
   can_assign_orders: false,        // NÃO pode atribuir OS
   can_manage_inventory: false,     // NÃO pode gerenciar estoque
   can_generate_reports: false,     // NÃO pode gerar relatórios
-  can_view_financials: false,      // NÃO pode ver financeiro
+  can_view_financials: false,      // NÃO pode ver valores/aprovar/enviar orçamentos
 };
 
 export function usePermissions() {

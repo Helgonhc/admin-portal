@@ -9,8 +9,12 @@ import toast from 'react-hot-toast';
 import { usePermissions } from '../../../hooks/usePermissions';
 
 export default function QuotesPage() {
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
   const { profile } = useAuthStore();
+  
+  // Técnico pode criar orçamentos mas NÃO pode ver valores
+  const canViewFinancials = can('can_view_financials');
+  const canCreateQuotes = can('can_create_quotes') || canViewFinancials;
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +156,7 @@ export default function QuotesPage() {
           <h1 className="text-2xl font-bold text-gray-800">Orçamentos</h1>
           <p className="text-gray-500">{quotes.length} orçamentos</p>
         </div>
-        {can('can_create_orders') && (
+        {canCreateQuotes && (
           <button onClick={() => setShowModal(true)} className="btn btn-primary">
             <Plus size={20} />
             Novo Orçamento
@@ -193,7 +197,7 @@ export default function QuotesPage() {
               <tr>
                 <th>Título</th>
                 <th>Cliente</th>
-                <th>Valor</th>
+                {canViewFinancials && <th>Valor</th>}
                 <th>Validade</th>
                 <th>Status</th>
                 <th>Data</th>
@@ -203,7 +207,7 @@ export default function QuotesPage() {
             <tbody>
               {filteredQuotes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">
+                  <td colSpan={canViewFinancials ? 7 : 6} className="text-center py-8 text-gray-500">
                     <Calculator className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                     Nenhum orçamento encontrado
                   </td>
@@ -213,9 +217,11 @@ export default function QuotesPage() {
                   <tr key={quote.id}>
                     <td className="font-medium">{quote.title}</td>
                     <td>{quote.clients?.name || '-'}</td>
-                    <td className="font-bold text-emerald-600">
-                      R$ {quote.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </td>
+                    {canViewFinancials && (
+                      <td className="font-bold text-emerald-600">
+                        R$ {quote.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </td>
+                    )}
                     <td>
                       {quote.valid_until 
                         ? new Date(quote.valid_until).toLocaleDateString('pt-BR')
@@ -302,7 +308,7 @@ export default function QuotesPage() {
               {/* Items */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="label mb-0">Itens</label>
+                  <label className="label mb-0">Itens / Serviços</label>
                   <button onClick={addItem} className="text-sm text-indigo-600 hover:underline">
                     + Adicionar item
                   </button>
@@ -315,7 +321,7 @@ export default function QuotesPage() {
                         value={item.description}
                         onChange={(e) => updateItem(index, 'description', e.target.value)}
                         className="input flex-1"
-                        placeholder="Descrição do item"
+                        placeholder="Descrição do item/serviço"
                       />
                       <input
                         type="number"
@@ -325,14 +331,17 @@ export default function QuotesPage() {
                         placeholder="Qtd"
                         min="1"
                       />
-                      <input
-                        type="number"
-                        value={item.unit_price}
-                        onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
-                        className="input w-28"
-                        placeholder="Valor"
-                        step="0.01"
-                      />
+                      {/* Valor unitário - SÓ ADMIN/FINANCEIRO PODE VER */}
+                      {canViewFinancials && (
+                        <input
+                          type="number"
+                          value={item.unit_price}
+                          onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
+                          className="input w-28"
+                          placeholder="Valor"
+                          step="0.01"
+                        />
+                      )}
                       {formData.items.length > 1 && (
                         <button
                           onClick={() => removeItem(index)}
@@ -346,13 +355,21 @@ export default function QuotesPage() {
                 </div>
               </div>
 
-              {/* Total */}
-              <div className="p-4 bg-emerald-50 rounded-lg flex justify-between items-center">
-                <span className="font-medium text-emerald-700">Total:</span>
-                <span className="text-2xl font-bold text-emerald-700">
-                  R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+              {/* Total - SÓ ADMIN/FINANCEIRO PODE VER */}
+              {canViewFinancials ? (
+                <div className="p-4 bg-emerald-50 rounded-lg flex justify-between items-center">
+                  <span className="font-medium text-emerald-700">Total:</span>
+                  <span className="text-2xl font-bold text-emerald-700">
+                    R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              ) : (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    💡 Os valores serão preenchidos pelo administrador após a coleta das informações.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
               <button onClick={() => setShowModal(false)} className="btn btn-secondary">

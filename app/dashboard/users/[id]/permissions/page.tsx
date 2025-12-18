@@ -15,6 +15,7 @@ interface Permissions {
   can_create_orders: boolean;
   can_create_clients: boolean;
   can_create_equipments: boolean;
+  can_create_quotes: boolean;        // NOVO: Criar orçamentos (sem ver valores)
   can_edit_own_orders: boolean;
   can_edit_all_orders: boolean;
   can_edit_clients: boolean;
@@ -25,7 +26,7 @@ interface Permissions {
   can_assign_orders: boolean;
   can_manage_inventory: boolean;
   can_generate_reports: boolean;
-  can_view_financials: boolean;
+  can_view_financials: boolean;      // Ver valores, aprovar, enviar orçamentos
 }
 
 // IMPORTANTE: Estes defaults DEVEM ser iguais aos do usePermissions.ts
@@ -38,6 +39,7 @@ const defaultPermissions: Permissions = {
   can_create_orders: true,         // Pode criar OS
   can_create_clients: false,       // NÃO pode criar clientes
   can_create_equipments: false,    // NÃO pode criar equipamentos
+  can_create_quotes: true,         // PODE criar orçamentos (coleta info no campo)
   can_edit_own_orders: true,       // Pode editar suas próprias OS
   can_edit_all_orders: false,      // NÃO pode editar OS de outros
   can_edit_clients: false,         // NÃO pode editar clientes
@@ -48,7 +50,7 @@ const defaultPermissions: Permissions = {
   can_assign_orders: false,        // NÃO pode atribuir OS
   can_manage_inventory: false,     // NÃO pode gerenciar estoque
   can_generate_reports: false,     // NÃO pode gerar relatórios
-  can_view_financials: false,      // NÃO pode ver financeiro
+  can_view_financials: false,      // NÃO pode ver valores/aprovar/enviar orçamentos
 };
 
 const templates = {
@@ -61,6 +63,7 @@ const templates = {
     can_create_orders: true,
     can_create_clients: false,
     can_create_equipments: false,
+    can_create_quotes: true,         // Pode criar orçamentos (coleta info)
     can_edit_own_orders: true,
     can_edit_all_orders: false,
     can_edit_clients: false,
@@ -82,6 +85,7 @@ const templates = {
     can_create_orders: true,
     can_create_clients: true,
     can_create_equipments: true,
+    can_create_quotes: true,         // Pode criar orçamentos
     can_edit_own_orders: true,
     can_edit_all_orders: true,
     can_edit_clients: true,
@@ -92,7 +96,7 @@ const templates = {
     can_assign_orders: true,
     can_manage_inventory: true,
     can_generate_reports: true,
-    can_view_financials: false,
+    can_view_financials: false,      // Ainda não pode ver valores
   },
   external: {
     // Técnico externo - só pode editar suas próprias OS
@@ -103,6 +107,7 @@ const templates = {
     can_create_orders: false,
     can_create_clients: false,
     can_create_equipments: false,
+    can_create_quotes: false,        // Não pode criar orçamentos
     can_edit_own_orders: true,
     can_edit_all_orders: false,
     can_edit_clients: false,
@@ -345,6 +350,12 @@ export default function UserPermissionsPage() {
           label="Criar Equipamentos"
           description="Pode cadastrar novos equipamentos"
           permKey="can_create_equipments"
+          icon={<Plus size={20} />}
+        />
+        <PermissionSwitch
+          label="Criar Orçamentos"
+          description="Pode criar orçamentos (coletar informações no campo, sem ver valores)"
+          permKey="can_create_quotes"
           icon={<Plus size={20} />}
         />
       </div>
