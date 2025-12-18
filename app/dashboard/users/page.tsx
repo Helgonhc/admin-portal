@@ -124,6 +124,11 @@ export default function UsersPage() {
       return;
     }
 
+    if (!editingUser && formData.password.length < 6) {
+      toast.error('Senha deve ter no mínimo 6 caracteres');
+      return;
+    }
+
     setSaving(true);
     try {
       if (editingUser) {
@@ -133,45 +138,95 @@ export default function UsersPage() {
           .update({
             full_name: formData.full_name,
             role: formData.role,
-            phone: formData.phone,
-            client_id: formData.role === 'client' ? formData.client_id : null,
-            cpf: formData.cpf,
-            cargo: formData.cargo,
+            phone: formData.phone || null,
+            cpf: formData.cpf || null,
+            cargo: formData.cargo || null,
           })
           .eq('id', editingUser.id);
         if (error) throw error;
         toast.success('Usuário atualizado!');
       } else {
-        // Criar novo usuário via Supabase Auth
+        // 1. Criar usuário no Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: formData.email,
+          email: formData.email.trim().toLowerCase(),
           password: formData.password,
           options: {
             data: {
-              full_name: formData.full_name,
+              full_name: formData.full_name.trim(),
               role: formData.role,
             },
           },
         });
 
-        if (authError) throw authError;
+        if (authError) {
+          if (authError.message.includes('already registered')) {
+            throw new Error('Este email já está cadastrado no sistema');
+          }
+          throw authError;
+        }
 
-        if (authData.user) {
-          // Atualizar perfil com dados adicionais
-          const { error: profileError } = await supabase
+        if (!authData.user) {
+          throw new Error('Falha ao criar usuário');
+        }
+
+        // 2. Aguardar trigger criar o perfil
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // 3. Verificar se o perfil foi criado pelo trigger
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (!existingProfile) {
+          // Se o trigger não funcionou, criar usando função SQL que bypassa RLS
+          const { error: rpcError } = await supabase.rpc('create_profile_for_user', {
+            user_id: authData.user.id,
+            user_email: formData.email.trim().toLowerCase(),
+            user_full_name: formData.full_name.trim(),
+            user_phone: formData.phone?.trim() || null,
+            user_role: formData.role,
+            user_is_active: true,
+          });
+
+          if (rpcError) {
+            console.error('Erro ao criar perfil via RPC:', rpcError);
+            // Tentar inserir diretamente
+            const { error: insertError } = await supabase
+              .from('profiles')
+              .insert({
+                id: authData.user.id,
+                email: formData.email.trim().toLowerCase(),
+                full_name: formData.full_name.trim(),
+                phone: formData.phone?.trim() || null,
+                role: formData.role,
+                is_active: true,
+                cpf: formData.cpf?.trim() || null,
+                cargo: formData.cargo?.trim() || null,
+              });
+            
+            if (insertError) {
+              console.error('Erro ao inserir perfil:', insertError);
+            }
+          }
+        } else {
+          // Se o perfil existe, apenas atualizar com dados adicionais
+          const { error: updateError } = await supabase
             .from('profiles')
             .update({
-              full_name: formData.full_name,
+              full_name: formData.full_name.trim(),
+              phone: formData.phone?.trim() || null,
+              cpf: formData.cpf?.trim() || null,
+              cargo: formData.cargo?.trim() || null,
               role: formData.role,
-              phone: formData.phone,
-              client_id: formData.role === 'client' ? formData.client_id : null,
-              cpf: formData.cpf,
-              cargo: formData.cargo,
               is_active: true,
             })
             .eq('id', authData.user.id);
 
-          if (profileError) console.error('Erro ao atualizar perfil:', profileError);
+          if (updateError) {
+            console.error('Erro ao atualizar perfil:', updateError);
+          }
         }
 
         // Mostrar modal com credenciais
