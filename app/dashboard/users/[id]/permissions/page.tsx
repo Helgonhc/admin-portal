@@ -28,32 +28,53 @@ interface Permissions {
   can_view_financials: boolean;
 }
 
+// IMPORTANTE: Estes defaults DEVEM ser iguais aos do usePermissions.ts
+// Técnicos começam com permissões RESTRITIVAS
 const defaultPermissions: Permissions = {
-  can_view_all_orders: false,
-  can_view_dashboard: true,
-  can_view_reports: false,
-  can_view_all_clients: true,
-  can_create_orders: true,
-  can_create_clients: false,
-  can_create_equipments: true,
-  can_edit_own_orders: true,
-  can_edit_all_orders: false,
-  can_edit_clients: false,
-  can_edit_equipments: true,
-  can_delete_own_orders: false,
-  can_delete_all_orders: false,
-  can_delete_clients: false,
-  can_assign_orders: false,
-  can_manage_inventory: false,
-  can_generate_reports: true,
-  can_view_financials: false,
+  can_view_all_orders: false,      // Técnico só vê suas próprias OS
+  can_view_dashboard: true,        // Pode ver dashboard básico
+  can_view_reports: false,         // NÃO pode ver relatórios
+  can_view_all_clients: false,     // NÃO pode ver todos os clientes
+  can_create_orders: true,         // Pode criar OS
+  can_create_clients: false,       // NÃO pode criar clientes
+  can_create_equipments: false,    // NÃO pode criar equipamentos
+  can_edit_own_orders: true,       // Pode editar suas próprias OS
+  can_edit_all_orders: false,      // NÃO pode editar OS de outros
+  can_edit_clients: false,         // NÃO pode editar clientes
+  can_edit_equipments: false,      // NÃO pode editar equipamentos
+  can_delete_own_orders: false,    // NÃO pode deletar OS
+  can_delete_all_orders: false,    // NÃO pode deletar OS de outros
+  can_delete_clients: false,       // NÃO pode deletar clientes
+  can_assign_orders: false,        // NÃO pode atribuir OS
+  can_manage_inventory: false,     // NÃO pode gerenciar estoque
+  can_generate_reports: false,     // NÃO pode gerar relatórios
+  can_view_financials: false,      // NÃO pode ver financeiro
 };
 
 const templates = {
   junior: {
-    ...defaultPermissions,
+    // Técnico júnior - permissões mínimas
+    can_view_all_orders: false,
+    can_view_dashboard: true,
+    can_view_reports: false,
+    can_view_all_clients: false,
+    can_create_orders: true,
+    can_create_clients: false,
+    can_create_equipments: false,
+    can_edit_own_orders: true,
+    can_edit_all_orders: false,
+    can_edit_clients: false,
+    can_edit_equipments: false,
+    can_delete_own_orders: false,
+    can_delete_all_orders: false,
+    can_delete_clients: false,
+    can_assign_orders: false,
+    can_manage_inventory: false,
+    can_generate_reports: false,
+    can_view_financials: false,
   },
   senior: {
+    // Técnico sênior - mais permissões
     can_view_all_orders: true,
     can_view_dashboard: true,
     can_view_reports: true,
@@ -74,6 +95,7 @@ const templates = {
     can_view_financials: false,
   },
   external: {
+    // Técnico externo - só pode editar suas próprias OS
     can_view_all_orders: false,
     can_view_dashboard: false,
     can_view_reports: false,
