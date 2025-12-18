@@ -98,72 +98,88 @@ export default function Sidebar() {
 
   const SidebarContent = () => (
     <>
-      {/* Logo e Nome da Empresa - Área de Destaque */}
+      {/* Header do Sidebar */}
       <div className={`${collapsed ? 'p-2' : 'p-4'} bg-gradient-to-br from-indigo-50 via-white to-purple-50 border-b border-indigo-100`}>
         {collapsed ? (
-          // Versão colapsada - só logo
+          // Versão colapsada - só avatar do usuário
           <div className="flex justify-center">
-            {appConfig?.logo_url ? (
+            {profile?.avatar_url ? (
               <img 
-                src={appConfig.logo_url} 
-                alt={appConfig.company_name || 'Logo'} 
-                className="w-10 h-10 rounded-xl object-contain bg-white shadow-sm border border-gray-200"
+                src={profile.avatar_url} 
+                alt={profile.full_name || 'Avatar'} 
+                className="w-10 h-10 rounded-full object-cover border-2 border-indigo-300 shadow-sm"
               />
             ) : (
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
-                <span className="text-white text-xl">🔧</span>
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-md">
+                <span className="text-white text-sm font-bold">
+                  {profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
               </div>
             )}
           </div>
         ) : (
-          // Versão expandida - logo grande + info da empresa
+          // Versão expandida
           <div className="text-center">
-            {/* Logo Grande */}
-            <div className="flex justify-center mb-3">
-              {appConfig?.logo_url ? (
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-2xl blur-md opacity-30"></div>
-                  <img 
-                    src={appConfig.logo_url} 
-                    alt={appConfig.company_name || 'Logo'} 
-                    className="relative w-20 h-20 rounded-2xl object-contain bg-white shadow-lg border-2 border-white"
-                  />
-                </div>
-              ) : (
-                <div className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <span className="text-white text-4xl">🔧</span>
-                </div>
-              )}
-            </div>
-            
-            {/* Nome da Empresa */}
-            <h1 className="font-bold text-gray-800 text-lg leading-tight mb-1">
-              {appConfig?.company_name || 'Portal Admin'}
-            </h1>
-            
-            {/* Info de contato da empresa (discreto) */}
-            {(appConfig?.phone || appConfig?.email) && (
-              <div className="text-xs text-gray-500 space-y-0.5 mb-2">
-                {appConfig?.phone && (
-                  <p className="flex items-center justify-center gap-1">
-                    <span>📞</span> {appConfig.phone}
-                  </p>
-                )}
+            {/* Logo da Empresa (pequena) */}
+            {appConfig?.logo_url && (
+              <div className="flex justify-center mb-2">
+                <img 
+                  src={appConfig.logo_url} 
+                  alt={appConfig.company_name || 'Logo'} 
+                  className="h-10 object-contain"
+                />
               </div>
             )}
             
-            {/* Separador elegante */}
-            <div className="flex items-center gap-2 mt-3">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent"></div>
-            </div>
+            {/* Nome da Empresa */}
+            <h1 className="font-bold text-gray-800 text-sm leading-tight mb-1">
+              {appConfig?.company_name || 'Portal Admin'}
+            </h1>
             
-            {/* Usuário logado */}
-            <div className="mt-2 flex items-center justify-center gap-2">
-              <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center">
-                <span className="text-xs">👤</span>
+            {/* Telefone da empresa */}
+            {appConfig?.phone && (
+              <p className="text-xs text-gray-500 mb-2">📞 {appConfig.phone}</p>
+            )}
+            
+            {/* Separador */}
+            <div className="h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent my-3"></div>
+            
+            {/* Avatar e Info do Usuário Logado */}
+            <div className="flex flex-col items-center">
+              {/* Avatar Grande */}
+              <div className="relative mb-2">
+                {profile?.avatar_url ? (
+                  <img 
+                    src={profile.avatar_url} 
+                    alt={profile.full_name || 'Avatar'} 
+                    className="w-16 h-16 rounded-full object-cover border-3 border-indigo-300 shadow-lg"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                    <span className="text-white text-2xl font-bold">
+                      {profile?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                )}
+                {/* Badge de status online */}
+                <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
               </div>
-              <span className="text-xs text-gray-600 font-medium truncate max-w-[140px]">
-                {profile?.full_name}
+              
+              {/* Nome do Usuário */}
+              <p className="font-semibold text-gray-800 text-sm truncate max-w-[180px]">
+                {profile?.full_name || 'Usuário'}
+              </p>
+              
+              {/* Cargo/Role */}
+              <span className={`text-xs px-2 py-0.5 rounded-full mt-1 ${
+                profile?.role === 'super_admin' 
+                  ? 'bg-purple-100 text-purple-700' 
+                  : profile?.role === 'admin' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : 'bg-green-100 text-green-700'
+              }`}>
+                {profile?.role === 'super_admin' ? '⭐ Super Admin' : 
+                 profile?.role === 'admin' ? '👑 Administrador' : '🔧 Técnico'}
               </span>
             </div>
           </div>
