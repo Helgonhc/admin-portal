@@ -60,6 +60,8 @@ const adminItems = [
 interface AppConfig {
   company_name: string;
   logo_url: string;
+  phone: string;
+  email: string;
 }
 
 export default function Sidebar() {
@@ -75,11 +77,9 @@ export default function Sidebar() {
     async function loadAppConfig() {
       const { data, error } = await supabase
         .from('app_config')
-        .select('company_name, logo_url')
+        .select('company_name, logo_url, phone, email')
         .limit(1)
         .single();
-      
-      console.log('📦 Sidebar Config:', data, error);
       
       if (data) {
         setAppConfig(data);
@@ -95,29 +95,76 @@ export default function Sidebar() {
 
   const SidebarContent = () => (
     <>
-      {/* Logo e Nome da Empresa */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          {appConfig?.logo_url ? (
-            <img 
-              src={appConfig.logo_url} 
-              alt={appConfig.company_name || 'Logo'} 
-              className="w-10 h-10 rounded-xl object-contain bg-white"
-            />
-          ) : (
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-xl">🔧</span>
+      {/* Logo e Nome da Empresa - Área de Destaque */}
+      <div className={`${collapsed ? 'p-2' : 'p-4'} bg-gradient-to-br from-indigo-50 via-white to-purple-50 border-b border-indigo-100`}>
+        {collapsed ? (
+          // Versão colapsada - só logo
+          <div className="flex justify-center">
+            {appConfig?.logo_url ? (
+              <img 
+                src={appConfig.logo_url} 
+                alt={appConfig.company_name || 'Logo'} 
+                className="w-10 h-10 rounded-xl object-contain bg-white shadow-sm border border-gray-200"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-md">
+                <span className="text-white text-xl">🔧</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          // Versão expandida - logo grande + info da empresa
+          <div className="text-center">
+            {/* Logo Grande */}
+            <div className="flex justify-center mb-3">
+              {appConfig?.logo_url ? (
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-2xl blur-md opacity-30"></div>
+                  <img 
+                    src={appConfig.logo_url} 
+                    alt={appConfig.company_name || 'Logo'} 
+                    className="relative w-20 h-20 rounded-2xl object-contain bg-white shadow-lg border-2 border-white"
+                  />
+                </div>
+              ) : (
+                <div className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <span className="text-white text-4xl">🔧</span>
+                </div>
+              )}
             </div>
-          )}
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <h1 className="font-bold text-gray-800 truncate">
-                {appConfig?.company_name || 'Portal Admin'}
-              </h1>
-              <p className="text-xs text-gray-500 truncate">{profile?.full_name}</p>
+            
+            {/* Nome da Empresa */}
+            <h1 className="font-bold text-gray-800 text-lg leading-tight mb-1">
+              {appConfig?.company_name || 'Portal Admin'}
+            </h1>
+            
+            {/* Info de contato da empresa (discreto) */}
+            {(appConfig?.phone || appConfig?.email) && (
+              <div className="text-xs text-gray-500 space-y-0.5 mb-2">
+                {appConfig?.phone && (
+                  <p className="flex items-center justify-center gap-1">
+                    <span>📞</span> {appConfig.phone}
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {/* Separador elegante */}
+            <div className="flex items-center gap-2 mt-3">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent"></div>
             </div>
-          )}
-        </div>
+            
+            {/* Usuário logado */}
+            <div className="mt-2 flex items-center justify-center gap-2">
+              <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span className="text-xs">👤</span>
+              </div>
+              <span className="text-xs text-gray-600 font-medium truncate max-w-[140px]">
+                {profile?.full_name}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Menu */}
