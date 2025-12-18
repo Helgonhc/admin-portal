@@ -654,40 +654,42 @@ export default function ClientsPage() {
                 </Link>
               </div>
 
-              {/* Botões de Portal - Grid responsivo */}
-              <div className="space-y-1.5 sm:space-y-2">
-                {/* Botão Liberar Portal */}
-                <button 
-                  onClick={() => handleOpenPortalModal(client)}
-                  className="w-full py-1.5 sm:py-2 px-2 sm:px-3 border-2 border-orange-400 text-orange-600 hover:bg-orange-50 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium"
-                >
-                  <Globe size={12} className="sm:w-4 sm:h-4" />
-                  <span className="truncate">Liberar Portal</span>
-                  <Lock size={10} className="sm:w-3.5 sm:h-3.5" />
-                </button>
+              {/* Botões de Portal - SÓ ADMIN PODE VER */}
+              {isAdmin && (
+                <div className="space-y-1.5 sm:space-y-2">
+                  {/* Botão Liberar Portal */}
+                  <button 
+                    onClick={() => handleOpenPortalModal(client)}
+                    className="w-full py-1.5 sm:py-2 px-2 sm:px-3 border-2 border-orange-400 text-orange-600 hover:bg-orange-50 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium"
+                  >
+                    <Globe size={12} className="sm:w-4 sm:h-4" />
+                    <span className="truncate">Liberar Portal</span>
+                    <Lock size={10} className="sm:w-3.5 sm:h-3.5" />
+                  </button>
 
-                {/* Botão Gerenciar Usuários */}
-                <Link 
-                  href={`/dashboard/clients/${client.id}/users`}
-                  className="w-full py-1.5 sm:py-2 px-2 sm:px-3 border-2 border-purple-400 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium"
-                >
-                  <Users size={12} className="sm:w-4 sm:h-4" />
-                  <span>👥 Gerenciar Usuários</span>
-                </Link>
+                  {/* Botão Gerenciar Usuários */}
+                  <Link 
+                    href={`/dashboard/clients/${client.id}/users`}
+                    className="w-full py-1.5 sm:py-2 px-2 sm:px-3 border-2 border-purple-400 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium"
+                  >
+                    <Users size={12} className="sm:w-4 sm:h-4" />
+                    <span>👥 Gerenciar Usuários</span>
+                  </Link>
 
-                {/* Botão Bloquear/Desbloquear Portal */}
-                <button 
-                  onClick={() => handleTogglePortalBlock(client)}
-                  className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium ${
-                    client.portal_blocked 
-                      ? 'bg-red-600 text-white hover:bg-red-700' 
-                      : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
-                  }`}
-                >
-                  {client.portal_blocked ? <Unlock size={12} className="sm:w-4 sm:h-4" /> : <Lock size={12} className="sm:w-4 sm:h-4" />}
-                  {client.portal_blocked ? '🔓 Desbloquear' : '🔒 Bloquear Portal'}
-                </button>
-              </div>
+                  {/* Botão Bloquear/Desbloquear Portal */}
+                  <button 
+                    onClick={() => handleTogglePortalBlock(client)}
+                    className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium ${
+                      client.portal_blocked 
+                        ? 'bg-red-600 text-white hover:bg-red-700' 
+                        : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
+                    }`}
+                  >
+                    {client.portal_blocked ? <Unlock size={12} className="sm:w-4 sm:h-4" /> : <Lock size={12} className="sm:w-4 sm:h-4" />}
+                    {client.portal_blocked ? '🔓 Desbloquear' : '🔒 Bloquear Portal'}
+                  </button>
+                </div>
+              )}
 
               {/* Indicador de Bloqueio */}
               {client.portal_blocked && (

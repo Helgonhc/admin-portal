@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../../../lib/supabase';
+import { usePermissions } from '../../../../../hooks/usePermissions';
 import { 
-  ArrowLeft, UserPlus, Trash2, Power, User, Mail, Loader2, Users
+  ArrowLeft, UserPlus, Trash2, Power, User, Mail, Loader2, Users, Shield
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -20,6 +21,7 @@ interface ClientUser {
 export default function ManageClientUsersPage() {
   const params = useParams();
   const router = useRouter();
+  const { isAdmin } = usePermissions();
   const [client, setClient] = useState<any>(null);
   const [users, setUsers] = useState<ClientUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,6 +233,23 @@ export default function ManageClientUsersPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  // Só admin pode acessar esta página
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <Shield className="w-16 h-16 text-red-300 mb-4" />
+        <h2 className="text-xl font-bold text-gray-600">Acesso Restrito</h2>
+        <p className="text-gray-500 mt-2">Apenas administradores podem gerenciar usuários do portal.</p>
+        <button 
+          onClick={() => router.back()}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Voltar
+        </button>
       </div>
     );
   }
