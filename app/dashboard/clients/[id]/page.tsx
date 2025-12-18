@@ -222,22 +222,31 @@ export default function ClientDetailsPage() {
       if (authError) throw new Error(authError.message);
       if (!authData.user) throw new Error('Usuário não foi criado');
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      await supabase.from('profiles').update({
+      // CRIAR profile diretamente (UPSERT)
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id: authData.user.id,
         email: portalEmail,
         full_name: client?.responsible_name || client?.name,
         role: 'client',
         client_id: params.id,
-        phone: client?.phone || null
-      }).eq('id', authData.user.id);
+        phone: client?.phone || null,
+        is_active: true,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'id' });
 
-      if (client?.email !== portalEmail) {
-        await supabase.from('clients').update({ email: portalEmail }).eq('id', params.id);
-      }
+      if (profileError) throw new Error('Erro ao criar perfil: ' + profileError.message);
+
+      // Atualizar cliente com portal liberado
+      await supabase.from('clients').update({ 
+        email: portalEmail,
+        portal_enabled: true,
+        portal_blocked: false
+      }).eq('id', params.id);
 
       setPortalModalVisible(false);
-      toast.success(`Portal Habilitado!\n\nEmail: ${portalEmail}\nSenha: ${portalPassword}`);
+      toast.success(`✅ Portal Habilitado!\n\nEmail: ${portalEmail}\nSenha: ${portalPassword}`);
       loadClient();
     } catch (error: any) {
       toast.error(`Erro: ${error.message}`);

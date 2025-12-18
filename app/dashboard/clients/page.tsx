@@ -416,36 +416,40 @@ export default function ClientsPage() {
       if (authError) throw new Error(authError.message);
       if (!authData.user) throw new Error('Usuário não foi criado');
 
-      // 2. Aguardar trigger criar profile
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 2. Aguardar um pouco para o auth processar
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // 3. Atualizar profile com dados corretos
+      // 3. CRIAR profile diretamente (UPSERT - cria ou atualiza)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: authData.user.id,
           email: portalEmail,
           full_name: selectedClient.responsible_name || selectedClient.name,
           role: 'client',
           client_id: selectedClient.id,
-          phone: selectedClient.phone || null
-        })
-        .eq('id', authData.user.id);
+          phone: selectedClient.phone || null,
+          is_active: true,
+          created_at: new Date().toISOString()
+        }, { onConflict: 'id' });
 
       if (profileError) {
-        console.error('Erro ao atualizar profile:', profileError);
-        throw new Error(profileError.message);
+        console.error('Erro ao criar profile:', profileError);
+        throw new Error('Erro ao criar perfil: ' + profileError.message);
       }
 
-      // 4. Atualizar email do cliente se necessário
-      if (selectedClient.email !== portalEmail) {
-        await supabase
-          .from('clients')
-          .update({ email: portalEmail })
-          .eq('id', selectedClient.id);
-      }
+      // 4. Atualizar cliente com portal liberado
+      await supabase
+        .from('clients')
+        .update({ 
+          email: portalEmail,
+          portal_enabled: true,
+          portal_blocked: false
+        })
+        .eq('id', selectedClient.id);
 
       setPortalModalVisible(false);
-      toast.success(`Portal Habilitado!\n\nEmail: ${portalEmail}\nSenha: ${portalPassword}\n\nInforme estas credenciais ao cliente.`);
+      toast.success(`✅ Portal Habilitado!\n\nEmail: ${portalEmail}\nSenha: ${portalPassword}\n\nInforme estas credenciais ao cliente.`);
       loadClients();
     } catch (error: any) {
       console.error('Erro ao criar acesso ao portal:', error);
