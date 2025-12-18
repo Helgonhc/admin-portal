@@ -6,8 +6,8 @@ import { useAuthStore } from '../../store/authStore';
 import Sidebar from '../../components/Sidebar';
 import { Shield } from 'lucide-react';
 
-// Páginas que só admin pode acessar
-const adminOnlyPages = ['/dashboard/users', '/dashboard/settings'];
+// Páginas que só admin pode acessar (settings NÃO está aqui - todos podem editar seu perfil)
+const adminOnlyPages = ['/dashboard/users'];
 
 // Páginas que requerem permissões específicas
 // Pode ser string (uma permissão) ou array (qualquer uma das permissões)
