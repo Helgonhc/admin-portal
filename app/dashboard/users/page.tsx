@@ -4,8 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase, Profile } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/authStore';
-import { Plus, Search, Edit, Trash2, Loader2, UserCog, Shield, User } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, UserCog, Shield, User, Copy, Check, Smartphone, Globe, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// URLs dos portais
+const ADMIN_PORTAL_URL = 'https://chameiapp-admin.vercel.app';
+const CLIENT_PORTAL_URL = 'https://chameiapp-portal.vercel.app';
+const APK_DOWNLOAD_URL = 'https://expo.dev/accounts/helgon/projects/chameiapp/builds';
 
 export default function UsersPage() {
   const router = useRouter();
@@ -28,8 +33,19 @@ export default function UsersPage() {
     cargo: '',
   });
   const [saving, setSaving] = useState(false);
+  
+  // Modal de credenciais após criar usuário
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    email: string;
+    password: string;
+    name: string;
+    role: string;
+  } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   useEffect(() => {
     if (isAdmin) {
@@ -155,7 +171,14 @@ export default function UsersPage() {
           if (profileError) console.error('Erro ao atualizar perfil:', profileError);
         }
 
-        toast.success(`✅ Usuário criado!\n\n📧 ${formData.email}\n🔑 ${formData.password}`);
+        // Mostrar modal com credenciais
+        setCreatedCredentials({
+          email: formData.email,
+          password: formData.password,
+          name: formData.full_name,
+          role: formData.role,
+        });
+        setShowCredentialsModal(true);
       }
       setShowModal(false);
       loadData();
@@ -190,6 +213,7 @@ export default function UsersPage() {
 
   const getRoleIcon = (role: string) => {
     switch (role) {
+      case 'super_admin': return <Star className="w-4 h-4 text-yellow-600" />;
       case 'admin': return <Shield className="w-4 h-4 text-indigo-600" />;
       case 'technician': return <UserCog className="w-4 h-4 text-blue-600" />;
       case 'client': return <User className="w-4 h-4 text-gray-600" />;
@@ -199,15 +223,29 @@ export default function UsersPage() {
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
+      super_admin: 'Super Admin',
       admin: 'Administrador',
       technician: 'Técnico',
       client: 'Cliente',
     };
     return labels[role] || role;
   };
+  
+  // Função para copiar texto
+  async function copyToClipboard(text: string, field: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      toast.success('Copiado!');
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (err) {
+      toast.error('Erro ao copiar');
+    }
+  }
 
   const getRoleColor = (role: string) => {
     switch (role) {
+      case 'super_admin': return 'bg-yellow-100 text-yellow-700';
       case 'admin': return 'bg-indigo-100 text-indigo-700';
       case 'technician': return 'bg-blue-100 text-blue-700';
       case 'client': return 'bg-gray-100 text-gray-700';
@@ -408,7 +446,8 @@ export default function UsersPage() {
                     onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                     className="input"
                   >
-                    <option value="admin">👑 Administrador</option>
+                    {isSuperAdmin && <option value="admin">👑 Administrador</option>}
+                    {!isSuperAdmin && currentUser?.role === 'admin' && <option value="admin">👑 Administrador</option>}
                     <option value="technician">🔧 Técnico</option>
                     <option value="client">👤 Cliente</option>
                   </select>
@@ -469,6 +508,147 @@ export default function UsersPage() {
               <button onClick={handleSave} disabled={saving} className="btn btn-primary">
                 {saving ? <Loader2 className="animate-spin" size={20} /> : null}
                 {editingUser ? 'Salvar' : 'Criar Usuário'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Credenciais Criadas */}
+      {showCredentialsModal && createdCredentials && (
+        <div className="modal-overlay" onClick={() => setShowCredentialsModal(false)}>
+          <div className="modal-content max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b bg-green-50">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                  <Check className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">✅ Usuário Criado!</h2>
+                  <p className="text-sm text-gray-600">{createdCredentials.name}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {/* Credenciais */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                  🔐 Credenciais de Acesso
+                </h3>
+                
+                {/* Email */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-white border rounded-lg px-3 py-2">
+                    <p className="text-xs text-gray-500">Email</p>
+                    <p className="font-mono text-sm">{createdCredentials.email}</p>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(createdCredentials.email, 'email')}
+                    className="p-2 bg-indigo-100 hover:bg-indigo-200 rounded-lg text-indigo-600"
+                  >
+                    {copiedField === 'email' ? <Check size={18} /> : <Copy size={18} />}
+                  </button>
+                </div>
+                
+                {/* Senha */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-white border rounded-lg px-3 py-2">
+                    <p className="text-xs text-gray-500">Senha</p>
+                    <p className="font-mono text-sm">{createdCredentials.password}</p>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(createdCredentials.password, 'password')}
+                    className="p-2 bg-indigo-100 hover:bg-indigo-200 rounded-lg text-indigo-600"
+                  >
+                    {copiedField === 'password' ? <Check size={18} /> : <Copy size={18} />}
+                  </button>
+                </div>
+                
+                {/* Copiar Tudo */}
+                <button
+                  onClick={() => copyToClipboard(
+                    `📧 Email: ${createdCredentials.email}\n🔑 Senha: ${createdCredentials.password}`,
+                    'all'
+                  )}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+                >
+                  {copiedField === 'all' ? <Check size={16} /> : <Copy size={16} />}
+                  Copiar Credenciais
+                </button>
+              </div>
+
+              {/* Onde Acessar */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-gray-700">📍 Onde Acessar</h3>
+                
+                {createdCredentials.role === 'client' ? (
+                  // Cliente - Portal do Cliente
+                  <a
+                    href={CLIENT_PORTAL_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors"
+                  >
+                    <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                      <Globe className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">Portal do Cliente</p>
+                      <p className="text-xs text-gray-500">{CLIENT_PORTAL_URL}</p>
+                    </div>
+                  </a>
+                ) : (
+                  // Admin/Técnico - Portal Admin + APK
+                  <>
+                    <a
+                      href={ADMIN_PORTAL_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors"
+                    >
+                      <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                        <Globe className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-800">Portal Administrativo (Web)</p>
+                        <p className="text-xs text-gray-500">{ADMIN_PORTAL_URL}</p>
+                      </div>
+                    </a>
+                    
+                    <a
+                      href={APK_DOWNLOAD_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 transition-colors"
+                    >
+                      <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                        <Smartphone className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-800">Aplicativo Android (APK)</p>
+                        <p className="text-xs text-gray-500">Baixar última versão do app</p>
+                      </div>
+                    </a>
+                  </>
+                )}
+              </div>
+
+              {/* Aviso */}
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-xs text-yellow-800">
+                  ⚠️ <strong>Importante:</strong> Envie estas credenciais para o usuário de forma segura. 
+                  {createdCredentials.role !== 'client' && ' O técnico pode usar tanto o portal web quanto o aplicativo Android.'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t bg-gray-50">
+              <button
+                onClick={() => setShowCredentialsModal(false)}
+                className="w-full py-2 bg-gray-800 hover:bg-gray-900 text-white rounded-lg font-medium"
+              >
+                Fechar
               </button>
             </div>
           </div>
