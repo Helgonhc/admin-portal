@@ -253,19 +253,42 @@ export default function UsersPage() {
       return;
     }
 
-    if (!confirm(`Excluir usuário "${user.full_name}"?`)) return;
+    // Não permitir excluir super_admin
+    if (user.role === 'super_admin' && currentUser?.role !== 'super_admin') {
+      toast.error('Apenas Super Admin pode excluir outro Super Admin');
+      return;
+    }
+
+    const confirmMessage = `⚠️ EXCLUIR USUÁRIO PERMANENTEMENTE\n\n` +
+      `Tem certeza que deseja excluir "${user.full_name}"?\n\n` +
+      `Esta ação irá:\n` +
+      `• Excluir o usuário do sistema\n` +
+      `• Remover acesso ao aplicativo e portal\n` +
+      `• Esta ação é IRREVERSÍVEL!\n\n` +
+      `As OS criadas por este usuário serão mantidas.`;
+
+    if (!confirm(confirmMessage)) return;
 
     try {
-      // Desativar usuário (não deletar completamente)
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_active: false })
-        .eq('id', user.id);
-      if (error) throw error;
-      toast.success('Usuário desativado!');
+      // Usar função SQL que deleta completamente (profile + auth.users)
+      const { data, error } = await supabase.rpc('delete_user_completely', {
+        user_uuid: user.id
+      });
+
+      if (error) {
+        console.error('Erro ao chamar função:', error);
+        throw error;
+      }
+
+      if (data && !data.success) {
+        throw new Error(data.message || 'Erro ao excluir usuário');
+      }
+
+      toast.success('✅ Usuário excluído permanentemente!');
       loadData();
     } catch (error: any) {
-      toast.error(error.message);
+      console.error('Erro ao excluir:', error);
+      toast.error(`Erro ao excluir: ${error.message}`);
     }
   }
 
