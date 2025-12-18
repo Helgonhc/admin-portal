@@ -6,6 +6,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { Plus, Search, Eye, Edit, Trash2, Loader2, FileText, Calendar, AlertTriangle, Check } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 interface Contract {
   id: string;
@@ -23,6 +24,7 @@ interface Contract {
 }
 
 export default function MaintenancePage() {
+  const { can } = usePermissions();
   const { profile } = useAuthStore();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -214,10 +216,12 @@ export default function MaintenancePage() {
           <h1 className="text-2xl font-bold text-gray-800">Contratos de Manutenção</h1>
           <p className="text-gray-500">{contracts.length} contratos</p>
         </div>
-        <button onClick={() => openModal()} className="btn btn-primary">
-          <Plus size={20} />
-          Novo Contrato
-        </button>
+        {can('can_create_orders') && (
+          <button onClick={() => openModal()} className="btn btn-primary">
+            <Plus size={20} />
+            Novo Contrato
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -335,18 +339,22 @@ export default function MaintenancePage() {
                       </td>
                       <td>
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openModal(contract)}
-                            className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
-                          >
-                            <Edit size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(contract)}
-                            className="p-2 hover:bg-red-50 rounded-lg text-red-600"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                          {can('can_edit_all_orders') && (
+                            <button
+                              onClick={() => openModal(contract)}
+                              className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
+                            >
+                              <Edit size={18} />
+                            </button>
+                          )}
+                          {can('can_delete_all_orders') && (
+                            <button
+                              onClick={() => handleDelete(contract)}
+                              className="p-2 hover:bg-red-50 rounded-lg text-red-600"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

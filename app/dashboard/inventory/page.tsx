@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Plus, Search, Edit, Trash2, Loader2, Package, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 interface Product {
   id: string;
@@ -19,6 +20,7 @@ interface Product {
 }
 
 export default function InventoryPage() {
+  const { can } = usePermissions();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -267,10 +269,12 @@ export default function InventoryPage() {
           <h1 className="text-2xl font-bold text-gray-800">Estoque</h1>
           <p className="text-gray-500">{products.length} produtos</p>
         </div>
-        <button onClick={() => openModal()} className="btn btn-primary">
-          <Plus size={20} />
-          Novo Produto
-        </button>
+        {can('can_manage_inventory') && (
+          <button onClick={() => openModal()} className="btn btn-primary">
+            <Plus size={20} />
+            Novo Produto
+          </button>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -359,32 +363,36 @@ export default function InventoryPage() {
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => openMovementModal(product)}
-                          className="p-2 hover:bg-emerald-50 rounded-lg text-emerald-600"
-                          title="Entrada"
-                        >
-                          <ArrowUp size={18} />
-                        </button>
-                        <button
-                          onClick={() => { setSelectedProduct(product); setMovementData({ ...movementData, type: 'out' }); setShowMovementModal(true); }}
-                          className="p-2 hover:bg-amber-50 rounded-lg text-amber-600"
-                          title="Saída"
-                        >
-                          <ArrowDown size={18} />
-                        </button>
-                        <button
-                          onClick={() => openModal(product)}
-                          className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(product)}
-                          className="p-2 hover:bg-red-50 rounded-lg text-red-600"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {can('can_manage_inventory') && (
+                          <>
+                            <button
+                              onClick={() => openMovementModal(product)}
+                              className="p-2 hover:bg-emerald-50 rounded-lg text-emerald-600"
+                              title="Entrada"
+                            >
+                              <ArrowUp size={18} />
+                            </button>
+                            <button
+                              onClick={() => { setSelectedProduct(product); setMovementData({ ...movementData, type: 'out' }); setShowMovementModal(true); }}
+                              className="p-2 hover:bg-amber-50 rounded-lg text-amber-600"
+                              title="Saída"
+                            >
+                              <ArrowDown size={18} />
+                            </button>
+                            <button
+                              onClick={() => openModal(product)}
+                              className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"
+                            >
+                              <Edit size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(product)}
+                              className="p-2 hover:bg-red-50 rounded-lg text-red-600"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

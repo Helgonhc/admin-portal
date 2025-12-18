@@ -5,8 +5,10 @@ import { supabase, Equipment } from '../../../lib/supabase';
 import { Plus, Search, Edit, Trash2, Eye, Loader2, Wrench, QrCode } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 export default function EquipmentsPage() {
+  const { can } = usePermissions();
   const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,10 +156,12 @@ export default function EquipmentsPage() {
           <h1 className="text-2xl font-bold text-gray-800">Equipamentos</h1>
           <p className="text-gray-500">{equipments.length} equipamentos cadastrados</p>
         </div>
-        <button onClick={() => openModal()} className="btn btn-primary">
-          <Plus size={20} />
-          Novo Equipamento
-        </button>
+        {can('can_create_equipments') && (
+          <button onClick={() => openModal()} className="btn btn-primary">
+            <Plus size={20} />
+            Novo Equipamento
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -194,18 +198,22 @@ export default function EquipmentsPage() {
                   >
                     <QrCode size={16} />
                   </Link>
-                  <button
-                    onClick={() => openModal(equipment)}
-                    className="p-1.5 hover:bg-gray-100 rounded text-gray-500"
-                  >
-                    <Edit size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(equipment)}
-                    className="p-1.5 hover:bg-red-50 rounded text-red-500"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {can('can_edit_equipments') && (
+                    <button
+                      onClick={() => openModal(equipment)}
+                      className="p-1.5 hover:bg-gray-100 rounded text-gray-500"
+                    >
+                      <Edit size={16} />
+                    </button>
+                  )}
+                  {can('can_delete_clients') && (
+                    <button
+                      onClick={() => handleDelete(equipment)}
+                      className="p-1.5 hover:bg-red-50 rounded text-red-500"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
               <h3 className="font-semibold text-gray-800 mb-1">{equipment.name}</h3>

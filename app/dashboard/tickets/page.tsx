@@ -6,8 +6,10 @@ import { useAuthStore } from '../../../store/authStore';
 import { Plus, Search, Eye, Loader2, Ticket as TicketIcon, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 export default function TicketsPage() {
+  const { can } = usePermissions();
   const { profile } = useAuthStore();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -178,10 +180,12 @@ export default function TicketsPage() {
           <h1 className="text-2xl font-bold text-gray-800">Chamados</h1>
           <p className="text-gray-500">{tickets.length} chamados</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary">
-          <Plus size={20} />
-          Novo Chamado
-        </button>
+        {can('can_create_orders') && (
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            <Plus size={20} />
+            Novo Chamado
+          </button>
+        )}
       </div>
 
       {/* Filters */}

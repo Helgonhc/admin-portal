@@ -6,8 +6,10 @@ import { useAuthStore } from '../../../store/authStore';
 import { Plus, Search, Eye, Loader2, Calculator, Send, Check, X } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 export default function QuotesPage() {
+  const { can } = usePermissions();
   const { profile } = useAuthStore();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -150,10 +152,12 @@ export default function QuotesPage() {
           <h1 className="text-2xl font-bold text-gray-800">Orçamentos</h1>
           <p className="text-gray-500">{quotes.length} orçamentos</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary">
-          <Plus size={20} />
-          Novo Orçamento
-        </button>
+        {can('can_create_orders') && (
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            <Plus size={20} />
+            Novo Orçamento
+          </button>
+        )}
       </div>
 
       {/* Filters */}

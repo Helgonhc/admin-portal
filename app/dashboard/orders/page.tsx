@@ -6,8 +6,10 @@ import { useAuthStore } from '../../../store/authStore';
 import { Plus, Search, Filter, Eye, Loader2, ClipboardList, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 export default function OrdersPage() {
+  const { can } = usePermissions();
   const { profile } = useAuthStore();
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -227,10 +229,12 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold text-gray-800">Ordens de Serviço</h1>
           <p className="text-gray-500">{orders.length} ordens cadastradas</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn btn-primary">
-          <Plus size={20} />
-          Nova OS
-        </button>
+        {can('can_create_orders') && (
+          <button onClick={() => setShowModal(true)} className="btn btn-primary">
+            <Plus size={20} />
+            Nova OS
+          </button>
+        )}
       </div>
 
       {/* Filters */}
