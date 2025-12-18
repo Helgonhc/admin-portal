@@ -52,10 +52,13 @@ const menuItems = [
   { name: 'Baixar App', href: '/dashboard/download', icon: Download, permission: null },
 ];
 
+// Items que só admin pode ver
 const adminItems = [
   { name: 'Usuários', href: '/dashboard/users', icon: UserCog },
-  { name: 'Configurações', href: '/dashboard/settings', icon: Settings },
 ];
+
+// Item de perfil - todos podem ver
+const profileItem = { name: 'Meu Perfil', href: '/dashboard/settings', icon: Settings };
 
 interface AppConfig {
   company_name: string;
@@ -197,7 +200,21 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Admin Section */}
+        {/* Meu Perfil - TODOS podem ver */}
+        <div className={`pt-4 pb-2 ${collapsed ? 'hidden' : ''}`}>
+          <p className="px-4 text-xs font-semibold text-gray-400 uppercase">Conta</p>
+        </div>
+        <Link
+          href={profileItem.href}
+          onClick={() => setMobileOpen(false)}
+          className={`sidebar-item ${pathname === profileItem.href || pathname.startsWith(profileItem.href + '/') ? 'active' : ''} ${collapsed ? 'justify-center px-2' : ''}`}
+          title={collapsed ? profileItem.name : undefined}
+        >
+          <profileItem.icon size={20} />
+          {!collapsed && <span>{profileItem.name}</span>}
+        </Link>
+
+        {/* Admin Section - só admin vê */}
         {isAdmin && (
           <>
             <div className={`pt-4 pb-2 ${collapsed ? 'hidden' : ''}`}>
