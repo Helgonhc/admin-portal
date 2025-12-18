@@ -63,8 +63,16 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
+        // Limpar estado ANTES de fazer signOut
+        set({ user: null, profile: null, isAuthenticated: false, isLoading: false });
+        
+        // Limpar localStorage manualmente
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('admin-auth-storage');
+        }
+        
+        // Fazer signOut no Supabase
         await supabase.auth.signOut();
-        set({ user: null, profile: null, isAuthenticated: false });
       },
 
       loadProfile: async () => {
@@ -83,6 +91,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
+        // Verificar se já foi feito logout (localStorage limpo)
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('admin-auth-storage');
+          if (!stored) {
+            set({ user: null, profile: null, isAuthenticated: false, isLoading: false });
+            return;
+          }
+        }
+        
         set({ isLoading: true });
         
         const { data: { session } } = await supabase.auth.getSession();

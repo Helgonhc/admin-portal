@@ -146,11 +146,21 @@ export default function UsersPage() {
         if (error) throw error;
         toast.success('Usuário atualizado!');
       } else {
+        // 0. Verificar se email já existe no profiles ANTES de criar
+        const { data: existingEmail } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('email', formData.email.trim().toLowerCase())
+          .single();
+        
+        if (existingEmail) {
+          throw new Error('⚠️ Este email já está cadastrado no sistema! Use outro email.');
+        }
+        
         // Salvar sessão atual do admin antes de criar novo usuário
         const { data: currentSession } = await supabase.auth.getSession();
         
-        // 1. Criar usuário no Supabase Auth usando Admin API via função RPC
-        // Isso evita que o admin seja deslogado
+        // 1. Criar usuário no Supabase Auth
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email.trim().toLowerCase(),
           password: formData.password,
@@ -163,8 +173,8 @@ export default function UsersPage() {
         });
 
         if (authError) {
-          if (authError.message.includes('already registered')) {
-            throw new Error('Este email já está cadastrado no sistema');
+          if (authError.message.includes('already registered') || authError.message.includes('already been registered')) {
+            throw new Error('⚠️ Este email já está cadastrado no sistema! Use outro email.');
           }
           throw authError;
         }
