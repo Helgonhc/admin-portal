@@ -192,6 +192,13 @@ export default function UsersPage() {
           });
         }
 
+        // 2.5. Confirmar email do usuário automaticamente (evita "Invalid login credentials")
+        try {
+          await supabase.rpc('confirm_user_email', { user_uuid: authData.user.id });
+        } catch (e) {
+          console.log('Aviso: Não foi possível confirmar email automaticamente');
+        }
+
         // 3. Aguardar trigger criar o perfil
         await new Promise(resolve => setTimeout(resolve, 1500));
 
