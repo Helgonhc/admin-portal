@@ -146,7 +146,11 @@ export default function UsersPage() {
         if (error) throw error;
         toast.success('Usuário atualizado!');
       } else {
-        // 1. Criar usuário no Supabase Auth
+        // Salvar sessão atual do admin antes de criar novo usuário
+        const { data: currentSession } = await supabase.auth.getSession();
+        
+        // 1. Criar usuário no Supabase Auth usando Admin API via função RPC
+        // Isso evita que o admin seja deslogado
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email.trim().toLowerCase(),
           password: formData.password,
@@ -169,10 +173,19 @@ export default function UsersPage() {
           throw new Error('Falha ao criar usuário');
         }
 
-        // 2. Aguardar trigger criar o perfil
+        // 2. IMPORTANTE: Restaurar sessão do admin imediatamente
+        // O signUp faz login automático com o novo usuário, precisamos reverter
+        if (currentSession?.session) {
+          await supabase.auth.setSession({
+            access_token: currentSession.session.access_token,
+            refresh_token: currentSession.session.refresh_token,
+          });
+        }
+
+        // 3. Aguardar trigger criar o perfil
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // 3. Verificar se o perfil foi criado pelo trigger
+        // 4. Verificar se o perfil foi criado pelo trigger
         const { data: existingProfile } = await supabase
           .from('profiles')
           .select('id')
