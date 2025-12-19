@@ -1,4 +1,5 @@
 'use client';
+// Fix: alert_days_before array conversion v2
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
