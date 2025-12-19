@@ -223,11 +223,31 @@ export default function MaintenancePage() {
     }
   }
 
+  // Verificar se pode concluir (só na data agendada ou depois)
+  function canComplete(contract: Contract): boolean {
+    const today = new Date().toISOString().split('T')[0];
+    const scheduledDate = contract.next_maintenance_date;
+    return today >= scheduledDate;
+  }
+
+  // Calcular a próxima data após a atual (para mostrar no card)
+  function getNextAfterCurrent(contract: Contract): string {
+    return calculateNextDate(contract.next_maintenance_date, contract.frequency);
+  }
+
   async function handleMarkCompleted(contract: Contract) {
-    if (!confirm(`Marcar "${contract.title}" como concluída?\n\nA próxima manutenção será agendada automaticamente.`)) return;
+    const today = new Date().toISOString().split('T')[0];
+    const scheduledDate = contract.next_maintenance_date;
+    
+    // Verificar se pode concluir
+    if (today < scheduledDate) {
+      toast.error(`⚠️ Só é possível concluir esta manutenção a partir de ${new Date(scheduledDate).toLocaleDateString('pt-BR')}`);
+      return;
+    }
+
+    if (!confirm(`Marcar "${contract.title}" como concluída?\n\nData agendada: ${new Date(scheduledDate).toLocaleDateString('pt-BR')}\n\nA próxima manutenção será agendada automaticamente.`)) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
       const nextDate = calculateNextDate(today, contract.frequency);
 
       const { error } = await supabase
@@ -450,19 +470,57 @@ export default function MaintenancePage() {
               </div>
 
               {/* Cliente */}
-              <p className="text-sm font-medium text-gray-700 mb-2">{contract.client_name}</p>
+              <p className="text-sm font-medium text-gray-700 mb-3">{contract.client_name}</p>
 
-              {/* Datas */}
-              <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  {new Date(contract.next_maintenance_date).toLocaleDateString('pt-BR')}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  {getFrequencyLabel(contract.frequency)}
-                </span>
+              {/* Datas - Última, Atual e Próxima */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="bg-gray-50 rounded-lg p-2 text-center">
+                  <p className="text-xs text-gray-500">Última</p>
+                  <p className="text-xs font-semibold text-gray-700">
+                    {contract.last_maintenance_date 
+                      ? new Date(contract.last_maintenance_date).toLocaleDateString('pt-BR')
+                      : '--'}
+                  </p>
+                </div>
+                <div className={`rounded-lg p-2 text-center border-2 ${
+                  contract.urgency_status === 'vencido' ? 'bg-red-100 border-red-400' :
+                  contract.urgency_status === 'urgente' ? 'bg-amber-100 border-amber-400' : 'bg-indigo-100 border-indigo-400'
+                }`}>
+                  <p className="text-xs text-gray-600 font-medium">📅 Agendada</p>
+                  <p className={`text-xs font-bold ${
+                    contract.urgency_status === 'vencido' ? 'text-red-600' :
+                    contract.urgency_status === 'urgente' ? 'text-amber-600' : 'text-indigo-600'
+                  }`}>
+                    {new Date(contract.next_maintenance_date).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                <div className="bg-emerald-50 rounded-lg p-2 text-center">
+                  <p className="text-xs text-gray-500">Próxima</p>
+                  <p className="text-xs font-semibold text-emerald-600">
+                    {new Date(getNextAfterCurrent(contract)).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
               </div>
+
+              {/* Frequência */}
+              <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                <Clock className="w-4 h-4" />
+                <span>Frequência: {getFrequencyLabel(contract.frequency)}</span>
+              </div>
+              
+              {/* Alerta se vencido ou urgente */}
+              {(contract.urgency_status === 'vencido' || contract.urgency_status === 'urgente') && (
+                <div className={`flex items-center gap-2 p-2 rounded-lg mb-3 ${
+                  contract.urgency_status === 'vencido' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  <Bell className="w-4 h-4" />
+                  <span className="text-xs font-medium">
+                    {contract.urgency_status === 'vencido' 
+                      ? '⚠️ Manutenção vencida! Entre em contato.'
+                      : '🔔 Manutenção próxima! Envie um lembrete.'}
+                  </span>
+                </div>
+              )}
 
               {/* Actions */}
               <div className="flex items-center gap-2 pt-3 border-t" onClick={e => e.stopPropagation()}>
@@ -671,23 +729,44 @@ export default function MaintenancePage() {
                 {selectedContract.client_phone && <p className="text-sm text-gray-500">{selectedContract.client_phone}</p>}
               </div>
 
-              {/* Datas */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-500 mb-1">Próxima Manutenção</p>
-                  <p className="text-lg font-bold text-indigo-600">
-                    {new Date(selectedContract.next_maintenance_date).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-500 mb-1">Última Manutenção</p>
-                  <p className="text-lg font-bold text-gray-800">
+              {/* Datas - Última, Atual, Próxima */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-gray-500 mb-1">Última Realizada</p>
+                  <p className="text-sm font-bold text-gray-700">
                     {selectedContract.last_maintenance_date 
                       ? new Date(selectedContract.last_maintenance_date).toLocaleDateString('pt-BR')
                       : '--'}
                   </p>
                 </div>
+                <div className={`rounded-lg p-3 text-center border-2 ${
+                  selectedContract.urgency_status === 'vencido' ? 'bg-red-100 border-red-400' :
+                  selectedContract.urgency_status === 'urgente' ? 'bg-amber-100 border-amber-400' : 'bg-indigo-100 border-indigo-400'
+                }`}>
+                  <p className="text-xs text-gray-600 font-medium mb-1">📅 Agendada</p>
+                  <p className={`text-sm font-bold ${
+                    selectedContract.urgency_status === 'vencido' ? 'text-red-600' :
+                    selectedContract.urgency_status === 'urgente' ? 'text-amber-600' : 'text-indigo-600'
+                  }`}>
+                    {new Date(selectedContract.next_maintenance_date).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-gray-500 mb-1">Próxima</p>
+                  <p className="text-sm font-bold text-emerald-600">
+                    {new Date(getNextAfterCurrent(selectedContract)).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
               </div>
+              
+              {/* Aviso se não pode concluir ainda */}
+              {!canComplete(selectedContract) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-sm text-blue-700">
+                    ℹ️ Esta manutenção só pode ser concluída a partir de <strong>{new Date(selectedContract.next_maintenance_date).toLocaleDateString('pt-BR')}</strong>
+                  </p>
+                </div>
+              )}
 
               {/* Frequência */}
               <div className="flex items-center justify-between">
@@ -743,10 +822,12 @@ export default function MaintenancePage() {
                 </button>
                 <button
                   onClick={() => handleMarkCompleted(selectedContract)}
-                  className="btn bg-purple-500 hover:bg-purple-600 text-white"
+                  className={`btn text-white ${canComplete(selectedContract) ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-400 cursor-not-allowed'}`}
+                  disabled={!canComplete(selectedContract)}
+                  title={!canComplete(selectedContract) ? `Só pode concluir a partir de ${new Date(selectedContract.next_maintenance_date).toLocaleDateString('pt-BR')}` : ''}
                 >
                   <CheckCircle size={16} />
-                  Concluir
+                  {canComplete(selectedContract) ? 'Concluir' : 'Aguardando'}
                 </button>
               </div>
               <div className="flex gap-2">

@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/authStore';
-import { ChevronLeft, ChevronRight, Plus, Loader2, Calendar, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Loader2, Calendar, Clock, Wrench, AlertTriangle, Filter, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import Link from 'next/link';
 
 interface Appointment {
   id: string;
@@ -19,15 +20,33 @@ interface Appointment {
   clients?: { name: string };
 }
 
+interface MaintenanceContract {
+  id: string;
+  title: string;
+  next_maintenance_date: string;
+  last_maintenance_date: string | null;
+  frequency: string;
+  urgency_status: string;
+  maintenance_type_name: string | null;
+  maintenance_color: string | null;
+  client_name: string;
+  days_until_maintenance: number;
+}
+
 export default function AgendaPage() {
   const { profile } = useAuthStore();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
+  const [maintenances, setMaintenances] = useState<MaintenanceContract[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    type: 'all', // 'all', 'orders', 'maintenance', 'appointments'
+  });
   const [formData, setFormData] = useState({
     client_id: '',
     title: '',
@@ -46,7 +65,7 @@ export default function AgendaPage() {
       const start = startOfMonth(currentMonth);
       const end = endOfMonth(currentMonth);
 
-      const [appointmentsRes, ordersRes, clientsRes] = await Promise.all([
+      const [appointmentsRes, ordersRes, maintenancesRes, clientsRes] = await Promise.all([
         supabase
           .from('appointments')
           .select('*, clients(name)')
@@ -60,11 +79,17 @@ export default function AgendaPage() {
           .lte('scheduled_date', format(end, 'yyyy-MM-dd'))
           .not('scheduled_date', 'is', null)
           .order('scheduled_date'),
+        supabase
+          .from('active_maintenance_contracts')
+          .select('id, title, next_maintenance_date, last_maintenance_date, frequency, urgency_status, maintenance_type_name, maintenance_color, client_name, days_until_maintenance')
+          .gte('next_maintenance_date', format(start, 'yyyy-MM-dd'))
+          .lte('next_maintenance_date', format(end, 'yyyy-MM-dd')),
         supabase.from('clients').select('id, name').eq('is_active', true).order('name'),
       ]);
 
       setAppointments(appointmentsRes.data || []);
       setOrders(ordersRes.data || []);
+      setMaintenances(maintenancesRes.data || []);
       setClients(clientsRes.data || []);
     } catch (error) {
       console.error('Erro:', error);
@@ -81,12 +106,27 @@ export default function AgendaPage() {
 
   const getEventsForDay = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const dayAppointments = appointments.filter(a => a.scheduled_date === dateStr);
-    const dayOrders = orders.filter(o => o.scheduled_date === dateStr);
-    return [...dayAppointments.map(a => ({ ...a, type: 'appointment' })), ...dayOrders.map(o => ({ ...o, type: 'order' }))];
+    const dayAppointments = filters.type === 'all' || filters.type === 'appointments' 
+      ? appointments.filter(a => a.scheduled_date === dateStr) 
+      : [];
+    const dayOrders = filters.type === 'all' || filters.type === 'orders' 
+      ? orders.filter(o => o.scheduled_date === dateStr) 
+      : [];
+    const dayMaintenances = filters.type === 'all' || filters.type === 'maintenance'
+      ? maintenances.filter(m => m.next_maintenance_date === dateStr)
+      : [];
+    return [
+      ...dayAppointments.map(a => ({ ...a, type: 'appointment' })), 
+      ...dayOrders.map(o => ({ ...o, type: 'order' })),
+      ...dayMaintenances.map(m => ({ ...m, type: 'maintenance' }))
+    ];
   };
 
   const selectedDateEvents = selectedDate ? getEventsForDay(selectedDate) : [];
+  
+  // Estatísticas do mês
+  const monthMaintenances = maintenances.length;
+  const urgentMaintenances = maintenances.filter(m => m.urgency_status === 'vencido' || m.urgency_status === 'urgente').length;
 
   function openModal(date?: Date) {
     setFormData({
@@ -141,11 +181,75 @@ export default function AgendaPage() {
             {format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}
           </p>
         </div>
-        <button onClick={() => openModal()} className="btn btn-primary">
-          <Plus size={20} />
-          Novo Agendamento
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowFilters(!showFilters)} className={`btn ${showFilters ? 'btn-primary' : 'btn-secondary'}`}>
+            <Filter size={18} />
+            Filtros
+          </button>
+          <button onClick={() => openModal()} className="btn btn-primary">
+            <Plus size={20} />
+            Novo Agendamento
+          </button>
+        </div>
       </div>
+
+      {/* Filtros */}
+      {showFilters && (
+        <div className="card p-4 animate-fadeIn">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-800">Filtrar por Tipo</h3>
+            {filters.type !== 'all' && (
+              <button onClick={() => setFilters({ type: 'all' })} className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                <X size={14} /> Limpar
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setFilters({ type: 'all' })} className={`btn btn-sm ${filters.type === 'all' ? 'btn-primary' : 'btn-secondary'}`}>
+              Todos
+            </button>
+            <button onClick={() => setFilters({ type: 'orders' })} className={`btn btn-sm ${filters.type === 'orders' ? 'bg-amber-500 text-white' : 'btn-secondary'}`}>
+              📋 Ordens de Serviço
+            </button>
+            <button onClick={() => setFilters({ type: 'maintenance' })} className={`btn btn-sm ${filters.type === 'maintenance' ? 'bg-purple-500 text-white' : 'btn-secondary'}`}>
+              🔧 Manutenções Periódicas
+            </button>
+            <button onClick={() => setFilters({ type: 'appointments' })} className={`btn btn-sm ${filters.type === 'appointments' ? 'bg-blue-500 text-white' : 'btn-secondary'}`}>
+              📅 Agendamentos
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Stats de Manutenções */}
+      {monthMaintenances > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="card p-4 border-l-4 border-l-purple-500">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                <Wrench className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-purple-600">{monthMaintenances}</p>
+                <p className="text-sm text-gray-500">Manutenções no mês</p>
+              </div>
+            </div>
+          </div>
+          {urgentMaintenances > 0 && (
+            <div className="card p-4 border-l-4 border-l-red-500">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-red-600">{urgentMaintenances}</p>
+                  <p className="text-sm text-gray-500">Urgentes/Vencidas</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Calendar */}
@@ -169,6 +273,22 @@ export default function AgendaPage() {
             </button>
           </div>
 
+          {/* Legenda */}
+          <div className="flex flex-wrap gap-3 mb-4 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              <span className="text-gray-600">Ordens</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+              <span className="text-gray-600">Manutenções</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+              <span className="text-gray-600">Agendamentos</span>
+            </div>
+          </div>
+
           {/* Weekday Headers */}
           <div className="grid grid-cols-7 gap-1 mb-2">
             {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
@@ -189,6 +309,9 @@ export default function AgendaPage() {
               const events = getEventsForDay(day);
               const isToday = isSameDay(day, new Date());
               const isSelected = selectedDate && isSameDay(day, selectedDate);
+              const hasOrder = events.some(e => e.type === 'order');
+              const hasMaintenance = events.some(e => e.type === 'maintenance');
+              const hasAppointment = events.some(e => e.type === 'appointment');
 
               return (
                 <button
@@ -205,14 +328,9 @@ export default function AgendaPage() {
                   <span className="block">{format(day, 'd')}</span>
                   {events.length > 0 && (
                     <div className="flex justify-center gap-0.5 mt-0.5">
-                      {events.slice(0, 3).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            isSelected ? 'bg-white' : 'bg-indigo-500'
-                          }`}
-                        />
-                      ))}
+                      {hasOrder && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500'}`} />}
+                      {hasMaintenance && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-purple-300' : 'bg-purple-500'}`} />}
+                      {hasAppointment && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-blue-300' : 'bg-indigo-500'}`} />}
                     </div>
                   )}
                 </button>
@@ -246,19 +364,24 @@ export default function AgendaPage() {
               </p>
             ) : (
               selectedDateEvents.map((event: any) => (
-                <div
+                <Link
                   key={event.id}
-                  className={`p-3 rounded-lg border-l-4 ${
+                  href={event.type === 'maintenance' ? '/dashboard/maintenance' : event.type === 'order' ? `/dashboard/orders/${event.id}` : '#'}
+                  className={`block p-3 rounded-lg border-l-4 hover:shadow-md transition-shadow cursor-pointer ${
                     event.type === 'order'
                       ? 'bg-amber-50 border-amber-500'
+                      : event.type === 'maintenance'
+                      ? 'bg-purple-50 border-purple-500'
                       : 'bg-indigo-50 border-indigo-500'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     {event.type === 'order' ? (
-                      <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded">OS</span>
+                      <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded">📋 OS</span>
+                    ) : event.type === 'maintenance' ? (
+                      <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded">🔧 Manutenção</span>
                     ) : (
-                      <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">Agendamento</span>
+                      <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">📅 Agendamento</span>
                     )}
                     {event.scheduled_time && (
                       <span className="text-xs text-gray-500 flex items-center gap-1">
@@ -266,10 +389,23 @@ export default function AgendaPage() {
                         {event.scheduled_time}
                       </span>
                     )}
+                    {event.type === 'maintenance' && event.urgency_status && (
+                      <span className={`text-xs px-2 py-0.5 rounded text-white ${
+                        event.urgency_status === 'vencido' ? 'bg-red-500' :
+                        event.urgency_status === 'urgente' ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}>
+                        {event.urgency_status === 'vencido' ? 'Vencida' : 
+                         event.urgency_status === 'urgente' ? 'Urgente' : 'OK'}
+                      </span>
+                    )}
                   </div>
-                  <p className="font-medium text-gray-800 text-sm">{event.title}</p>
-                  <p className="text-xs text-gray-500">{event.clients?.name}</p>
-                </div>
+                  <p className="font-medium text-gray-800 text-sm">
+                    {event.type === 'maintenance' ? (event.maintenance_type_name || event.title) : event.title}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {event.type === 'maintenance' ? event.client_name : event.clients?.name}
+                  </p>
+                </Link>
               ))
             )}
           </div>

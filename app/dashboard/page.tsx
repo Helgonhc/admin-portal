@@ -14,6 +14,8 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
+  Calendar,
+  Bell,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -24,6 +26,9 @@ interface DashboardStats {
   openTickets: number;
   pendingOvertime: number;
   completedToday: number;
+  maintenanceVencidas: number;
+  maintenanceUrgentes: number;
+  maintenanceProximas: number;
 }
 
 export default function DashboardPage() {
@@ -49,6 +54,7 @@ export default function DashboardPage() {
         { count: openTickets, error: e4 },
         { count: pendingOvertime, error: e5 },
         { count: completedToday, error: e6 },
+        { data: maintenanceData, error: e7 },
       ] = await Promise.all([
         supabase.from('clients').select('*', { count: 'exact', head: true }),
         supabase.from('equipments').select('*', { count: 'exact', head: true }),
@@ -58,9 +64,15 @@ export default function DashboardPage() {
         supabase.from('service_orders').select('*', { count: 'exact', head: true })
           .in('status', ['completed', 'concluido'])
           .gte('completed_at', new Date().toISOString().split('T')[0]),
+        supabase.from('active_maintenance_contracts').select('urgency_status'),
       ]);
 
-      console.log('📊 Stats:', { totalClients, totalEquipments, pendingOrders, openTickets });
+      // Contar manutenções por status
+      const maintenanceVencidas = maintenanceData?.filter(m => m.urgency_status === 'vencido').length || 0;
+      const maintenanceUrgentes = maintenanceData?.filter(m => m.urgency_status === 'urgente').length || 0;
+      const maintenanceProximas = maintenanceData?.filter(m => m.urgency_status === 'proximo').length || 0;
+
+      console.log('📊 Stats:', { totalClients, totalEquipments, pendingOrders, openTickets, maintenanceVencidas, maintenanceUrgentes });
       if (e1 || e2 || e3 || e4) console.error('Erros:', { e1, e2, e3, e4 });
 
       setStats({
@@ -70,6 +82,9 @@ export default function DashboardPage() {
         openTickets: openTickets || 0,
         pendingOvertime: pendingOvertime || 0,
         completedToday: completedToday || 0,
+        maintenanceVencidas,
+        maintenanceUrgentes,
+        maintenanceProximas,
       });
 
       // Carregar ordens recentes
@@ -239,6 +254,67 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Alertas de Manutenções */}
+      {(stats?.maintenanceVencidas || 0) + (stats?.maintenanceUrgentes || 0) > 0 && (
+        <div className="card border-l-4 border-l-red-500 bg-red-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <Bell className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-red-800">⚠️ Atenção: Manutenções Pendentes!</h3>
+                <p className="text-sm text-red-600">
+                  {stats?.maintenanceVencidas || 0} vencidas • {stats?.maintenanceUrgentes || 0} urgentes (próximos 7 dias)
+                </p>
+              </div>
+            </div>
+            <Link href="/dashboard/maintenance" className="btn btn-sm bg-red-600 hover:bg-red-700 text-white">
+              Ver Manutenções
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Stats de Manutenções */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Link href="/dashboard/maintenance" className="card card-hover border-l-4 border-l-red-500">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-600">{stats?.maintenanceVencidas || 0}</p>
+              <p className="text-xs text-gray-500">Manutenções Vencidas</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/maintenance" className="card card-hover border-l-4 border-l-amber-500">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <Clock className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-600">{stats?.maintenanceUrgentes || 0}</p>
+              <p className="text-xs text-gray-500">Urgentes (7 dias)</p>
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/maintenance" className="card card-hover border-l-4 border-l-blue-500">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Calendar className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-blue-600">{stats?.maintenanceProximas || 0}</p>
+              <p className="text-xs text-gray-500">Próximas (30 dias)</p>
+            </div>
+          </div>
+        </Link>
       </div>
 
       {/* Recent Activity */}
