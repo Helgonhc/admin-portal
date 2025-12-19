@@ -45,6 +45,7 @@ const menuItems = [
   { name: 'Chamados', href: '/dashboard/tickets', icon: Ticket, permission: null },
   { name: 'Orçamentos', href: '/dashboard/quotes', icon: Calculator, permission: ['can_create_quotes', 'can_view_financials'] }, // Criar OU ver valores
   { name: 'Manutenções Periódicas', href: '/dashboard/maintenance', icon: Calendar, permission: null }, // Todos podem ver
+  { name: 'Solicitações Manutenção', href: '/dashboard/maintenance-requests', icon: FileCheck, permission: null, hasBadge: false },
   { name: 'Agenda', href: '/dashboard/agenda', icon: Calendar, permission: null },
   { name: 'Banco de Horas', href: '/dashboard/overtime', icon: Clock, permission: null },
   { name: 'Estoque', href: '/dashboard/inventory', icon: Package, permission: 'can_manage_inventory' },

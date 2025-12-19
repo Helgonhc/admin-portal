@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Ticket } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/authStore';
-import { Plus, Search, Eye, Loader2, Ticket as TicketIcon, AlertCircle } from 'lucide-react';
+import { Plus, Search, Eye, Loader2, Ticket as TicketIcon, AlertCircle, User } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { usePermissions } from '../../../hooks/usePermissions';
@@ -267,6 +267,7 @@ export default function TicketsPage() {
                 <th>Prioridade</th>
                 <th>Título</th>
                 <th>Cliente</th>
+                <th>Solicitante</th>
                 <th>Status</th>
                 <th>Data</th>
                 <th className="text-right">Ações</th>
@@ -275,7 +276,7 @@ export default function TicketsPage() {
             <tbody>
               {filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-500">
+                  <td colSpan={7} className="text-center py-8 text-gray-500">
                     <TicketIcon className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                     Nenhum chamado encontrado
                   </td>
@@ -293,6 +294,16 @@ export default function TicketsPage() {
                       )}
                     </td>
                     <td>{ticket.clients?.name || '-'}</td>
+                    <td>
+                      {ticket.creator?.full_name ? (
+                        <span className="flex items-center gap-1 text-sm text-indigo-600">
+                          <User size={14} />
+                          {ticket.creator.full_name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">-</span>
+                      )}
+                    </td>
                     <td>
                       <span className={`badge ${getStatusColor(ticket.status)}`}>
                         {getStatusLabel(ticket.status)}
