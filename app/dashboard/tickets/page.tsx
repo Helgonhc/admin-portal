@@ -99,7 +99,7 @@ export default function TicketsPage() {
         urgent: 'alta',
       };
 
-      const { error } = await supabase.from('tickets').insert([{
+      const { data: newTicket, error } = await supabase.from('tickets').insert([{
         ticket_number: ticketNumber,
         client_id: formData.client_id,
         title: formData.title,
@@ -107,8 +107,52 @@ export default function TicketsPage() {
         priority: priorityMap[formData.priority] || 'media',
         status: 'aberto',
         created_by: profile?.id,
-      }]);
+      }]).select('id, ticket_number').single();
       if (error) throw error;
+
+      // Buscar nome do cliente para a notificação
+      const selectedClient = clients.find(c => c.id === formData.client_id);
+
+      // Criar notificações para todos os usuários do cliente (portal)
+      const { data: clientUsers } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('client_id', formData.client_id)
+        .eq('role', 'client')
+        .eq('is_active', true);
+
+      if (clientUsers && clientUsers.length > 0) {
+        const notifications = clientUsers.map(u => ({
+          user_id: u.id,
+          title: '🎫 Novo Chamado Criado',
+          message: `Chamado: ${formData.title}`,
+          type: 'ticket',
+          reference_id: newTicket?.id,
+          is_read: false
+        }));
+        await supabase.from('notifications').insert(notifications);
+      }
+
+      // Criar notificações para todos os usuários da plataforma (admin, super_admin, técnicos)
+      const { data: allUsers } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('role', ['admin', 'super_admin', 'technician'])
+        .eq('is_active', true)
+        .neq('id', profile?.id); // Não notificar quem criou
+
+      if (allUsers && allUsers.length > 0) {
+        const notifications = allUsers.map(u => ({
+          user_id: u.id,
+          title: '🎫 Novo Chamado Criado',
+          message: `Cliente: ${selectedClient?.name || 'N/A'} - ${formData.title}`,
+          type: 'ticket',
+          reference_id: newTicket?.id,
+          is_read: false
+        }));
+        await supabase.from('notifications').insert(notifications);
+      }
+
       toast.success('Chamado criado!');
       setShowModal(false);
       setFormData({ client_id: '', title: '', description: '', priority: 'medium' });
