@@ -342,106 +342,177 @@ export default function OrdersPage() {
       {/* Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-800">Nova Ordem de Serviço</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Cliente *</label>
-                  <select
-                    value={formData.client_id}
-                    onChange={(e) => handleClientChange(e.target.value)}
-                    className="input"
-                  >
-                    <option value="">Selecione um cliente</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>{client.name}</option>
-                    ))}
-                  </select>
+          <div className="modal-content max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-6 border-b bg-gradient-to-r from-indigo-500 to-purple-600">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <ClipboardList className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <label className="label">Equipamento</label>
-                  <select
-                    value={formData.equipment_id}
-                    onChange={(e) => setFormData({ ...formData, equipment_id: e.target.value })}
-                    className="input"
-                    disabled={!formData.client_id}
-                  >
-                    <option value="">Selecione (opcional)</option>
-                    {equipments.map((eq) => (
-                      <option key={eq.id} value={eq.id}>{eq.name} {eq.model && `- ${eq.model}`}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="label">Título *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="input"
-                  placeholder="Título da ordem de serviço"
-                />
-              </div>
-              <div>
-                <label className="label">Descrição</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="input min-h-[100px]"
-                  placeholder="Descreva o serviço a ser realizado..."
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="label">Técnico Responsável</label>
-                  <select
-                    value={formData.technician_id}
-                    onChange={(e) => setFormData({ ...formData, technician_id: e.target.value })}
-                    className="input"
-                  >
-                    <option value="">Selecione (opcional)</option>
-                    <option value={profile?.id}>⭐ Eu mesmo</option>
-                    {technicians.filter(t => t.id !== profile?.id).map((tech) => (
-                      <option key={tech.id} value={tech.id}>{tech.full_name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Prioridade</label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    className="input"
-                  >
-                    <option value="low">🟢 Baixa</option>
-                    <option value="medium">🟡 Média</option>
-                    <option value="high">🟠 Alta</option>
-                    <option value="urgent">🔴 Urgente</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Data Agendada</label>
-                  <input
-                    type="date"
-                    value={formData.scheduled_date}
-                    onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
-                    className="input"
-                  />
+                  <h2 className="text-xl font-bold text-white">Nova Ordem de Serviço</h2>
+                  <p className="text-white/70 text-sm">Preencha os dados para criar uma nova OS</p>
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => setShowModal(false)} className="btn btn-secondary">
-                Cancelar
-              </button>
-              <button onClick={handleCreate} disabled={saving} className="btn btn-primary">
-                {saving ? <Loader2 className="animate-spin" size={20} /> : null}
-                Criar OS
-              </button>
+
+            <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
+              {/* Seção: Cliente e Equipamento */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xs font-bold">1</span>
+                  Identificação
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label flex items-center gap-1">
+                      <span>Cliente</span>
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.client_id}
+                      onChange={(e) => handleClientChange(e.target.value)}
+                      className="input"
+                    >
+                      <option value="">Selecione um cliente</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>{client.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Equipamento</label>
+                    <select
+                      value={formData.equipment_id}
+                      onChange={(e) => setFormData({ ...formData, equipment_id: e.target.value })}
+                      className="input"
+                      disabled={!formData.client_id}
+                    >
+                      <option value="">Selecione (opcional)</option>
+                      {equipments.map((eq) => (
+                        <option key={eq.id} value={eq.id}>{eq.name} {eq.model && `- ${eq.model}`}</option>
+                      ))}
+                    </select>
+                    {!formData.client_id && (
+                      <p className="text-xs text-gray-400 mt-1">Selecione um cliente primeiro</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção: Detalhes do Serviço */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xs font-bold">2</span>
+                  Detalhes do Serviço
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="label flex items-center gap-1">
+                      <span>Título</span>
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      className="input"
+                      placeholder="Ex: Manutenção preventiva, Reparo de equipamento..."
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Descrição</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="input min-h-[100px] resize-none"
+                      placeholder="Descreva detalhadamente o serviço a ser realizado..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção: Atribuição e Agendamento */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-xs font-bold">3</span>
+                  Atribuição e Agendamento
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">Técnico Responsável</label>
+                    <select
+                      value={formData.technician_id}
+                      onChange={(e) => setFormData({ ...formData, technician_id: e.target.value })}
+                      className="input"
+                    >
+                      <option value="">Selecione (opcional)</option>
+                      <option value={profile?.id}>⭐ Eu mesmo</option>
+                      {technicians.filter(t => t.id !== profile?.id).map((tech) => (
+                        <option key={tech.id} value={tech.id}>{tech.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Prioridade</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'low', label: 'Baixa', color: 'bg-green-100 border-green-300 text-green-700', dot: 'bg-green-500' },
+                        { value: 'medium', label: 'Média', color: 'bg-amber-100 border-amber-300 text-amber-700', dot: 'bg-amber-500' },
+                        { value: 'high', label: 'Alta', color: 'bg-orange-100 border-orange-300 text-orange-700', dot: 'bg-orange-500' },
+                        { value: 'urgent', label: 'Urgente', color: 'bg-red-100 border-red-300 text-red-700', dot: 'bg-red-500' },
+                      ].map((p) => (
+                        <button
+                          key={p.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, priority: p.value })}
+                          className={`px-3 py-2 rounded-lg border-2 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                            formData.priority === p.value
+                              ? `${p.color} border-current shadow-sm`
+                              : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${p.dot}`}></span>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Data Agendada</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <input
+                        type="date"
+                        value={formData.scheduled_date}
+                        onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
+                        className="input pl-10"
+                        min={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t bg-gray-50 flex items-center justify-between">
+              <p className="text-xs text-gray-400">
+                <span className="text-red-500">*</span> Campos obrigatórios
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowModal(false)} className="btn btn-secondary">
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleCreate} 
+                  disabled={saving || !formData.client_id || !formData.title} 
+                  className="btn btn-primary"
+                >
+                  {saving ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
+                  Criar Ordem de Serviço
+                </button>
+              </div>
             </div>
           </div>
         </div>
