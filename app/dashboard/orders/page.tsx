@@ -138,8 +138,44 @@ export default function OrdersPage() {
       if (formData.technician_id) insertData.technician_id = formData.technician_id;
       if (formData.scheduled_date) insertData.scheduled_at = formData.scheduled_date;
 
-      const { error } = await supabase.from('service_orders').insert([insertData]);
+      const { data: newOrder, error } = await supabase.from('service_orders').insert([insertData]).select('id').single();
       if (error) throw error;
+
+      // Buscar nome do cliente
+      const selectedClient = clients.find(c => c.id === formData.client_id);
+
+      // Notificar todos os usuários do cliente (portal)
+      const { data: clientUsers } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('client_id', formData.client_id)
+        .eq('role', 'client')
+        .eq('is_active', true);
+
+      if (clientUsers && clientUsers.length > 0) {
+        const notifications = clientUsers.map(u => ({
+          user_id: u.id,
+          title: '📋 Nova Ordem de Serviço',
+          message: `OS criada: ${formData.title}`,
+          type: 'order',
+          reference_id: newOrder?.id,
+          is_read: false
+        }));
+        await supabase.from('notifications').insert(notifications);
+      }
+
+      // Notificar técnico atribuído (se diferente de quem criou)
+      if (formData.technician_id && formData.technician_id !== profile?.id) {
+        await supabase.from('notifications').insert({
+          user_id: formData.technician_id,
+          title: '📋 OS Atribuída a Você',
+          message: `Cliente: ${selectedClient?.name || 'N/A'} - ${formData.title}`,
+          type: 'order',
+          reference_id: newOrder?.id,
+          is_read: false
+        });
+      }
+
       toast.success('Ordem de serviço criada!');
       setShowModal(false);
       setFormData({ client_id: '', equipment_id: '', technician_id: '', title: '', description: '', priority: 'medium', scheduled_date: '' });

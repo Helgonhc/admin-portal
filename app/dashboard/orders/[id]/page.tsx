@@ -176,12 +176,106 @@ export default function OrderDetailsPage() {
         .eq('id', params.id);
       
       if (error) throw error;
+      
+      // Enviar notificações sobre mudança de status
+      await sendStatusChangeNotifications(newStatus);
+      
       toast.success('Status atualizado!');
       loadOrder();
     } catch (error: any) {
       toast.error(error.message);
     } finally {
       setProcessing(false);
+    }
+  }
+
+  async function sendStatusChangeNotifications(newStatus: string) {
+    try {
+      const osId = order.id.slice(0, 6).toUpperCase();
+      const clientName = order.clients?.name || 'Cliente';
+      
+      // Mensagens de status
+      const statusMessages: Record<string, { title: string; message: string; emoji: string }> = {
+        em_andamento: {
+          title: `🔧 OS #${osId} - Execução Iniciada`,
+          message: `A ordem de serviço "${order.title}" está sendo executada pelo técnico.`,
+          emoji: '🔧'
+        },
+        pausado: {
+          title: `⏸️ OS #${osId} - Pausada`,
+          message: `A ordem de serviço "${order.title}" foi pausada temporariamente.`,
+          emoji: '⏸️'
+        },
+        concluido: {
+          title: `✅ OS #${osId} - Concluída`,
+          message: `A ordem de serviço "${order.title}" foi concluída com sucesso!`,
+          emoji: '✅'
+        },
+        cancelado: {
+          title: `❌ OS #${osId} - Cancelada`,
+          message: `A ordem de serviço "${order.title}" foi cancelada.`,
+          emoji: '❌'
+        }
+      };
+
+      const statusInfo = statusMessages[newStatus];
+      if (!statusInfo) return;
+
+      // Buscar usuários do cliente para notificar
+      if (order.client_id) {
+        const { data: clientUsers } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('client_id', order.client_id)
+          .eq('role', 'client');
+
+        if (clientUsers && clientUsers.length > 0) {
+          const clientNotifications = clientUsers.map(user => ({
+            user_id: user.id,
+            title: statusInfo.title,
+            message: statusInfo.message,
+            type: 'service_order',
+            reference_id: order.id,
+            reference_type: 'service_order'
+          }));
+
+          await supabase.from('notifications').insert(clientNotifications);
+        }
+      }
+
+      // Notificar técnico atribuído (se não for quem fez a alteração)
+      if (order.technician_id && order.technician_id !== profile?.id) {
+        await supabase.from('notifications').insert({
+          user_id: order.technician_id,
+          title: statusInfo.title,
+          message: `${statusInfo.message} (Cliente: ${clientName})`,
+          type: 'service_order',
+          reference_id: order.id,
+          reference_type: 'service_order'
+        });
+      }
+
+      // Notificar outros admins/super_admins (exceto quem fez a alteração)
+      const { data: teamUsers } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('role', ['admin', 'super_admin'])
+        .neq('id', profile?.id || '');
+
+      if (teamUsers && teamUsers.length > 0) {
+        const teamNotifications = teamUsers.map(user => ({
+          user_id: user.id,
+          title: statusInfo.title,
+          message: `${statusInfo.message} (Cliente: ${clientName})`,
+          type: 'service_order',
+          reference_id: order.id,
+          reference_type: 'service_order'
+        }));
+
+        await supabase.from('notifications').insert(teamNotifications);
+      }
+    } catch (error) {
+      console.error('Erro ao enviar notificações:', error);
     }
   }
 
