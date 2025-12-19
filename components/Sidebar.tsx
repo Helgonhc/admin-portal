@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 import { usePermissions } from '../hooks/usePermissions';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import {
   LayoutDashboard,
   Users,
@@ -48,7 +49,7 @@ const menuItems = [
   { name: 'Banco de Horas', href: '/dashboard/overtime', icon: Clock, permission: null },
   { name: 'Estoque', href: '/dashboard/inventory', icon: Package, permission: 'can_manage_inventory' },
   { name: 'Chat', href: '/dashboard/chat', icon: MessageSquare, permission: null },
-  { name: 'Notificações', href: '/dashboard/notifications', icon: Bell, permission: null },
+  { name: 'Notificações', href: '/dashboard/notifications', icon: Bell, permission: null, hasBadge: true },
   { name: 'Baixar App', href: '/dashboard/download', icon: Download, permission: null },
 ];
 
@@ -71,6 +72,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { profile, logout } = useAuthStore();
   const { can, isAdmin } = usePermissions();
+  const { unreadCount } = useRealtimeNotifications();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
@@ -210,7 +212,14 @@ export default function Sidebar() {
               className={`sidebar-item ${isActive ? 'active' : ''} ${collapsed ? 'justify-center px-2' : ''}`}
               title={collapsed ? item.name : undefined}
             >
-              <item.icon size={20} />
+              <div className="relative">
+                <item.icon size={20} />
+                {(item as any).hasBadge && unreadCount > 0 && (
+                  <span className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </div>
               {!collapsed && <span>{item.name}</span>}
             </Link>
           );
