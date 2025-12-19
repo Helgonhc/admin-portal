@@ -186,11 +186,6 @@ export default function MaintenancePage() {
 
     setSaving(true);
     try {
-      // Garantir que alert_days_before seja um array de números
-      const alertDays = Array.isArray(formData.alert_days_before) 
-        ? formData.alert_days_before.map(Number).filter(n => !isNaN(n))
-        : [30, 15, 7];
-
       const contractData = {
         client_id: formData.client_id,
         title: formData.title,
@@ -201,7 +196,7 @@ export default function MaintenancePage() {
         maintenance_value: formData.maintenance_value || null,
         send_email_alert: formData.send_email_alert,
         send_whatsapp_alert: formData.send_whatsapp_alert,
-        alert_days_before: alertDays,
+        // alert_days_before usa o valor padrão do banco: ARRAY[30, 15, 7]
         status: formData.status,
       };
 
