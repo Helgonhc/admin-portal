@@ -606,26 +606,70 @@ export default function MaintenancePage() {
                   ))}
                 </div>
               </div>
+              {/* VISUALIZAÇÃO DAS 3 DATAS */}
+              <div className="bg-gradient-to-r from-gray-50 to-indigo-50 rounded-xl p-4 border border-indigo-100">
+                <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-indigo-600" />
+                  Linha do Tempo das Manutenções
+                </p>
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Última */}
+                  <div className="bg-white rounded-lg p-3 text-center border border-gray-200 shadow-sm">
+                    <p className="text-xs text-gray-500 mb-1">📋 Última</p>
+                    <p className="text-sm font-bold text-gray-700">
+                      {formData.last_maintenance_date 
+                        ? new Date(formData.last_maintenance_date + 'T12:00:00').toLocaleDateString('pt-BR')
+                        : '--/--/----'}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">Realizada</p>
+                  </div>
+                  {/* Agendada (Atual) */}
+                  <div className="bg-indigo-100 rounded-lg p-3 text-center border-2 border-indigo-400 shadow-sm">
+                    <p className="text-xs text-indigo-600 font-medium mb-1">📅 Agendada</p>
+                    <p className="text-sm font-bold text-indigo-700">
+                      {formData.next_maintenance_date 
+                        ? new Date(formData.next_maintenance_date + 'T12:00:00').toLocaleDateString('pt-BR')
+                        : '--/--/----'}
+                    </p>
+                    <p className="text-xs text-indigo-500 mt-1">Atual</p>
+                  </div>
+                  {/* Próxima */}
+                  <div className="bg-emerald-50 rounded-lg p-3 text-center border border-emerald-200 shadow-sm">
+                    <p className="text-xs text-emerald-600 mb-1">🔮 Próxima</p>
+                    <p className="text-sm font-bold text-emerald-700">
+                      {formData.next_maintenance_date 
+                        ? new Date(calculateNextDate(formData.next_maintenance_date, formData.frequency) + 'T12:00:00').toLocaleDateString('pt-BR')
+                        : '--/--/----'}
+                    </p>
+                    <p className="text-xs text-emerald-500 mt-1">Calculada</p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  ↑ A próxima data é calculada automaticamente com base na frequência
+                </p>
+              </div>
+
+              {/* CAMPOS DE EDIÇÃO DAS DATAS */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Última Manutenção</label>
+                  <label className="label">📋 Última Manutenção (Data de Início)</label>
                   <input
                     type="date"
                     value={formData.last_maintenance_date}
                     onChange={(e) => handleLastDateChange(e.target.value)}
                     className="input"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Data da última manutenção realizada</p>
+                  <p className="text-xs text-gray-500 mt-1">Quando foi a última manutenção realizada</p>
                 </div>
                 <div>
-                  <label className="label">Próxima Manutenção *</label>
+                  <label className="label">📅 Manutenção Agendada *</label>
                   <input
                     type="date"
                     value={formData.next_maintenance_date}
                     onChange={(e) => setFormData({ ...formData, next_maintenance_date: e.target.value })}
                     className="input"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Calculada automaticamente</p>
+                  <p className="text-xs text-gray-500 mt-1">Data da próxima manutenção a ser realizada</p>
                 </div>
               </div>
               <div>
