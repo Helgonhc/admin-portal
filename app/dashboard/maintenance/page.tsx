@@ -125,6 +125,18 @@ export default function MaintenancePage() {
   function openModal(contract?: Contract) {
     if (contract) {
       setEditingContract(contract);
+      // Garantir que alert_days_before seja um array de números
+      let alertDays = [30, 15, 7];
+      if (contract.alert_days_before) {
+        if (Array.isArray(contract.alert_days_before)) {
+          alertDays = contract.alert_days_before.map(Number).filter(n => !isNaN(n));
+        } else if (typeof contract.alert_days_before === 'string') {
+          try {
+            const parsed = JSON.parse(contract.alert_days_before);
+            alertDays = Array.isArray(parsed) ? parsed.map(Number).filter(n => !isNaN(n)) : [30, 15, 7];
+          } catch { alertDays = [30, 15, 7]; }
+        }
+      }
       setFormData({
         client_id: contract.client_id,
         maintenance_type_id: '',
@@ -136,7 +148,7 @@ export default function MaintenancePage() {
         maintenance_value: contract.maintenance_value || 0,
         send_email_alert: contract.send_email_alert ?? true,
         send_whatsapp_alert: contract.send_whatsapp_alert ?? true,
-        alert_days_before: contract.alert_days_before || [30, 15, 7],
+        alert_days_before: alertDays,
         status: contract.status,
       });
     } else {
@@ -173,6 +185,11 @@ export default function MaintenancePage() {
 
     setSaving(true);
     try {
+      // Garantir que alert_days_before seja um array de números
+      const alertDays = Array.isArray(formData.alert_days_before) 
+        ? formData.alert_days_before.map(Number).filter(n => !isNaN(n))
+        : [30, 15, 7];
+
       const contractData = {
         client_id: formData.client_id,
         title: formData.title,
@@ -183,7 +200,7 @@ export default function MaintenancePage() {
         maintenance_value: formData.maintenance_value || null,
         send_email_alert: formData.send_email_alert,
         send_whatsapp_alert: formData.send_whatsapp_alert,
-        alert_days_before: formData.alert_days_before,
+        alert_days_before: alertDays,
         status: formData.status,
       };
 
