@@ -288,8 +288,6 @@ export default function MaintenancePage() {
         type: 'maintenance_completed',
         title: 'Manutenção Concluída',
         message: `Manutenção "${contract.title}" do cliente ${contract.client_name} foi concluída. Próxima: ${new Date(nextDate).toLocaleDateString('pt-BR')}`,
-        reference_type: 'contract',
-        reference_id: contract.id,
       });
 
       toast.success(`Manutenção concluída! Próxima: ${new Date(nextDate).toLocaleDateString('pt-BR')}`);
