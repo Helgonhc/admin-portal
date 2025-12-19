@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
@@ -18,6 +18,7 @@ export function useRealtimeNotifications() {
   const { profile } = useAuthStore()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const channelRef = useRef<any>(null)
 
   const loadNotifications = useCallback(async () => {
     if (!profile?.id) return
@@ -43,9 +44,17 @@ export function useRealtimeNotifications() {
 
     loadNotifications()
 
+    // Remover canal anterior se existir
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+    }
+
+    // Nome único do canal para evitar conflitos
+    const channelName = `notifications-admin-${profile.id}-${Date.now()}`
+
     // Inscrever para atualizações em tempo real
     const channel = supabase
-      .channel(`notifications-${profile.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -55,6 +64,7 @@ export function useRealtimeNotifications() {
           filter: `user_id=eq.${profile.id}`
         },
         (payload) => {
+          console.log('🔔 Nova notificação recebida (admin):', payload)
           const newNotification = payload.new as Notification
           setNotifications(prev => [newNotification, ...prev].slice(0, 20))
           setUnreadCount(prev => prev + 1)
@@ -90,7 +100,11 @@ export function useRealtimeNotifications() {
           loadNotifications()
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('📡 Status do canal de notificações (admin):', status)
+      })
+
+    channelRef.current = channel
 
     // Pedir permissão para notificações do navegador
     if ('Notification' in window && Notification.permission === 'default') {
@@ -98,7 +112,10 @@ export function useRealtimeNotifications() {
     }
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
     }
   }, [profile?.id, loadNotifications])
 
