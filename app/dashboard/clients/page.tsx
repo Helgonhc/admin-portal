@@ -5,7 +5,8 @@ import { supabase, Client } from '../../../lib/supabase';
 import { 
   Plus, Search, Edit, Trash2, Eye, Loader2, Building2, 
   Globe, Lock, Users, MessageCircle, Phone, Mail, MapPin,
-  Navigation, Unlock, UserPlus, Upload, Image, X, Shield
+  Navigation, Unlock, UserPlus, Upload, Image, X, Shield,
+  AlertTriangle, Calendar
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [maintenanceStatus, setMaintenanceStatus] = useState<Record<string, { vencidas: number; urgentes: number }>>({});
   
   // Verificar permissão de acesso
   const canViewClients = can('can_view_all_clients');
@@ -70,6 +72,25 @@ export default function ClientsPage() {
 
       if (error) throw error;
       setClients(data || []);
+
+      // Buscar manutenções por cliente (vencidas e urgentes)
+      const { data: maintenanceData } = await supabase
+        .from('active_maintenance_contracts')
+        .select('client_id, urgency_status');
+      
+      // Agrupar por cliente
+      const statusByClient: Record<string, { vencidas: number; urgentes: number }> = {};
+      maintenanceData?.forEach(m => {
+        if (!statusByClient[m.client_id]) {
+          statusByClient[m.client_id] = { vencidas: 0, urgentes: 0 };
+        }
+        if (m.urgency_status === 'vencido') {
+          statusByClient[m.client_id].vencidas++;
+        } else if (m.urgency_status === 'urgente') {
+          statusByClient[m.client_id].urgentes++;
+        }
+      });
+      setMaintenanceStatus(statusByClient);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
       toast.error('Erro ao carregar clientes');
@@ -559,7 +580,13 @@ export default function ClientsPage() {
           </div>
         ) : (
           filteredClients.map((client) => (
-            <div key={client.id} className="card hover:shadow-lg transition-shadow">
+            <div key={client.id} className={`card hover:shadow-lg transition-shadow ${
+              maintenanceStatus[client.id]?.vencidas > 0 
+                ? 'border-l-4 border-l-red-500 bg-red-50/30' 
+                : maintenanceStatus[client.id]?.urgentes > 0 
+                  ? 'border-l-4 border-l-amber-500 bg-amber-50/30' 
+                  : ''
+            }`}>
               {/* Header do Card */}
               <div className="flex items-start gap-2 sm:gap-3 mb-3 sm:mb-4">
                 {client.client_logo_url ? (
@@ -701,6 +728,27 @@ export default function ClientsPage() {
                   <Lock size={10} className="sm:w-3 sm:h-3 flex-shrink-0" />
                   <span className="truncate">Bloqueado: {client.portal_blocked_reason || 'Sem motivo'}</span>
                 </div>
+              )}
+
+              {/* Indicador de Manutenção Atrasada/Urgente */}
+              {(maintenanceStatus[client.id]?.vencidas > 0 || maintenanceStatus[client.id]?.urgentes > 0) && (
+                <Link 
+                  href="/dashboard/maintenance"
+                  className={`mt-1.5 sm:mt-2 p-1.5 sm:p-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold border-2 ${
+                    maintenanceStatus[client.id]?.vencidas > 0 
+                      ? 'bg-red-50 border-red-400 text-red-700' 
+                      : 'bg-amber-50 border-amber-400 text-amber-700'
+                  }`}
+                >
+                  <AlertTriangle size={12} className="sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                  <span className="flex-1">
+                    {maintenanceStatus[client.id]?.vencidas > 0 
+                      ? `⚠️ ${maintenanceStatus[client.id].vencidas} manutenção(ões) VENCIDA(S)!`
+                      : `🔔 ${maintenanceStatus[client.id].urgentes} manutenção(ões) urgente(s)`
+                    }
+                  </span>
+                  <Calendar size={10} className="sm:w-3 sm:h-3 flex-shrink-0" />
+                </Link>
               )}
 
               {/* Link Ver Detalhes */}
