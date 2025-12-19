@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/authStore';
-import { Calendar, Clock, User, Check, X, MessageCircle, Loader2, AlertTriangle, Send, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, User, Check, X, MessageCircle, Loader2, AlertTriangle, Send, ChevronRight, Edit, Trash2, CalendarClock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -42,6 +42,15 @@ export default function MaintenanceRequestsPage() {
   const [responseForm, setResponseForm] = useState({
     action: 'confirmar' as 'confirmar' | 'reagendar',
     confirmed_date: '',
+    admin_notes: ''
+  });
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    suggested_date: '',
+    suggested_time_period: 'manha',
     admin_notes: ''
   });
 
@@ -137,6 +146,71 @@ export default function MaintenanceRequestsPage() {
     } catch (error: any) {
       toast.error(error.message);
     }
+  }
+
+  function openEditModal(request: MaintenanceRequest) {
+    setSelectedRequest(request);
+    setEditForm({
+      title: request.title,
+      description: request.description || '',
+      suggested_date: request.confirmed_date || request.suggested_date,
+      suggested_time_period: request.suggested_time_period,
+      admin_notes: request.admin_notes || ''
+    });
+    setShowEditModal(true);
+  }
+
+  async function handleEditRequest() {
+    if (!selectedRequest) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('maintenance_requests')
+        .update({
+          title: editForm.title,
+          description: editForm.description || null,
+          confirmed_date: editForm.suggested_date,
+          admin_notes: editForm.admin_notes || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedRequest.id);
+
+      if (error) throw error;
+      toast.success('Solicitação atualizada!');
+      setShowEditModal(false);
+      loadRequests();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteRequest(request: MaintenanceRequest) {
+    if (!confirm(`Excluir solicitação "${request.title}"?\n\nEsta ação não pode ser desfeita.`)) return;
+    
+    try {
+      const { error } = await supabase
+        .from('maintenance_requests')
+        .delete()
+        .eq('id', request.id);
+
+      if (error) throw error;
+      toast.success('Solicitação excluída!');
+      loadRequests();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  }
+
+  async function handleReschedule(request: MaintenanceRequest) {
+    setSelectedRequest(request);
+    setResponseForm({
+      action: 'reagendar',
+      confirmed_date: '',
+      admin_notes: ''
+    });
+    setShowModal(true);
   }
 
   function getStatusColor(status: string) {
@@ -374,6 +448,31 @@ export default function MaintenanceRequestsPage() {
                     </div>
                   )}
 
+                  {/* Botões de Editar, Reagendar e Excluir */}
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => openEditModal(request)}
+                      className="btn btn-sm btn-secondary flex-1"
+                      title="Editar"
+                    >
+                      <Edit size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleReschedule(request)}
+                      className="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white flex-1"
+                      title="Reagendar"
+                    >
+                      <CalendarClock size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteRequest(request)}
+                      className="btn btn-sm bg-red-500 hover:bg-red-600 text-white flex-1"
+                      title="Excluir"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+
                   <p className="text-xs text-gray-400 text-center">
                     {new Date(request.created_at).toLocaleDateString('pt-BR')}
                   </p>
@@ -490,6 +589,87 @@ export default function MaintenanceRequestsPage() {
                   <>
                     <Send size={16} />
                     {responseForm.action === 'confirmar' ? 'Confirmar Data' : 'Enviar Nova Data'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição */}
+      {showEditModal && selectedRequest && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-content max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-800">Editar Solicitação</h2>
+              <p className="text-gray-500">{selectedRequest.request_number}</p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="label">Título *</label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label className="label">Descrição</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="input min-h-[80px]"
+                  placeholder="Descrição da solicitação..."
+                />
+              </div>
+
+              <div>
+                <label className="label">Data</label>
+                <input
+                  type="date"
+                  value={editForm.suggested_date}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, suggested_date: e.target.value }))}
+                  className="input"
+                />
+              </div>
+
+              <div>
+                <label className="label">Período</label>
+                <select
+                  value={editForm.suggested_time_period}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, suggested_time_period: e.target.value }))}
+                  className="input"
+                >
+                  <option value="manha">Manhã</option>
+                  <option value="tarde">Tarde</option>
+                  <option value="qualquer">Qualquer horário</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Observação do Admin</label>
+                <textarea
+                  value={editForm.admin_notes}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, admin_notes: e.target.value }))}
+                  className="input min-h-[60px]"
+                  placeholder="Observações internas..."
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 flex gap-3">
+              <button onClick={() => setShowEditModal(false)} className="btn btn-secondary flex-1">
+                Cancelar
+              </button>
+              <button onClick={handleEditRequest} disabled={saving} className="btn btn-primary flex-1">
+                {saving ? <Loader2 className="animate-spin" size={20} /> : (
+                  <>
+                    <Check size={16} />
+                    Salvar
                   </>
                 )}
               </button>
