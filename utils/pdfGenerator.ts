@@ -1,20 +1,23 @@
 import { supabase } from '../lib/supabase';
 
-// Formatar data/hora - trata datas locais sem timezone
+// Formatar data/hora - SEMPRE extrai direto da string, sem conversão de timezone
 const formatDateTime = (dateString: string) => {
   if (!dateString) return '-';
   try {
-    if (dateString.includes('T') && !dateString.includes('Z') && !dateString.includes('+')) {
-      const [datePart, timePart] = dateString.split('T');
+    // Remove Z ou +00:00 do final se existir (ignora timezone)
+    let cleanDate = dateString.replace('Z', '').replace(/\+\d{2}:\d{2}$/, '').replace(/\.\d+$/, '');
+    
+    // Se tem T, extrai data e hora diretamente
+    if (cleanDate.includes('T')) {
+      const [datePart, timePart] = cleanDate.split('T');
       const [year, month, day] = datePart.split('-');
       const [hour, minute] = (timePart || '00:00').split(':');
       return `${day}/${month}/${year} ${hour}:${minute}`;
     }
-    return new Date(dateString).toLocaleString('pt-BR', { 
-      timeZone: 'America/Sao_Paulo',
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
+    
+    // Se não tem T, tenta parsear como data simples
+    const [year, month, day] = cleanDate.split('-');
+    return `${day}/${month}/${year}`;
   } catch { return dateString; }
 };
 
