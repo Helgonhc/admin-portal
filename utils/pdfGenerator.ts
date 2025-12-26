@@ -49,7 +49,7 @@ function buildOrderPDF(company: any, order: any, osNumber: string, techName: str
   const c = company.color;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OS #${osNumber}</title>
 <style>
-@page{margin:15mm 12mm;size:A4}
+@page{margin:10mm;size:210mm 210mm}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#333;line-height:1.4}
 .header{display:flex;align-items:center;border-bottom:3px solid ${c};padding-bottom:10px;margin-bottom:12px}
@@ -77,8 +77,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#333;line-heigh
 .check-pending::before{content:"○ "}
 .report{background:#fff;border:1px solid #ddd;border-left:3px solid ${c};padding:12px;font-size:9pt;line-height:1.6;white-space:pre-wrap;min-height:40px}
 .photos{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.photo{aspect-ratio:1;border-radius:16px;overflow:hidden;border:1px solid #ddd;background:#f5f5f5;display:flex;align-items:center;justify-content:center}
-.photo img{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px}
+.photo{position:relative;width:100%;padding-bottom:100%;border-radius:16px;overflow:hidden;border:1px solid #ddd;background:#f5f5f5}
+.photo img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;border-radius:14px}
 .signatures{display:flex;margin-top:20px;page-break-inside:avoid}
 .sig{flex:1;text-align:center;padding:0 20px}
 .sig-img{height:40px;margin-bottom:-5px}
