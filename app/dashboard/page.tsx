@@ -195,6 +195,58 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card">
+          <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <TrendingUp size={18} className="text-indigo-600" />
+            Volume de O.S. (Últimos 7 dias)
+          </h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                  cursor={{ fill: 'rgba(79, 70, 229, 0.05)' }}
+                />
+                <Bar dataKey="quantidade" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={35} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="card text-responsive overflow-hidden">
+          <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <ClipboardList size={18} className="text-indigo-600" />
+            Distribuição por Status
+          </h3>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={statusChartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {statusChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend iconType="circle" />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       {/* Alertas de Manutenções */}
       {(stats?.maintenanceVencidas || 0) + (stats?.maintenanceUrgentes || 0) > 0 && (
         <div className="card border-l-4 border-l-red-500 bg-red-50">
