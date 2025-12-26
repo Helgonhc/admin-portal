@@ -57,6 +57,9 @@ export default function OrderDetailsPage() {
     status: '',
     execution_report: '',
     photos_url: [] as string[],
+    checkin_at: '',
+    completed_at: '',
+    checkout_at: '',
   });
   const [clients, setClients] = useState<any[]>([]);
   const [equipments, setEquipments] = useState<any[]>([]);
@@ -143,6 +146,9 @@ export default function OrderDetailsPage() {
       status: order?.status || 'pendente',
       execution_report: order?.execution_report || '',
       photos_url: order?.photos_url || [],
+      checkin_at: order?.checkin_at ? order.checkin_at.slice(0, 16) : '',
+      completed_at: order?.completed_at ? order.completed_at.slice(0, 16) : '',
+      checkout_at: order?.checkout_at ? order.checkout_at.slice(0, 16) : '',
     });
 
     setShowEditModal(true);
@@ -184,6 +190,17 @@ export default function OrderDetailsPage() {
 
       if (editData.scheduled_at) {
         updateData.scheduled_at = editData.scheduled_at;
+      }
+      
+      // Datas de execução
+      if (editData.checkin_at) {
+        updateData.checkin_at = editData.checkin_at;
+      }
+      if (editData.completed_at) {
+        updateData.completed_at = editData.completed_at;
+      }
+      if (editData.checkout_at) {
+        updateData.checkout_at = editData.checkout_at;
       }
 
       const { error } = await supabase
@@ -864,6 +881,16 @@ export default function OrderDetailsPage() {
               <Play size={18} /> Retomar
             </button>
           )}
+          {order.status === 'concluido' && (
+            <button onClick={() => updateStatus('em_andamento')} disabled={processing} className="btn btn-warning !bg-amber-500 hover:!bg-amber-600 !text-white">
+              <Play size={18} /> Reabrir OS
+            </button>
+          )}
+          {order.status === 'cancelado' && (
+            <button onClick={() => updateStatus('pendente')} disabled={processing} className="btn btn-primary">
+              <Play size={18} /> Reativar OS
+            </button>
+          )}
           {order.status !== 'cancelado' && order.status !== 'concluido' && (
             <button onClick={() => updateStatus('cancelado')} disabled={processing} className="btn btn-danger">
               <X size={18} /> Cancelar
@@ -1079,10 +1106,48 @@ export default function OrderDetailsPage() {
                 </div>
               </div>
 
+              {/* Seção: Datas de Execução */}
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 text-xs font-bold">4</span>
+                  ⏰ Datas de Execução
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">Início (Check-in)</label>
+                    <input
+                      type="datetime-local"
+                      value={editData.checkin_at}
+                      onChange={(e) => setEditData({ ...editData, checkin_at: e.target.value })}
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Conclusão</label>
+                    <input
+                      type="datetime-local"
+                      value={editData.completed_at}
+                      onChange={(e) => setEditData({ ...editData, completed_at: e.target.value })}
+                      className="input"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Checkout</label>
+                    <input
+                      type="datetime-local"
+                      value={editData.checkout_at}
+                      onChange={(e) => setEditData({ ...editData, checkout_at: e.target.value })}
+                      className="input"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">💡 Edite as datas para corrigir horários de execução</p>
+              </div>
+
               {/* Seção: Relatório Técnico */}
               <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">4</span>
+                  <span className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">5</span>
                   📝 Relatório Técnico
                 </h3>
                 <textarea
@@ -1096,7 +1161,7 @@ export default function OrderDetailsPage() {
               {/* Seção: Fotos */}
               <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-xs font-bold">5</span>
+                  <span className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-xs font-bold">6</span>
                   📷 Fotos ({editData.photos_url.length})
                 </h3>
                 
