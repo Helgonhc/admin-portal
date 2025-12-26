@@ -19,6 +19,29 @@ const formatOrderId = (id: string, dateString: string) => {
   return `${yearMonth}-${suffix}`;
 };
 
+// Função para formatar texto em parágrafos HTML
+const formatReportText = (text: string) => {
+  if (!text || text.trim() === '') {
+    return '<p><i>Nenhuma observação registrada.</i></p>';
+  }
+  
+  // Dividir por quebras de linha duplas (parágrafos) ou simples
+  const paragraphs = text
+    .split(/\n\n+/) // Divide por linhas duplas primeiro
+    .map(p => p.trim())
+    .filter(p => p.length > 0)
+    .map(p => {
+      // Dentro de cada parágrafo, substituir quebras simples por <br>
+      return p.replace(/\n/g, '<br>');
+    });
+  
+  if (paragraphs.length === 0) {
+    return '<p><i>Nenhuma observação registrada.</i></p>';
+  }
+  
+  return paragraphs.map(p => `<p>${p}</p>`).join('');
+};
+
 // Buscar configurações da empresa
 async function getCompanyConfig() {
   const { data: config } = await supabase
@@ -72,7 +95,7 @@ export async function generateServiceOrderPDF(order: any) {
       .order('created_at');
 
     const osNumber = formatOrderId(order.id, order.created_at);
-    const reportContent = order.execution_report || order.description || '<i>Nenhuma observação registrada.</i>';
+    const reportContent = formatReportText(order.execution_report || order.description || '');
     const photos = order.photos_url || order.photos || [];
 
     const html = generateOrderHTML(company, order, osNumber, technicianName, technicianSignature, technicianDoc, tasks || [], reportContent, photos);
@@ -153,7 +176,9 @@ body { font-family: Arial, sans-serif; font-size: 9px; color: #333; line-height:
 .check-done::before { content: "✓ "; font-weight: bold; }
 .check-pending { color: #999; }
 .check-pending::before { content: "○ "; }
-.report-box { background: #fafafa; border: 1px solid #ddd; padding: 10px; border-radius: 4px; font-size: 9px; line-height: 1.5; white-space: pre-wrap; min-height: 50px; }
+.report-box { background: #fafafa; border: 1px solid #ddd; padding: 15px; border-radius: 6px; font-size: 10px; line-height: 1.7; min-height: 60px; text-align: justify; }
+.report-box p { margin-bottom: 10px; text-indent: 2em; }
+.report-box p:last-child { margin-bottom: 0; }
 .photos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
 .photo-item { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; background: #f5f5f5; }
 .photo-item img { width: 100%; height: auto; max-height: 200px; object-fit: contain; display: block; }
