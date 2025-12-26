@@ -76,9 +76,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#333;line-heigh
 .check-pending{color:#9ca3af}
 .check-pending::before{content:"○ "}
 .report{background:#fff;border:1px solid #ddd;border-left:3px solid ${c};padding:12px;font-size:9pt;line-height:1.6;white-space:pre-wrap;min-height:40px}
-.photos{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.photo{border-radius:6px;overflow:hidden;border:1px solid #ddd;background:#f5f5f5}
-.photo img{width:100%;height:auto;max-height:180px;object-fit:contain;display:block}
+.photos{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.photo{aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #ddd;background:#f5f5f5;display:flex;align-items:center;justify-content:center}
+.photo img{max-width:100%;max-height:100%;object-fit:contain}
 .signatures{display:flex;margin-top:20px;page-break-inside:avoid}
 .sig{flex:1;text-align:center;padding:0 20px}
 .sig-img{height:40px;margin-bottom:-5px}
