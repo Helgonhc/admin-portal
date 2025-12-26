@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { supabase, Client } from '../../../lib/supabase';
-import { 
-  Plus, Search, Edit, Trash2, Eye, Loader2, Building2, 
+import {
+  Plus, Search, Edit, Trash2, Eye, Loader2, Building2,
   Globe, Lock, Users, MessageCircle, Phone, Mail, MapPin,
   Navigation, Unlock, UserPlus, Upload, Image, X, Shield,
   AlertTriangle, Calendar
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { Skeleton, ListSkeleton } from '../../../components/Skeleton';
 import { usePermissions } from '../../../hooks/usePermissions';
 
 export default function ClientsPage() {
@@ -18,13 +19,13 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [maintenanceStatus, setMaintenanceStatus] = useState<Record<string, { vencidas: number; urgentes: number }>>({});
-  
+
   // Verificar permissão de acesso
   const canViewClients = can('can_view_all_clients');
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Form data completo igual ao app
   const [formData, setFormData] = useState({
     type: 'PJ' as 'PF' | 'PJ',
@@ -43,15 +44,15 @@ export default function ClientsPage() {
     state: '',
     client_logo_url: '',
   });
-  
+
   // Loading states para busca automática
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
-  
+
   // Upload de logo
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  
+
   // Modal de Portal
   const [portalModalVisible, setPortalModalVisible] = useState(false);
   const [selectedClient, setSelectedClient] = useState<any>(null);
@@ -77,7 +78,7 @@ export default function ClientsPage() {
       const { data: maintenanceData } = await supabase
         .from('active_maintenance_contracts')
         .select('client_id, urgency_status');
-      
+
       // Agrupar por cliente
       const statusByClient: Record<string, { vencidas: number; urgentes: number }> = {};
       maintenanceData?.forEach(m => {
@@ -102,26 +103,26 @@ export default function ClientsPage() {
   // Upload de logo do cliente
   async function handleLogoUpload(file: File) {
     if (!file) return;
-    
+
     // Validar tipo
     if (!file.type.startsWith('image/')) {
       toast.error('Selecione uma imagem válida');
       return;
     }
-    
+
     // Validar tamanho (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       toast.error('Imagem muito grande. Máximo 2MB');
       return;
     }
-    
+
     setUploadingLogo(true);
-    
+
     try {
       // Gerar nome único
       const fileExt = file.name.split('.').pop();
       const fileName = `client-logos/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      
+
       // Upload para Supabase Storage
       const { data, error } = await supabase.storage
         .from('os-photos')
@@ -129,14 +130,14 @@ export default function ClientsPage() {
           cacheControl: '3600',
           upsert: false
         });
-      
+
       if (error) throw error;
-      
+
       // Pegar URL pública
       const { data: urlData } = supabase.storage
         .from('os-photos')
         .getPublicUrl(fileName);
-      
+
       setFormData(prev => ({ ...prev, client_logo_url: urlData.publicUrl }));
       toast.success('Logo enviada com sucesso!');
     } catch (error: any) {
@@ -146,7 +147,7 @@ export default function ClientsPage() {
       setUploadingLogo(false);
     }
   }
-  
+
   // Handlers de drag and drop
   function handleDrag(e: React.DragEvent) {
     e.preventDefault();
@@ -157,23 +158,23 @@ export default function ClientsPage() {
       setDragActive(false);
     }
   }
-  
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleLogoUpload(e.dataTransfer.files[0]);
     }
   }
-  
+
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files[0]) {
       handleLogoUpload(e.target.files[0]);
     }
   }
-  
+
   function removeLogo() {
     setFormData(prev => ({ ...prev, client_logo_url: '' }));
   }
@@ -181,7 +182,7 @@ export default function ClientsPage() {
   // Busca automática de CNPJ (BrasilAPI)
   async function handleCnpjBlur() {
     if (formData.type === 'PF') return;
-    
+
     const cleanDoc = formData.cnpj_cpf.replace(/\D/g, '');
     if (cleanDoc.length !== 14) return;
 
@@ -298,7 +299,7 @@ export default function ClientsPage() {
     setSaving(true);
     try {
       const fullAddress = `${formData.street}, ${formData.number} - ${formData.neighborhood}, ${formData.city}/${formData.state} ${formData.zip_code ? `- CEP ${formData.zip_code}` : ''}`;
-      
+
       const payload = {
         ...formData,
         address: fullAddress,
@@ -343,7 +344,7 @@ export default function ClientsPage() {
         .delete()
         .eq('id', client.id);
       if (error) throw error;
-      
+
       toast.success('Cliente excluído!');
       loadClients();
     } catch (error: any) {
@@ -437,7 +438,7 @@ export default function ClientsPage() {
         console.error('Erro na função SQL:', rpcError);
         throw new Error(`Erro ao criar usuário: ${rpcError.message}. Execute o SQL CRIAR_USUARIO_SEM_AFETAR_SESSAO.sql no Supabase.`);
       }
-      
+
       if (result && !result.success) {
         throw new Error(result.error || 'Erro ao criar usuário');
       } else if (result && result.success) {
@@ -451,7 +452,7 @@ export default function ClientsPage() {
       // Atualizar cliente com portal liberado
       await supabase
         .from('clients')
-        .update({ 
+        .update({
           email: portalEmail.trim().toLowerCase(),
           portal_enabled: true,
           portal_blocked: false
@@ -472,8 +473,8 @@ export default function ClientsPage() {
   // Bloquear/Desbloquear portal
   async function handleTogglePortalBlock(client: any) {
     const isBlocked = client.portal_blocked || false;
-    
-    if (!confirm(isBlocked 
+
+    if (!confirm(isBlocked
       ? `Deseja DESBLOQUEAR o acesso ao portal para ${client.name}?\n\nO cliente poderá fazer login novamente.`
       : `Deseja BLOQUEAR o acesso ao portal para ${client.name}?\n\nO cliente não conseguirá fazer login até ser desbloqueado.`
     )) return;
@@ -569,19 +570,18 @@ export default function ClientsPage() {
           </div>
         ) : (
           filteredClients.map((client) => (
-            <div key={client.id} className={`card hover:shadow-lg transition-shadow ${
-              maintenanceStatus[client.id]?.vencidas > 0 
-                ? 'border-l-4 border-l-red-500 bg-red-50/30' 
-                : maintenanceStatus[client.id]?.urgentes > 0 
-                  ? 'border-l-4 border-l-amber-500 bg-amber-50/30' 
+            <div key={client.id} className={`card hover:shadow-lg transition-shadow ${maintenanceStatus[client.id]?.vencidas > 0
+                ? 'border-l-4 border-l-red-500 bg-red-50/30'
+                : maintenanceStatus[client.id]?.urgentes > 0
+                  ? 'border-l-4 border-l-amber-500 bg-amber-50/30'
                   : ''
-            }`}>
+              }`}>
               {/* Header do Card */}
               <div className="flex items-start gap-2 sm:gap-3 mb-3 sm:mb-4">
                 {client.client_logo_url ? (
-                  <img 
-                    src={client.client_logo_url} 
-                    alt={client.name} 
+                  <img
+                    src={client.client_logo_url}
+                    alt={client.name}
                     className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-indigo-100 flex-shrink-0"
                   />
                 ) : (
@@ -627,7 +627,7 @@ export default function ClientsPage() {
                   </a>
                 )}
                 {client.address && (
-                  <button 
+                  <button
                     onClick={() => handleOpenMap(client.address)}
                     className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-rose-600 text-left w-full"
                   >
@@ -641,7 +641,7 @@ export default function ClientsPage() {
               {/* Botões de Ação Rápida */}
               <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-2 sm:mb-3">
                 <div className="relative group">
-                  <button 
+                  <button
                     onClick={() => handleWhatsApp(client, 'vazio')}
                     className="w-full py-1.5 sm:py-2 px-1 sm:px-3 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center justify-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm font-medium"
                   >
@@ -657,7 +657,7 @@ export default function ClientsPage() {
                     <button onClick={() => handleWhatsApp(client, 'vazio')} className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-left text-xs sm:text-sm hover:bg-gray-50 rounded-b-lg">💬 Em branco</button>
                   </div>
                 </div>
-                <a 
+                <a
                   href={`mailto:${client.email}`}
                   className="py-1.5 sm:py-2 px-1 sm:px-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm font-medium"
                 >
@@ -665,7 +665,7 @@ export default function ClientsPage() {
                   <span className="hidden xs:inline">E-mail</span>
                   <span className="xs:hidden">Mail</span>
                 </a>
-                <Link 
+                <Link
                   href={`/dashboard/equipments?client=${client.id}`}
                   className="py-1.5 sm:py-2 px-1 sm:px-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm font-medium"
                 >
@@ -678,7 +678,7 @@ export default function ClientsPage() {
               {isAdmin && (
                 <div className="space-y-1.5 sm:space-y-2">
                   {/* Botão Liberar Portal */}
-                  <button 
+                  <button
                     onClick={() => handleOpenPortalModal(client)}
                     className="w-full py-1.5 sm:py-2 px-2 sm:px-3 border-2 border-orange-400 text-orange-600 hover:bg-orange-50 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium"
                   >
@@ -688,7 +688,7 @@ export default function ClientsPage() {
                   </button>
 
                   {/* Botão Gerenciar Usuários */}
-                  <Link 
+                  <Link
                     href={`/dashboard/clients/${client.id}/users`}
                     className="w-full py-1.5 sm:py-2 px-2 sm:px-3 border-2 border-purple-400 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium"
                   >
@@ -697,13 +697,12 @@ export default function ClientsPage() {
                   </Link>
 
                   {/* Botão Bloquear/Desbloquear Portal */}
-                  <button 
+                  <button
                     onClick={() => handleTogglePortalBlock(client)}
-                    className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium ${
-                      client.portal_blocked 
-                        ? 'bg-red-600 text-white hover:bg-red-700' 
+                    className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium ${client.portal_blocked
+                        ? 'bg-red-600 text-white hover:bg-red-700'
                         : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
-                    }`}
+                      }`}
                   >
                     {client.portal_blocked ? <Unlock size={12} className="sm:w-4 sm:h-4" /> : <Lock size={12} className="sm:w-4 sm:h-4" />}
                     {client.portal_blocked ? '🔓 Desbloquear' : '🔒 Bloquear Portal'}
@@ -721,17 +720,16 @@ export default function ClientsPage() {
 
               {/* Indicador de Manutenção Atrasada/Urgente */}
               {(maintenanceStatus[client.id]?.vencidas > 0 || maintenanceStatus[client.id]?.urgentes > 0) && (
-                <Link 
+                <Link
                   href="/dashboard/maintenance"
-                  className={`mt-1.5 sm:mt-2 p-1.5 sm:p-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold border-2 ${
-                    maintenanceStatus[client.id]?.vencidas > 0 
-                      ? 'bg-red-50 border-red-400 text-red-700' 
+                  className={`mt-1.5 sm:mt-2 p-1.5 sm:p-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold border-2 ${maintenanceStatus[client.id]?.vencidas > 0
+                      ? 'bg-red-50 border-red-400 text-red-700'
                       : 'bg-amber-50 border-amber-400 text-amber-700'
-                  }`}
+                    }`}
                 >
                   <AlertTriangle size={12} className="sm:w-3.5 sm:h-3.5 flex-shrink-0" />
                   <span className="flex-1">
-                    {maintenanceStatus[client.id]?.vencidas > 0 
+                    {maintenanceStatus[client.id]?.vencidas > 0
                       ? `⚠️ ${maintenanceStatus[client.id].vencidas} manutenção(ões) VENCIDA(S)!`
                       : `🔔 ${maintenanceStatus[client.id].urgentes} manutenção(ões) urgente(s)`
                     }
@@ -741,7 +739,7 @@ export default function ClientsPage() {
               )}
 
               {/* Link Ver Detalhes */}
-              <Link 
+              <Link
                 href={`/dashboard/clients/${client.id}`}
                 className="mt-2 sm:mt-3 block text-center text-xs sm:text-sm text-indigo-600 hover:underline"
               >
@@ -766,17 +764,15 @@ export default function ClientsPage() {
               <div className="flex gap-1 sm:gap-2 p-1 bg-gray-100 rounded-lg">
                 <button
                   onClick={() => setFormData({ ...formData, type: 'PF' })}
-                  className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-md font-medium transition-all text-xs sm:text-sm ${
-                    formData.type === 'PF' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'
-                  }`}
+                  className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-md font-medium transition-all text-xs sm:text-sm ${formData.type === 'PF' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'
+                    }`}
                 >
                   👤 <span className="hidden sm:inline">Pessoa </span>Física
                 </button>
                 <button
                   onClick={() => setFormData({ ...formData, type: 'PJ' })}
-                  className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-md font-medium transition-all text-xs sm:text-sm ${
-                    formData.type === 'PJ' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'
-                  }`}
+                  className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-md font-medium transition-all text-xs sm:text-sm ${formData.type === 'PJ' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'
+                    }`}
                 >
                   🏢 <span className="hidden sm:inline">Pessoa </span>Jurídica
                 </button>
@@ -863,7 +859,7 @@ export default function ClientsPage() {
               {/* Endereço */}
               <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4">
                 <h4 className="font-semibold text-gray-700 mb-2 sm:mb-3 text-sm sm:text-base">📍 Endereço</h4>
-                
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mb-2 sm:mb-4">
                   <div>
                     <label className="label">CEP</label>
@@ -951,13 +947,13 @@ export default function ClientsPage() {
               {/* Logo do Cliente - Upload */}
               <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4">
                 <h4 className="font-semibold text-gray-700 mb-2 sm:mb-3 text-sm sm:text-base">🖼️ Logo do Cliente</h4>
-                
+
                 {formData.client_logo_url ? (
                   // Preview da logo
                   <div className="relative inline-block">
-                    <img 
-                      src={formData.client_logo_url} 
-                      alt="Logo do cliente" 
+                    <img
+                      src={formData.client_logo_url}
+                      alt="Logo do cliente"
                       className="h-24 sm:h-32 max-w-full object-contain rounded-lg border-2 border-indigo-200 bg-white p-2"
                     />
                     <button
@@ -977,8 +973,8 @@ export default function ClientsPage() {
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
                     className={`relative border-2 border-dashed rounded-xl p-6 sm:p-8 text-center transition-all cursor-pointer
-                      ${dragActive 
-                        ? 'border-indigo-500 bg-indigo-50' 
+                      ${dragActive
+                        ? 'border-indigo-500 bg-indigo-50'
                         : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
                       }
                       ${uploadingLogo ? 'opacity-50 pointer-events-none' : ''}
@@ -991,7 +987,7 @@ export default function ClientsPage() {
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       disabled={uploadingLogo}
                     />
-                    
+
                     {uploadingLogo ? (
                       <div className="flex flex-col items-center">
                         <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-2" />
@@ -1015,7 +1011,7 @@ export default function ClientsPage() {
                     )}
                   </div>
                 )}
-                
+
                 {/* Campo de URL alternativo */}
                 <div className="mt-3">
                   <label className="text-xs text-gray-500 flex items-center gap-1 mb-1">

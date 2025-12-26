@@ -86,7 +86,7 @@ export default function Sidebar() {
         .select('company_name, logo_url, phone, email')
         .limit(1)
         .single();
-      
+
       if (data) {
         setAppConfig(data);
       }
@@ -107,9 +107,9 @@ export default function Sidebar() {
           // Versão colapsada - só avatar do usuário
           <div className="flex justify-center">
             {profile?.avatar_url ? (
-              <img 
-                src={profile.avatar_url} 
-                alt={profile.full_name || 'Avatar'} 
+              <img
+                src={profile.avatar_url}
+                alt={profile.full_name || 'Avatar'}
                 className="w-10 h-10 rounded-full object-cover border-2 border-indigo-300 shadow-sm"
               />
             ) : (
@@ -126,35 +126,35 @@ export default function Sidebar() {
             {/* Logo da Empresa (pequena) */}
             {appConfig?.logo_url && (
               <div className="flex justify-center mb-2">
-                <img 
-                  src={appConfig.logo_url} 
-                  alt={appConfig.company_name || 'Logo'} 
+                <img
+                  src={appConfig.logo_url}
+                  alt={appConfig.company_name || 'Logo'}
                   className="h-10 object-contain"
                 />
               </div>
             )}
-            
+
             {/* Nome da Empresa */}
             <h1 className="font-bold text-gray-800 text-sm leading-tight mb-1">
               {appConfig?.company_name || 'Portal Admin'}
             </h1>
-            
+
             {/* Telefone da empresa */}
             {appConfig?.phone && (
               <p className="text-xs text-gray-500 mb-2">📞 {appConfig.phone}</p>
             )}
-            
+
             {/* Separador */}
             <div className="h-px bg-gradient-to-r from-transparent via-indigo-200 to-transparent my-3"></div>
-            
+
             {/* Avatar e Info do Usuário Logado */}
             <div className="flex flex-col items-center">
               {/* Avatar Grande */}
               <div className="relative mb-2">
                 {profile?.avatar_url ? (
-                  <img 
-                    src={profile.avatar_url} 
-                    alt={profile.full_name || 'Avatar'} 
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.full_name || 'Avatar'}
                     className="w-16 h-16 rounded-full object-cover border-3 border-indigo-300 shadow-lg"
                   />
                 ) : (
@@ -167,22 +167,21 @@ export default function Sidebar() {
                 {/* Badge de status online */}
                 <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
               </div>
-              
+
               {/* Nome do Usuário */}
               <p className="font-semibold text-gray-800 text-sm truncate max-w-[180px]">
                 {profile?.full_name || 'Usuário'}
               </p>
-              
+
               {/* Cargo/Role */}
-              <span className={`text-xs px-2 py-0.5 rounded-full mt-1 ${
-                profile?.role === 'super_admin' 
-                  ? 'bg-purple-100 text-purple-700' 
-                  : profile?.role === 'admin' 
-                    ? 'bg-blue-100 text-blue-700' 
+              <span className={`text-xs px-2 py-0.5 rounded-full mt-1 ${profile?.role === 'super_admin'
+                  ? 'bg-purple-100 text-purple-700'
+                  : profile?.role === 'admin'
+                    ? 'bg-blue-100 text-blue-700'
                     : 'bg-green-100 text-green-700'
-              }`}>
-                {profile?.role === 'super_admin' ? '⭐ Super Admin' : 
-                 profile?.role === 'admin' ? '👑 Administrador' : '🔧 Técnico'}
+                }`}>
+                {profile?.role === 'super_admin' ? '⭐ Super Admin' :
+                  profile?.role === 'admin' ? '👑 Administrador' : '🔧 Técnico'}
               </span>
             </div>
           </div>
@@ -203,7 +202,7 @@ export default function Sidebar() {
             }
           }
           if (!hasPermission) return null;
-          
+
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
@@ -306,22 +305,25 @@ export default function Sidebar() {
 
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ${
-          collapsed ? 'w-16' : 'w-64'
-        }`}
+        className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out relative ${collapsed ? 'w-20' : 'w-72'
+          }`}
       >
-        <SidebarContent />
-        
-        {/* Collapse Button - Posicionado dentro do sidebar, não fora */}
-        <div className="absolute bottom-24 right-2">
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="w-8 h-8 bg-indigo-100 hover:bg-indigo-200 border border-indigo-300 rounded-full flex items-center justify-center shadow-sm transition-colors"
-            title={collapsed ? 'Expandir menu' : 'Recolher menu'}
-          >
-            {collapsed ? <ChevronRight size={16} className="text-indigo-600" /> : <ChevronLeft size={16} className="text-indigo-600" />}
-          </button>
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <SidebarContent />
         </div>
+
+        {/* Collapse Button - Posicionado flutuando na borda */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute top-10 -right-3.5 w-7 h-7 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md hover:bg-indigo-50 transition-colors z-20 group"
+          title={collapsed ? 'Expandir menu' : 'Recolher menu'}
+        >
+          {collapsed ? (
+            <ChevronRight size={14} className="text-gray-400 group-hover:text-indigo-600" />
+          ) : (
+            <ChevronLeft size={14} className="text-gray-400 group-hover:text-indigo-600" />
+          )}
+        </button>
       </aside>
     </>
   );

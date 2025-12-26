@@ -7,6 +7,8 @@ import { Plus, Search, Eye, Loader2, Ticket as TicketIcon, AlertCircle, User } f
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { usePermissions } from '../../../hooks/usePermissions';
+import { Skeleton, ListSkeleton } from '../../../components/Skeleton';
+import { getStatusColor, getStatusLabel } from '../../../utils/statusUtils';
 
 export default function TicketsPage() {
   const { can } = usePermissions();
@@ -31,45 +33,33 @@ export default function TicketsPage() {
 
   async function loadData() {
     try {
-      console.log('🔄 Carregando tickets...');
-      
-      // Carregar tickets - query simples primeiro
       const ticketsRes = await supabase
         .from('tickets')
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('🎫 Resultado Tickets:', { data: ticketsRes.data?.length, error: ticketsRes.error });
-
       if (ticketsRes.error) {
-        console.error('❌ Erro ao carregar tickets:', ticketsRes.error);
         toast.error('Erro ao carregar tickets: ' + ticketsRes.error.message);
       } else {
-        // Se deu certo, buscar com joins (especificando a FK correta)
         const ticketsWithJoins = await supabase
           .from('tickets')
           .select('*, clients(name), creator:profiles!tickets_created_by_fkey(full_name)')
           .order('created_at', { ascending: false });
-        
+
         setTickets(ticketsWithJoins.data || ticketsRes.data || []);
-        console.log('✅ Tickets carregados:', ticketsWithJoins.data?.length || ticketsRes.data?.length);
       }
 
-      // Carregar clientes
       const clientsRes = await supabase
         .from('clients')
         .select('id, name')
         .eq('is_active', true)
         .order('name');
-      
-      console.log('👥 Clientes:', clientsRes.data?.length, clientsRes.error);
       setClients(clientsRes.data || []);
 
     } catch (error: any) {
-      console.error('💥 Erro geral:', error);
       toast.error('Erro ao carregar dados: ' + (error?.message || 'Verifique sua conexão'));
     } finally {
-      setLoading(false);
+      setTimeout(() => setLoading(false), 500);
     }
   }
 
@@ -88,10 +78,8 @@ export default function TicketsPage() {
 
     setSaving(true);
     try {
-      // Gerar número do ticket
-      const ticketNumber = `TKT-${new Date().toISOString().slice(0,7).replace('-','')}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`;
-      
-      // Mapear prioridade para português
+      const ticketNumber = `TKT-${new Date().toISOString().slice(0, 7).replace('-', '')}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`;
+
       const priorityMap: Record<string, string> = {
         low: 'baixa',
         medium: 'media',
@@ -110,10 +98,8 @@ export default function TicketsPage() {
       }]).select('id, ticket_number').single();
       if (error) throw error;
 
-      // Buscar nome do cliente para a notificação
       const selectedClient = clients.find(c => c.id === formData.client_id);
 
-      // Criar notificações para todos os usuários do cliente (portal)
       const { data: clientUsers } = await supabase
         .from('profiles')
         .select('id')
@@ -133,13 +119,12 @@ export default function TicketsPage() {
         await supabase.from('notifications').insert(notifications);
       }
 
-      // Criar notificações para todos os usuários da plataforma (admin, super_admin, técnicos)
       const { data: allUsers } = await supabase
         .from('profiles')
         .select('id')
         .in('role', ['admin', 'super_admin', 'technician'])
         .eq('is_active', true)
-        .neq('id', profile?.id); // Não notificar quem criou
+        .neq('id', profile?.id);
 
       if (allUsers && allUsers.length > 0) {
         const notifications = allUsers.map(u => ({
@@ -164,36 +149,6 @@ export default function TicketsPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'resolved':
-      case 'closed':
-      case 'aprovado':
-      case 'convertido': return 'badge-success';
-      case 'in_progress':
-      case 'em_analise': return 'badge-info';
-      case 'open':
-      case 'aberto': return 'badge-warning';
-      case 'rejeitado': return 'badge-danger';
-      default: return 'badge-gray';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      open: 'Aberto',
-      aberto: 'Aberto',
-      in_progress: 'Em Andamento',
-      em_analise: 'Em Análise',
-      resolved: 'Resolvido',
-      aprovado: 'Aprovado',
-      closed: 'Fechado',
-      convertido: 'Convertido em OS',
-      rejeitado: 'Rejeitado',
-    };
-    return labels[status] || status;
-  };
-
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
       case 'urgent':
@@ -208,13 +163,7 @@ export default function TicketsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
+  if (loading) return <ListSkeleton />;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -295,10 +244,10 @@ export default function TicketsPage() {
                     </td>
                     <td>{ticket.clients?.name || '-'}</td>
                     <td>
-                      {ticket.creator?.full_name ? (
+                      {(ticket as any).creator?.full_name ? (
                         <span className="flex items-center gap-1 text-sm text-indigo-600">
                           <User size={14} />
-                          {ticket.creator.full_name}
+                          {(ticket as any).creator.full_name}
                         </span>
                       ) : (
                         <span className="text-gray-400 text-sm">-</span>
