@@ -1,6 +1,31 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+/* Skeleton & Premium UX */
+.skeleton {
+  @apply bg-gray-200 animate-pulse bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200;
+  background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s infinite linear;
+}
+
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+}
+
+.animate-fadeIn {
+  @apply animate-[fadeIn_0.5s_ease-out];
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 :root {
   /* Cores dinâmicas - serão sobrescritas pelo JavaScript */

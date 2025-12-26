@@ -18,6 +18,8 @@ import {
   Bell,
 } from 'lucide-react';
 import Link from 'next/link';
+import { Skeleton, DashboardSkeleton } from '../../components/Skeleton';
+import { getStatusColor, getStatusLabel } from '../../utils/statusUtils';
 
 interface DashboardStats {
   totalClients: number;
@@ -45,16 +47,15 @@ export default function DashboardPage() {
   async function loadDashboard() {
     try {
       console.log('🏠 Carregando dashboard...');
-      
-      // Carregar estatísticas - usando status em português E inglês
+
       const [
-        { count: totalClients, error: e1 },
-        { count: totalEquipments, error: e2 },
-        { count: pendingOrders, error: e3 },
-        { count: openTickets, error: e4 },
-        { count: pendingOvertime, error: e5 },
-        { count: completedToday, error: e6 },
-        { data: maintenanceData, error: e7 },
+        { count: totalClients },
+        { count: totalEquipments },
+        { count: pendingOrders },
+        { count: openTickets },
+        { count: pendingOvertime },
+        { count: completedToday },
+        { data: maintenanceData },
       ] = await Promise.all([
         supabase.from('clients').select('*', { count: 'exact', head: true }),
         supabase.from('equipments').select('*', { count: 'exact', head: true }),
@@ -67,13 +68,9 @@ export default function DashboardPage() {
         supabase.from('active_maintenance_contracts').select('urgency_status'),
       ]);
 
-      // Contar manutenções por status
       const maintenanceVencidas = maintenanceData?.filter(m => m.urgency_status === 'vencido').length || 0;
       const maintenanceUrgentes = maintenanceData?.filter(m => m.urgency_status === 'urgente').length || 0;
       const maintenanceProximas = maintenanceData?.filter(m => m.urgency_status === 'proximo').length || 0;
-
-      console.log('📊 Stats:', { totalClients, totalEquipments, pendingOrders, openTickets, maintenanceVencidas, maintenanceUrgentes });
-      if (e1 || e2 || e3 || e4) console.error('Erros:', { e1, e2, e3, e4 });
 
       setStats({
         totalClients: totalClients || 0,
@@ -87,89 +84,31 @@ export default function DashboardPage() {
         maintenanceProximas,
       });
 
-      // Carregar ordens recentes
-      const { data: orders, error: ordersError } = await supabase
+      const { data: orders } = await supabase
         .from('service_orders')
         .select('*, clients(name)')
         .order('created_at', { ascending: false })
         .limit(5);
-      
-      console.log('📋 Ordens recentes:', orders?.length, ordersError);
+
       setRecentOrders(orders || []);
 
-      // Carregar chamados recentes
-      const { data: tickets, error: ticketsError } = await supabase
+      const { data: tickets } = await supabase
         .from('tickets')
         .select('*, clients(name)')
         .order('created_at', { ascending: false })
         .limit(5);
-      
-      console.log('🎫 Tickets recentes:', tickets?.length, ticketsError);
+
       setRecentTickets(tickets || []);
 
     } catch (error) {
       console.error('💥 Erro ao carregar dashboard:', error);
     } finally {
-      setLoading(false);
+      // Pequeno delay para suavizar a transição do skeleton
+      setTimeout(() => setLoading(false), 500);
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-      case 'concluido':
-      case 'resolved':
-      case 'closed':
-      case 'aprovado':
-      case 'convertido':
-        return 'badge-success';
-      case 'in_progress':
-      case 'em_andamento':
-      case 'em_analise':
-        return 'badge-info';
-      case 'pending':
-      case 'pendente':
-      case 'open':
-      case 'aberto':
-        return 'badge-warning';
-      case 'cancelled':
-      case 'cancelado':
-      case 'rejeitado':
-        return 'badge-danger';
-      default:
-        return 'badge-gray';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      pending: 'Pendente',
-      pendente: 'Pendente',
-      in_progress: 'Em Andamento',
-      em_andamento: 'Em Andamento',
-      completed: 'Concluído',
-      concluido: 'Concluído',
-      cancelled: 'Cancelado',
-      cancelado: 'Cancelado',
-      open: 'Aberto',
-      aberto: 'Aberto',
-      em_analise: 'Em Análise',
-      aprovado: 'Aprovado',
-      rejeitado: 'Rejeitado',
-      convertido: 'Convertido',
-      resolved: 'Resolvido',
-      closed: 'Fechado',
-    };
-    return labels[status] || status;
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -178,7 +117,7 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-800">
           Olá, {profile?.full_name?.split(' ')[0]}! 👋
         </h1>
-        <p className="text-gray-500">Aqui está o resumo do seu dia</p>
+        <p className="text-gray-500">Aqui está o resumo operacional de hoje</p>
       </div>
 
       {/* Stats Cards */}

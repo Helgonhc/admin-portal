@@ -7,6 +7,8 @@ import { Plus, Search, Filter, Eye, Loader2, ClipboardList, Calendar } from 'luc
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { usePermissions } from '../../../hooks/usePermissions';
+import { Skeleton, ListSkeleton } from '../../../components/Skeleton';
+import { getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel } from '../../../utils/statusUtils';
 
 export default function OrdersPage() {
   const { can } = usePermissions();
@@ -37,55 +39,42 @@ export default function OrdersPage() {
   async function loadData() {
     try {
       console.log('🔄 Carregando dados...');
-      
-      // Carregar OS - query simples primeiro
+
       const ordersRes = await supabase
         .from('service_orders')
         .select('*')
         .order('created_at', { ascending: false });
 
-      console.log('📋 Resultado OS:', { data: ordersRes.data?.length, error: ordersRes.error });
-
       if (ordersRes.error) {
-        console.error('❌ Erro ao carregar OS:', ordersRes.error);
         toast.error('Erro ao carregar OS: ' + ordersRes.error.message);
       } else {
-        // Se deu certo, buscar com joins (especificando a FK correta)
         const ordersWithJoins = await supabase
           .from('service_orders')
           .select('*, clients(name), technician:profiles!service_orders_technician_id_fkey(full_name), equipments(name)')
           .order('created_at', { ascending: false });
-        
+
         setOrders(ordersWithJoins.data || ordersRes.data || []);
-        console.log('✅ OS carregadas:', ordersWithJoins.data?.length || ordersRes.data?.length);
       }
 
-      // Carregar clientes
       const clientsRes = await supabase
         .from('clients')
         .select('id, name')
         .eq('is_active', true)
         .order('name');
-      
-      console.log('👥 Clientes:', clientsRes.data?.length, clientsRes.error);
       setClients(clientsRes.data || []);
 
-      // Carregar técnicos
       const techniciansRes = await supabase
         .from('profiles')
         .select('id, full_name')
         .in('role', ['admin', 'technician'])
         .eq('is_active', true)
         .order('full_name');
-      
-      console.log('👷 Técnicos:', techniciansRes.data?.length, techniciansRes.error);
       setTechnicians(techniciansRes.data || []);
 
     } catch (error: any) {
-      console.error('💥 Erro geral:', error);
       toast.error('Erro ao carregar dados: ' + (error?.message || 'Verifique sua conexão'));
     } finally {
-      setLoading(false);
+      setTimeout(() => setLoading(false), 500);
     }
   }
 
@@ -118,7 +107,6 @@ export default function OrdersPage() {
 
     setSaving(true);
     try {
-      // Mapear prioridade para português
       const priorityMap: Record<string, string> = {
         low: 'baixa',
         medium: 'media',
@@ -141,10 +129,8 @@ export default function OrdersPage() {
       const { data: newOrder, error } = await supabase.from('service_orders').insert([insertData]).select('id').single();
       if (error) throw error;
 
-      // Buscar nome do cliente
       const selectedClient = clients.find(c => c.id === formData.client_id);
 
-      // Notificar todos os usuários do cliente (portal)
       const { data: clientUsers } = await supabase
         .from('profiles')
         .select('id')
@@ -164,7 +150,6 @@ export default function OrdersPage() {
         await supabase.from('notifications').insert(notifications);
       }
 
-      // Notificar técnico atribuído (se diferente de quem criou)
       if (formData.technician_id && formData.technician_id !== profile?.id) {
         await supabase.from('notifications').insert({
           user_id: formData.technician_id,
@@ -193,69 +178,7 @@ export default function OrdersPage() {
     loadEquipments(clientId);
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-      case 'concluido': return 'badge-success';
-      case 'in_progress':
-      case 'em_andamento': return 'badge-info';
-      case 'pending':
-      case 'pendente': return 'badge-warning';
-      case 'cancelled':
-      case 'cancelado': return 'badge-danger';
-      default: return 'badge-gray';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      pending: 'Pendente',
-      pendente: 'Pendente',
-      in_progress: 'Em Andamento',
-      em_andamento: 'Em Andamento',
-      completed: 'Concluído',
-      concluido: 'Concluído',
-      cancelled: 'Cancelado',
-      cancelado: 'Cancelado',
-    };
-    return labels[status] || status;
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-      case 'urgente': return 'text-red-600 bg-red-50';
-      case 'high':
-      case 'alta': return 'text-orange-600 bg-orange-50';
-      case 'medium':
-      case 'media': return 'text-amber-600 bg-amber-50';
-      case 'low':
-      case 'baixa': return 'text-green-600 bg-green-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  const getPriorityLabel = (priority: string) => {
-    const labels: Record<string, string> = {
-      urgent: 'Urgente',
-      urgente: 'Urgente',
-      high: 'Alta',
-      alta: 'Alta',
-      medium: 'Média',
-      media: 'Média',
-      low: 'Baixa',
-      baixa: 'Baixa',
-    };
-    return labels[priority] || priority;
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
+  if (loading) return <ListSkeleton />;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -330,8 +253,8 @@ export default function OrdersPage() {
                   <Calendar size={14} />
                   {new Date(order.created_at).toLocaleDateString('pt-BR')}
                 </span>
-                {order.technician?.full_name && (
-                  <span>👤 {order.technician.full_name.split(' ')[0]}</span>
+                {(order as any).technician?.full_name && (
+                  <span>👤 {(order as any).technician.full_name.split(' ')[0]}</span>
                 )}
               </div>
             </Link>
@@ -466,11 +389,10 @@ export default function OrdersPage() {
                           key={p.value}
                           type="button"
                           onClick={() => setFormData({ ...formData, priority: p.value })}
-                          className={`px-3 py-2 rounded-lg border-2 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
-                            formData.priority === p.value
-                              ? `${p.color} border-current shadow-sm`
-                              : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                          }`}
+                          className={`px-3 py-2 rounded-lg border-2 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${formData.priority === p.value
+                            ? `${p.color} border-current shadow-sm`
+                            : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                            }`}
                         >
                           <span className={`w-2 h-2 rounded-full ${p.dot}`}></span>
                           {p.label}
@@ -504,9 +426,9 @@ export default function OrdersPage() {
                 <button onClick={() => setShowModal(false)} className="btn btn-secondary">
                   Cancelar
                 </button>
-                <button 
-                  onClick={handleCreate} 
-                  disabled={saving || !formData.client_id || !formData.title} 
+                <button
+                  onClick={handleCreate}
+                  disabled={saving || !formData.client_id || !formData.title}
                   className="btn btn-primary"
                 >
                   {saving ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
