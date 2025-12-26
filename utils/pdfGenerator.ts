@@ -214,10 +214,10 @@ function createPDFHTML(
   .report-box { background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; border-radius: 10px; font-size: 12px; line-height: 1.8; min-height: 100px; }
   .report-box p { margin-bottom: 12px; text-indent: 25px; text-align: justify; }
   
-  /* Photos */
-  .photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; }
-  .photo-item { aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 2px solid #e5e7eb; background: #f9fafb; display: flex; align-items: center; justify-content: center; }
-  .photo-item img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  /* Photos - SEM CAIXA, CANTOS ARREDONDADOS, SEM CORTAR */
+  .photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 15px; }
+  .photo-item { width: 200px; height: 200px; display: flex; align-items: center; justify-content: center; }
+  .photo-item img { max-width: 200px; max-height: 200px; object-fit: contain; border-radius: 20px; }
   
   /* Signatures */
   .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 40px; padding: 0 40px; }
