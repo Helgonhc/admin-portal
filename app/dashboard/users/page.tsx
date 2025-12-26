@@ -146,117 +146,38 @@ export default function UsersPage() {
         if (error) throw error;
         toast.success('Usuário atualizado!');
       } else {
-        // 0. Verificar se email já existe no profiles ANTES de criar
-        const { data: existingEmail } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .eq('email', formData.email.trim().toLowerCase())
-          .single();
+        // Usar Edge Function para criar usuário (não afeta sessão do admin)
+        const { data: sessionData } = await supabase.auth.getSession();
         
-        if (existingEmail) {
-          throw new Error('⚠️ Este email já está cadastrado no sistema! Use outro email.');
+        if (!sessionData.session) {
+          throw new Error('Sessão expirada. Faça login novamente.');
         }
-        
-        // Salvar sessão atual do admin antes de criar novo usuário
-        const { data: currentSession } = await supabase.auth.getSession();
-        
-        // 1. Criar usuário no Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: formData.email.trim().toLowerCase(),
-          password: formData.password,
-          options: {
-            data: {
-              full_name: formData.full_name.trim(),
-              role: formData.role,
+
+        // Chamar Edge Function create-user
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionData.session.access_token}`,
             },
-          },
-        });
-
-        if (authError) {
-          if (authError.message.includes('already registered') || authError.message.includes('already been registered')) {
-            throw new Error('⚠️ Este email já está cadastrado no sistema! Use outro email.');
-          }
-          throw authError;
-        }
-
-        if (!authData.user) {
-          throw new Error('Falha ao criar usuário');
-        }
-
-        // 2. IMPORTANTE: Restaurar sessão do admin imediatamente
-        // O signUp faz login automático com o novo usuário, precisamos reverter
-        if (currentSession?.session) {
-          await supabase.auth.setSession({
-            access_token: currentSession.session.access_token,
-            refresh_token: currentSession.session.refresh_token,
-          });
-        }
-
-        // 2.5. Confirmar email do usuário automaticamente (evita "Invalid login credentials")
-        try {
-          await supabase.rpc('confirm_user_email', { user_uuid: authData.user.id });
-        } catch (e) {
-          console.log('Aviso: Não foi possível confirmar email automaticamente');
-        }
-
-        // 3. Aguardar trigger criar o perfil
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // 4. Verificar se o perfil foi criado pelo trigger
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', authData.user.id)
-          .single();
-
-        if (!existingProfile) {
-          // Se o trigger não funcionou, criar usando função SQL que bypassa RLS
-          const { error: rpcError } = await supabase.rpc('create_profile_for_user', {
-            user_id: authData.user.id,
-            user_email: formData.email.trim().toLowerCase(),
-            user_full_name: formData.full_name.trim(),
-            user_phone: formData.phone?.trim() || null,
-            user_role: formData.role,
-            user_is_active: true,
-          });
-
-          if (rpcError) {
-            console.error('Erro ao criar perfil via RPC:', rpcError);
-            // Tentar inserir diretamente
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert({
-                id: authData.user.id,
-                email: formData.email.trim().toLowerCase(),
-                full_name: formData.full_name.trim(),
-                phone: formData.phone?.trim() || null,
-                role: formData.role,
-                is_active: true,
-                cpf: formData.cpf?.trim() || null,
-                cargo: formData.cargo?.trim() || null,
-              });
-            
-            if (insertError) {
-              console.error('Erro ao inserir perfil:', insertError);
-            }
-          }
-        } else {
-          // Se o perfil existe, apenas atualizar com dados adicionais
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({
-              full_name: formData.full_name.trim(),
+            body: JSON.stringify({
+              email: formData.email.trim().toLowerCase(),
+              password: formData.password,
+              fullName: formData.full_name.trim(),
               phone: formData.phone?.trim() || null,
+              role: formData.role,
               cpf: formData.cpf?.trim() || null,
               cargo: formData.cargo?.trim() || null,
-              role: formData.role,
-              is_active: true,
-            })
-            .eq('id', authData.user.id);
-
-          if (updateError) {
-            console.error('Erro ao atualizar perfil:', updateError);
+            }),
           }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Erro ao criar usuário');
         }
 
         // Mostrar modal com credenciais
