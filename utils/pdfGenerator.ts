@@ -47,106 +47,265 @@ export async function generateServiceOrderPDF(order: any) {
 
 function buildOrderPDF(company: any, order: any, osNumber: string, techName: string, techSig: string, techDoc: string, tasks: any[], report: string, photos: string[]) {
   const c = company.color;
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>OS #${osNumber}</title>
-<style>
-@page{margin:10mm;size:210mm 210mm}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#333;line-height:1.4}
-.header{display:flex;align-items:center;border-bottom:3px solid ${c};padding-bottom:10px;margin-bottom:12px}
-.logo{width:60px;height:60px;margin-right:12px}
-.logo img{max-width:100%;max-height:100%;object-fit:contain}
-.company{flex:1}
-.company h1{font-size:14pt;color:${c};margin-bottom:2px}
-.company p{font-size:7pt;color:#666;margin:1px 0}
-.os-badge{background:${c};color:#fff;padding:8px 14px;border-radius:6px;text-align:center}
-.os-badge small{font-size:6pt;display:block;opacity:.8}
-.os-badge strong{font-size:12pt}
-.os-date{font-size:7pt;color:#666;margin-top:4px;text-align:center}
-.grid{display:flex;gap:12px;margin-bottom:10px;page-break-inside:avoid}
-.grid .box{flex:1;background:#f8f9fa;border:1px solid #e9ecef;border-radius:6px;padding:10px}
-.box-title{font-size:8pt;font-weight:700;color:${c};border-bottom:1px solid #dee2e6;padding-bottom:4px;margin-bottom:6px}
-.box p{font-size:8pt;margin:3px 0}
-.box p strong{color:#222}
-.section{margin-bottom:10px}
-.section-title{background:linear-gradient(90deg,${c},${c}dd);color:#fff;padding:6px 10px;font-size:9pt;font-weight:600;border-radius:4px;margin-bottom:8px}
-.checklist{columns:2;column-gap:15px}
-.check-item{font-size:8pt;padding:3px 0;break-inside:avoid}
-.check-done{color:#16a34a}
-.check-done::before{content:"✓ ";font-weight:700}
-.check-pending{color:#9ca3af}
-.check-pending::before{content:"○ "}
-.report{background:#fff;border:1px solid #ddd;border-left:3px solid ${c};padding:12px;font-size:9pt;line-height:1.6;white-space:pre-wrap;min-height:40px}
-.photos{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.photo{position:relative;width:100%;padding-bottom:100%;border-radius:16px;overflow:hidden;border:1px solid #ddd;background:#f5f5f5}
-.photo img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;border-radius:14px}
-.signatures{display:flex;margin-top:20px;page-break-inside:avoid}
-.sig{flex:1;text-align:center;padding:0 20px}
-.sig-img{height:40px;margin-bottom:-5px}
-.sig-line{border-top:1px solid #333;margin:5px 0}
-.sig-name{font-size:8pt;font-weight:600}
-.sig-role{font-size:7pt;color:#666}
-.sig-doc{font-size:6pt;color:#999}
-.footer{margin-top:15px;padding-top:8px;border-top:1px solid #ddd;text-align:center;font-size:6pt;color:#999}
-</style></head><body>
+  
+  // Formatar relatório com parágrafos
+  const formatReport = (text: string) => {
+    if (!text) return '<p style="color:#666;font-style:italic">Nenhuma observação registrada.</p>';
+    return text.split(/\n+/).filter(p => p.trim()).map(p => `<p style="margin-bottom:8px;text-indent:20px">${p.trim()}</p>`).join('');
+  };
 
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>OS #${osNumber}</title>
+<style>
+@page { margin: 15mm; size: A4; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.5; }
+
+/* HEADER */
+.header {
+  display: flex;
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 3px solid ${c};
+  margin-bottom: 20px;
+}
+.logo { width: 70px; height: 70px; margin-right: 15px; }
+.logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.company-info { flex: 1; }
+.company-info h1 { font-size: 16pt; color: ${c}; margin-bottom: 3px; }
+.company-info p { font-size: 8pt; color: #666; margin: 2px 0; }
+.os-number {
+  background: ${c};
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+.os-number small { font-size: 7pt; display: block; opacity: 0.9; }
+.os-number strong { font-size: 14pt; }
+.os-number .date { font-size: 8pt; margin-top: 5px; opacity: 0.9; }
+
+/* SEÇÕES */
+.section {
+  margin-bottom: 20px;
+  page-break-inside: avoid;
+}
+.section-header {
+  background: ${c};
+  color: white;
+  padding: 8px 15px;
+  font-size: 11pt;
+  font-weight: 600;
+  border-radius: 6px 6px 0 0;
+  margin-bottom: 0;
+}
+.section-content {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 15px;
+}
+
+/* GRID DE DADOS */
+.data-grid {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.data-box {
+  flex: 1;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  page-break-inside: avoid;
+}
+.data-box-title {
+  font-size: 10pt;
+  font-weight: 700;
+  color: ${c};
+  border-bottom: 2px solid ${c};
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.data-row {
+  display: flex;
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+}
+.data-row:last-child { border-bottom: none; }
+.data-label { width: 90px; font-weight: 600; color: #555; font-size: 9pt; }
+.data-value { flex: 1; color: #222; font-size: 9pt; }
+
+/* CHECKLIST */
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.check-item {
+  padding: 6px 10px;
+  background: white;
+  border-radius: 4px;
+  font-size: 9pt;
+}
+.check-done { color: #16a34a; border-left: 3px solid #16a34a; }
+.check-done::before { content: "✓ "; font-weight: bold; }
+.check-pending { color: #9ca3af; border-left: 3px solid #ddd; }
+.check-pending::before { content: "○ "; }
+
+/* RELATÓRIO */
+.report-content {
+  background: white;
+  padding: 15px;
+  border-radius: 6px;
+  font-size: 10pt;
+  line-height: 1.7;
+  text-align: justify;
+}
+
+/* FOTOS */
+.photos-section {
+  page-break-before: auto;
+  page-break-inside: avoid;
+}
+.photos-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.photo-item {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 1;
+}
+.photo-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 11px;
+}
+
+/* ASSINATURAS */
+.signatures {
+  display: flex;
+  gap: 40px;
+  margin-top: 30px;
+  page-break-inside: avoid;
+}
+.signature-box {
+  flex: 1;
+  text-align: center;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+.sig-image { height: 50px; margin-bottom: 5px; }
+.sig-line { border-top: 2px solid #333; margin: 10px 30px; }
+.sig-name { font-weight: 600; font-size: 10pt; }
+.sig-role { font-size: 8pt; color: #666; margin-top: 2px; }
+.sig-doc { font-size: 7pt; color: #999; margin-top: 3px; }
+
+/* FOOTER */
+.footer {
+  margin-top: 25px;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+  text-align: center;
+  font-size: 7pt;
+  color: #999;
+}
+</style>
+</head>
+<body>
+
+<!-- CABEÇALHO -->
 <div class="header">
-  <div class="logo">${company.logo ? `<img src="${company.logo}"/>` : ''}</div>
-  <div class="company">
+  <div class="logo">
+    ${company.logo ? `<img src="${company.logo}" />` : ''}
+  </div>
+  <div class="company-info">
     <h1>${company.name}</h1>
     ${company.cnpj ? `<p>CNPJ: ${company.cnpj}</p>` : ''}
     ${company.address ? `<p>${company.address}</p>` : ''}
     <p>${[company.phone, company.email].filter(Boolean).join(' • ')}</p>
   </div>
-  <div>
-    <div class="os-badge"><small>ORDEM DE SERVIÇO</small><strong>#${osNumber}</strong></div>
-    <div class="os-date">${new Date(order.created_at).toLocaleDateString('pt-BR')}</div>
+  <div class="os-number">
+    <small>ORDEM DE SERVIÇO</small>
+    <strong>#${osNumber}</strong>
+    <div class="date">${new Date(order.created_at).toLocaleDateString('pt-BR')}</div>
   </div>
 </div>
 
-<div class="grid">
-  <div class="box">
-    <div class="box-title">👤 CLIENTE</div>
-    <p><strong>${order.clients?.name || '-'}</strong></p>
-    <p>${order.clients?.cnpj || order.clients?.cnpj_cpf || '-'}</p>
-    <p>${order.clients?.address || '-'}</p>
-    <p>${order.clients?.phone || '-'}</p>
+<!-- DADOS DO CLIENTE E SERVIÇO -->
+<div class="data-grid">
+  <div class="data-box">
+    <div class="data-box-title">👤 DADOS DO CLIENTE</div>
+    <div class="data-row"><span class="data-label">Cliente:</span><span class="data-value"><strong>${order.clients?.name || '-'}</strong></span></div>
+    <div class="data-row"><span class="data-label">CNPJ/CPF:</span><span class="data-value">${order.clients?.cnpj || order.clients?.cnpj_cpf || '-'}</span></div>
+    <div class="data-row"><span class="data-label">Endereço:</span><span class="data-value">${order.clients?.address || '-'}</span></div>
+    <div class="data-row"><span class="data-label">Telefone:</span><span class="data-value">${order.clients?.phone || '-'}</span></div>
   </div>
-  <div class="box">
-    <div class="box-title">🔧 SERVIÇO</div>
-    <p><strong>${order.title}</strong></p>
-    <p>Técnico: ${techName}</p>
-    <p>Início: ${formatDateTime(order.checkin_at)}</p>
-    <p>Término: ${formatDateTime(order.completed_at)}</p>
+  <div class="data-box">
+    <div class="data-box-title">🔧 DADOS DO SERVIÇO</div>
+    <div class="data-row"><span class="data-label">Serviço:</span><span class="data-value"><strong>${order.title}</strong></span></div>
+    <div class="data-row"><span class="data-label">Técnico:</span><span class="data-value">${techName}</span></div>
+    <div class="data-row"><span class="data-label">Início:</span><span class="data-value">${formatDateTime(order.checkin_at)}</span></div>
+    <div class="data-row"><span class="data-label">Término:</span><span class="data-value">${formatDateTime(order.completed_at)}</span></div>
   </div>
 </div>
 
 ${tasks.length > 0 ? `
+<!-- CHECKLIST -->
 <div class="section">
-  <div class="section-title">✅ CHECKLIST</div>
-  <div class="checklist">${tasks.map(t => `<div class="check-item ${t.is_completed ? 'check-done' : 'check-pending'}">${t.title}</div>`).join('')}</div>
-</div>` : ''}
+  <div class="section-header">✅ CHECKLIST DE VERIFICAÇÃO</div>
+  <div class="section-content">
+    <div class="checklist-grid">
+      ${tasks.map(t => `<div class="check-item ${t.is_completed ? 'check-done' : 'check-pending'}">${t.title}</div>`).join('')}
+    </div>
+  </div>
+</div>
+` : ''}
 
+<!-- RELATÓRIO TÉCNICO -->
 <div class="section">
-  <div class="section-title">📝 RELATÓRIO TÉCNICO</div>
-  <div class="report">${report || 'Nenhuma observação registrada.'}</div>
+  <div class="section-header">📝 RELATÓRIO TÉCNICO</div>
+  <div class="section-content">
+    <div class="report-content">
+      ${formatReport(report)}
+    </div>
+  </div>
 </div>
 
 ${photos.length > 0 ? `
-<div class="section">
-  <div class="section-title">📷 FOTOS (${photos.length})</div>
-  <div class="photos">${photos.map(p => `<div class="photo"><img src="${p}"/></div>`).join('')}</div>
-</div>` : ''}
+<!-- REGISTRO FOTOGRÁFICO -->
+<div class="section photos-section">
+  <div class="section-header">📷 REGISTRO FOTOGRÁFICO (${photos.length} foto${photos.length > 1 ? 's' : ''})</div>
+  <div class="section-content">
+    <div class="photos-grid">
+      ${photos.map(p => `<div class="photo-item"><img src="${p}" /></div>`).join('')}
+    </div>
+  </div>
+</div>
+` : ''}
 
+<!-- ASSINATURAS -->
 <div class="signatures">
-  <div class="sig">
-    ${techSig ? `<img src="${techSig}" class="sig-img"/>` : '<div style="height:30px"></div>'}
+  <div class="signature-box">
+    ${techSig ? `<img src="${techSig}" class="sig-image" />` : '<div style="height:40px"></div>'}
     <div class="sig-line"></div>
     <div class="sig-name">${techName}</div>
     <div class="sig-role">Técnico Responsável</div>
     ${techDoc ? `<div class="sig-doc">CPF: ${techDoc}</div>` : ''}
   </div>
-  <div class="sig">
-    ${order.signature_url ? `<img src="${order.signature_url}" class="sig-img"/>` : '<div style="height:30px"></div>'}
+  <div class="signature-box">
+    ${order.signature_url ? `<img src="${order.signature_url}" class="sig-image" />` : '<div style="height:40px"></div>'}
     <div class="sig-line"></div>
     <div class="sig-name">${order.signer_name || 'Responsável'}</div>
     <div class="sig-role">Cliente</div>
@@ -154,8 +313,12 @@ ${photos.length > 0 ? `
   </div>
 </div>
 
-<div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div>
-</body></html>`;
+<div class="footer">
+  Documento gerado em ${new Date().toLocaleString('pt-BR')}
+</div>
+
+</body>
+</html>`;
 }
 
 
