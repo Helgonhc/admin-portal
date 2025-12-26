@@ -246,24 +246,22 @@ export async function generateServiceOrderPDF(order: any) {
     doc.text(splitReport, margin + 5, y + 6);
     y += reportHeight + 5;
 
-    // ========== FOTOS ==========
+    // ========== FOTOS E ASSINATURAS (PÁGINA DEDICADA) ==========
     if (photos.length > 0) {
-      // Verificar espaço
-      if (y + 50 > pageHeight - 50) {
-        doc.addPage();
-        y = margin;
-      }
+      // SEMPRE nova página para fotos
+      doc.addPage();
+      y = margin;
 
-      // Título
+      // Título FOTOS
       doc.setFillColor(rgb[0], rgb[1], rgb[2]);
       doc.roundedRect(margin, y, contentWidth, 7, 2, 2, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text(`FOTOS (${photos.length})`, margin + 5, y + 5);
+      doc.text(`REGISTRO FOTOGRÁFICO (${photos.length} foto${photos.length > 1 ? 's' : ''})`, margin + 5, y + 5);
       y += 10;
 
-      // Grid de fotos - 4 por linha
+      // Grid de fotos - 4 por linha, fotos menores para caber mais
       const photoSize = (contentWidth - 15) / 4;
       let photoX = margin;
       let photoY = y;
@@ -273,25 +271,17 @@ export async function generateServiceOrderPDF(order: any) {
         if (i > 0 && i % 4 === 0) {
           photoX = margin;
           photoY += photoSize + 5;
-          
-          // Nova página se necessário
-          if (photoY + photoSize > pageHeight - 50) {
-            doc.addPage();
-            photoY = margin;
-          }
         }
 
         try {
           const imgBase64 = await loadImageAsBase64(photos[i]);
           if (imgBase64) {
-            // Borda arredondada (simulada com retângulo)
             doc.setFillColor(245, 245, 245);
             doc.setDrawColor(200, 200, 200);
             doc.roundedRect(photoX, photoY, photoSize, photoSize, 3, 3, 'FD');
             doc.addImage(imgBase64, 'JPEG', photoX + 2, photoY + 2, photoSize - 4, photoSize - 4);
           }
         } catch (e) {
-          // Placeholder se falhar
           doc.setFillColor(240, 240, 240);
           doc.roundedRect(photoX, photoY, photoSize, photoSize, 3, 3, 'F');
         }
@@ -299,80 +289,142 @@ export async function generateServiceOrderPDF(order: any) {
         photoX += photoSize + 5;
       }
       
-      y = photoY + photoSize + 10;
+      // Calcular quantas linhas de fotos
+      const numRows = Math.ceil(photos.length / 4);
+      y = photoY + photoSize + 15;
+
+      // ========== ASSINATURAS (logo após as fotos) ==========
+      const sigWidth = (contentWidth - 20) / 2;
+      const sigY = y;
+
+      // Assinatura Técnico
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(margin, sigY, sigWidth, 40, 2, 2, 'F');
+      
+      if (technicianSignature) {
+        try {
+          const sigBase64 = await loadImageAsBase64(technicianSignature);
+          if (sigBase64) {
+            doc.addImage(sigBase64, 'PNG', margin + sigWidth/2 - 20, sigY + 3, 40, 15);
+          }
+        } catch (e) {}
+      }
+      
+      doc.setDrawColor(50, 50, 50);
+      doc.line(margin + 15, sigY + 22, margin + sigWidth - 15, sigY + 22);
+      
+      doc.setTextColor(50, 50, 50);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text(technicianName, margin + sigWidth/2, sigY + 28, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Técnico Responsável', margin + sigWidth/2, sigY + 33, { align: 'center' });
+      if (technicianDoc) {
+        doc.text(`CPF: ${technicianDoc}`, margin + sigWidth/2, sigY + 37, { align: 'center' });
+      }
+
+      // Assinatura Cliente
+      const sig2X = margin + sigWidth + 20;
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(sig2X, sigY, sigWidth, 40, 2, 2, 'F');
+      
+      if (order.signature_url) {
+        try {
+          const sigBase64 = await loadImageAsBase64(order.signature_url);
+          if (sigBase64) {
+            doc.addImage(sigBase64, 'PNG', sig2X + sigWidth/2 - 20, sigY + 3, 40, 15);
+          }
+        } catch (e) {}
+      }
+      
+      doc.setDrawColor(50, 50, 50);
+      doc.line(sig2X + 15, sigY + 22, sig2X + sigWidth - 15, sigY + 22);
+      
+      doc.setTextColor(50, 50, 50);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text(order.signer_name || 'Responsável', sig2X + sigWidth/2, sigY + 28, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Cliente', sig2X + sigWidth/2, sigY + 33, { align: 'center' });
+      if (order.signer_doc) {
+        doc.text(`CPF: ${order.signer_doc}`, sig2X + sigWidth/2, sigY + 37, { align: 'center' });
+      }
+
+    } else {
+      // SEM FOTOS - assinaturas na mesma página
+      const sigWidth = (contentWidth - 20) / 2;
+      const sigY = y + 10;
+
+      // Assinatura Técnico
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(margin, sigY, sigWidth, 40, 2, 2, 'F');
+      
+      if (technicianSignature) {
+        try {
+          const sigBase64 = await loadImageAsBase64(technicianSignature);
+          if (sigBase64) {
+            doc.addImage(sigBase64, 'PNG', margin + sigWidth/2 - 20, sigY + 3, 40, 15);
+          }
+        } catch (e) {}
+      }
+      
+      doc.setDrawColor(50, 50, 50);
+      doc.line(margin + 15, sigY + 22, margin + sigWidth - 15, sigY + 22);
+      
+      doc.setTextColor(50, 50, 50);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text(technicianName, margin + sigWidth/2, sigY + 28, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Técnico Responsável', margin + sigWidth/2, sigY + 33, { align: 'center' });
+      if (technicianDoc) {
+        doc.text(`CPF: ${technicianDoc}`, margin + sigWidth/2, sigY + 37, { align: 'center' });
+      }
+
+      // Assinatura Cliente
+      const sig2X = margin + sigWidth + 20;
+      doc.setFillColor(248, 249, 250);
+      doc.roundedRect(sig2X, sigY, sigWidth, 40, 2, 2, 'F');
+      
+      if (order.signature_url) {
+        try {
+          const sigBase64 = await loadImageAsBase64(order.signature_url);
+          if (sigBase64) {
+            doc.addImage(sigBase64, 'PNG', sig2X + sigWidth/2 - 20, sigY + 3, 40, 15);
+          }
+        } catch (e) {}
+      }
+      
+      doc.setDrawColor(50, 50, 50);
+      doc.line(sig2X + 15, sigY + 22, sig2X + sigWidth - 15, sigY + 22);
+      
+      doc.setTextColor(50, 50, 50);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text(order.signer_name || 'Responsável', sig2X + sigWidth/2, sigY + 28, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Cliente', sig2X + sigWidth/2, sigY + 33, { align: 'center' });
+      if (order.signer_doc) {
+        doc.text(`CPF: ${order.signer_doc}`, sig2X + sigWidth/2, sigY + 37, { align: 'center' });
+      }
     }
 
-    // ========== ASSINATURAS ==========
-    // Verificar espaço
-    if (y + 45 > pageHeight - 20) {
-      doc.addPage();
-      y = margin;
+    // ========== RODAPÉ EM TODAS AS PÁGINAS ==========
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      doc.setFontSize(6);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Documento gerado em ${new Date().toLocaleString('pt-BR')} - Página ${i} de ${totalPages}`, pageWidth/2, pageHeight - 8, { align: 'center' });
     }
-
-    const sigWidth = (contentWidth - 20) / 2;
-    const sigY = y + 5;
-
-    // Assinatura Técnico
-    doc.setFillColor(248, 249, 250);
-    doc.roundedRect(margin, sigY, sigWidth, 40, 2, 2, 'F');
-    
-    if (technicianSignature) {
-      try {
-        const sigBase64 = await loadImageAsBase64(technicianSignature);
-        if (sigBase64) {
-          doc.addImage(sigBase64, 'PNG', margin + sigWidth/2 - 20, sigY + 3, 40, 15);
-        }
-      } catch (e) {}
-    }
-    
-    doc.setDrawColor(50, 50, 50);
-    doc.line(margin + 15, sigY + 22, margin + sigWidth - 15, sigY + 22);
-    
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text(technicianName, margin + sigWidth/2, sigY + 28, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Técnico Responsável', margin + sigWidth/2, sigY + 33, { align: 'center' });
-    if (technicianDoc) {
-      doc.text(`CPF: ${technicianDoc}`, margin + sigWidth/2, sigY + 37, { align: 'center' });
-    }
-
-    // Assinatura Cliente
-    const sig2X = margin + sigWidth + 20;
-    doc.setFillColor(248, 249, 250);
-    doc.roundedRect(sig2X, sigY, sigWidth, 40, 2, 2, 'F');
-    
-    if (order.signature_url) {
-      try {
-        const sigBase64 = await loadImageAsBase64(order.signature_url);
-        if (sigBase64) {
-          doc.addImage(sigBase64, 'PNG', sig2X + sigWidth/2 - 20, sigY + 3, 40, 15);
-        }
-      } catch (e) {}
-    }
-    
-    doc.setDrawColor(50, 50, 50);
-    doc.line(sig2X + 15, sigY + 22, sig2X + sigWidth - 15, sigY + 22);
-    
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text(order.signer_name || 'Responsável', sig2X + sigWidth/2, sigY + 28, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Cliente', sig2X + sigWidth/2, sigY + 33, { align: 'center' });
-    if (order.signer_doc) {
-      doc.text(`CPF: ${order.signer_doc}`, sig2X + sigWidth/2, sigY + 37, { align: 'center' });
-    }
-
-    // ========== RODAPÉ ==========
-    doc.setFontSize(6);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`Documento gerado em ${new Date().toLocaleString('pt-BR')}`, pageWidth/2, pageHeight - 10, { align: 'center' });
 
     // Salvar/Abrir PDF
     doc.save(`OS_${osNumber}.pdf`);
