@@ -1,53 +1,34 @@
 import { supabase } from '../lib/supabase';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
-// Formatar data/hora - CORRIGIDO para lidar com datas do banco
+// Formatar data/hora
 const formatDateTime = (dateString: string) => {
   if (!dateString) return '-';
   try {
-    // Se a data não tem timezone, adicionar
-    let date: Date;
-    if (dateString.includes('T') && !dateString.includes('Z') && !dateString.includes('+')) {
-      // Data local sem timezone - interpretar como horário local
-      date = new Date(dateString);
-    } else {
-      date = new Date(dateString);
-    }
-    
+    const date = new Date(dateString);
     return date.toLocaleString('pt-BR', { 
       timeZone: 'America/Sao_Paulo',
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit', 
-      minute: '2-digit'
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
     });
-  } catch {
-    return dateString;
-  }
+  } catch { return '-'; }
 };
 
 const formatDate = (dateString: string) => {
   if (!dateString) return '-';
   try {
     return new Date(dateString).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-  } catch {
-    return dateString;
-  }
+  } catch { return '-'; }
 };
 
 const formatOrderId = (id: string, dateString: string) => {
-  if (!dateString) return id?.slice(0, 6).toUpperCase() || 'OS';
+  if (!id) return 'OS';
+  if (!dateString) return id.slice(0, 6).toUpperCase();
   try {
     const d = new Date(dateString);
     return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}-${id.slice(0, 4).toUpperCase()}`;
-  } catch {
-    return id?.slice(0, 6).toUpperCase() || 'OS';
-  }
-};
-
-const formatReportText = (text: string) => {
-  if (!text || text.trim() === '') return '<em>Nenhuma observação registrada.</em>';
-  return text.split(/\n+/).filter(p => p.trim()).map(p => `<p style="margin:0 0 8px 0;text-indent:20px;">${p.trim()}</p>`).join('');
+  } catch { return id.slice(0, 6).toUpperCase(); }
 };
 
 async function getCompanyConfig() {
@@ -63,16 +44,38 @@ async function getCompanyConfig() {
   };
 }
 
+// Converter imagem para base64
+async function imageToBase64(url: string): Promise<string> {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return url; }
+}
+
 
 // ============================================
 // GERAR PDF DA ORDEM DE SERVIÇO
 // ============================================
 export async function generateServiceOrderPDF(order: any) {
+  // Criar loading
+  const loadingDiv = document.createElement('div');
+  loadingDiv.innerHTML = `
+    <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999;">
+      <div style="background:white;padding:30px 50px;border-radius:12px;text-align:center;">
+        <div style="width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 15px;"></div>
+        <p style="font-size:16px;color:#333;">Gerando PDF...</p>
+      </div>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  `;
+  document.body.appendChild(loadingDiv);
+
   try {
-    console.log('=== DEBUG PDF ===');
-    console.log('checkin_at:', order.checkin_at);
-    console.log('completed_at:', order.completed_at);
-    
     const company = await getCompanyConfig();
     let techName = 'Técnico Responsável', techSig = '', techDoc = '';
     
@@ -84,225 +87,267 @@ export async function generateServiceOrderPDF(order: any) {
     const { data: tasks } = await supabase.from('order_tasks').select('*').eq('order_id', order.id).order('created_at');
     const osNumber = formatOrderId(order.id, order.created_at);
     const photos = order.photos_url || order.photos || [];
-    const report = order.execution_report || order.description || '';
-    const reportHTML = formatReportText(report);
-    const hasTasks = tasks && tasks.length > 0;
-    const hasPhotos = photos.length > 0;
+    const report = order.execution_report || order.description || 'Nenhuma observação registrada.';
 
-    // Abrir janela
-    const w = window.open('', '_blank', 'width=800,height=600');
-    if (!w) { alert('Permita pop-ups para gerar o PDF'); return; }
+    // Converter imagens para base64
+    let logoBase64 = '';
+    if (company.logo) logoBase64 = await imageToBase64(company.logo);
     
-    // HTML usando TABELAS para compatibilidade máxima com impressão
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>OS #${osNumber}</title>
-<style>
-@page { size: A4; margin: 12mm; }
-@media print { 
-  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .no-print { display: none !important; }
+    let techSigBase64 = '';
+    if (techSig) techSigBase64 = await imageToBase64(techSig);
+    
+    let clientSigBase64 = '';
+    if (order.signature_url) clientSigBase64 = await imageToBase64(order.signature_url);
+    
+    const photosBase64: string[] = [];
+    for (const photo of photos) {
+      photosBase64.push(await imageToBase64(photo));
+    }
+
+    // Criar container invisível
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;';
+    
+    container.innerHTML = createPDFHTML(
+      company, order, osNumber, techName, techSigBase64, techDoc, 
+      tasks || [], report, photosBase64, logoBase64, clientSigBase64
+    );
+    
+    document.body.appendChild(container);
+
+    // Aguardar renderização
+    await new Promise(r => setTimeout(r, 500));
+
+    // Gerar PDF com html2canvas + jsPDF
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 10;
+    const contentWidth = pageWidth - (margin * 2);
+
+    // Capturar página 1 (dados)
+    const page1 = container.querySelector('#page1') as HTMLElement;
+    if (page1) {
+      const canvas1 = await html2canvas(page1, { scale: 2, useCORS: true, logging: false });
+      const imgData1 = canvas1.toDataURL('image/jpeg', 0.95);
+      const imgHeight1 = (canvas1.height * contentWidth) / canvas1.width;
+      pdf.addImage(imgData1, 'JPEG', margin, margin, contentWidth, imgHeight1);
+    }
+
+    // Capturar página 2 (fotos + assinaturas) se existir
+    const page2 = container.querySelector('#page2') as HTMLElement;
+    if (page2 && photos.length > 0) {
+      pdf.addPage();
+      const canvas2 = await html2canvas(page2, { scale: 2, useCORS: true, logging: false });
+      const imgData2 = canvas2.toDataURL('image/jpeg', 0.95);
+      const imgHeight2 = (canvas2.height * contentWidth) / canvas2.width;
+      pdf.addImage(imgData2, 'JPEG', margin, margin, contentWidth, imgHeight2);
+    }
+
+    // Baixar PDF
+    pdf.save(`OS_${osNumber}.pdf`);
+
+    // Limpar
+    document.body.removeChild(container);
+    document.body.removeChild(loadingDiv);
+
+  } catch (error) {
+    console.error('Erro PDF:', error);
+    document.body.removeChild(loadingDiv);
+    alert('Erro ao gerar PDF. Tente novamente.');
+  }
 }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: Arial, sans-serif; font-size: 11px; color: #333; line-height: 1.4; }
-table { border-collapse: collapse; width: 100%; }
-td, th { vertical-align: top; }
 
-/* Header */
-.header-table { margin-bottom: 15px; border-bottom: 3px solid ${company.color}; padding-bottom: 12px; }
-.logo-cell { width: 80px; }
-.logo-cell img { max-width: 70px; max-height: 55px; }
-.company-cell { padding: 0 15px; }
-.company-name { font-size: 16px; font-weight: bold; color: ${company.color}; margin-bottom: 4px; }
-.company-info { font-size: 9px; color: #555; }
-.os-cell { width: 140px; text-align: right; }
-.os-badge { background: ${company.color}; color: white; padding: 10px 15px; border-radius: 6px; display: inline-block; }
-.os-badge small { font-size: 8px; display: block; opacity: 0.9; }
-.os-badge strong { font-size: 15px; }
-.os-date { font-size: 9px; color: #666; margin-top: 6px; }
 
-/* Sections */
-.section { margin-bottom: 15px; }
-.section-title { background: #f5f5f5; border-left: 4px solid ${company.color}; padding: 6px 10px; font-size: 11px; font-weight: bold; margin-bottom: 10px; }
-.data-table td { padding: 5px 8px; border-bottom: 1px solid #eee; font-size: 10px; }
-.data-table .label { color: #666; width: 90px; font-weight: 600; background: #fafafa; }
-.data-table .value { color: #222; }
-
-/* Checklist */
-.checklist-table td { padding: 4px 8px; font-size: 10px; border-bottom: 1px solid #f0f0f0; }
-.check-done { color: #16a34a; }
-.check-pending { color: #999; }
-
-/* Report */
-.report-box { background: #fafafa; border: 1px solid #ddd; padding: 12px; border-radius: 4px; font-size: 10px; line-height: 1.6; min-height: 60px; }
-
-/* Photos */
-.photos-table { margin-top: 10px; }
-.photos-table td { padding: 5px; text-align: center; }
-.photo-cell { width: 33.33%; }
-.photo-img { width: 100%; max-width: 180px; height: 140px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; }
-
-/* Signatures */
-.sig-table { margin-top: 25px; }
-.sig-cell { width: 50%; text-align: center; padding: 0 30px; }
-.sig-img { max-height: 45px; max-width: 140px; }
-.sig-line { border-top: 1px solid #333; margin: 8px 0; }
-.sig-name { font-weight: bold; font-size: 10px; }
-.sig-role { font-size: 9px; color: #666; }
-.sig-doc { font-size: 8px; color: #999; margin-top: 2px; }
-
-/* Footer */
-.footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; text-align: center; font-size: 8px; color: #888; }
-
-/* Page break */
-.page-break { page-break-before: always; margin-top: 0; padding-top: 15px; }
-
-/* Print button */
-.print-btn { position: fixed; top: 10px; right: 10px; background: ${company.color}; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; z-index: 1000; }
-.print-btn:hover { opacity: 0.9; }
+// ============================================
+// HTML DO PDF - DESIGN PROFISSIONAL
+// ============================================
+function createPDFHTML(
+  company: any, order: any, osNumber: string, techName: string, 
+  techSig: string, techDoc: string, tasks: any[], report: string,
+  photos: string[], logo: string, clientSig: string
+): string {
+  const color = company.color || '#1e40af';
+  const hasPhotos = photos.length > 0;
+  
+  return `
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+  .page { width: 794px; min-height: 1123px; padding: 40px; background: white; }
+  
+  /* Header */
+  .header { display: flex; align-items: center; border-bottom: 4px solid ${color}; padding-bottom: 20px; margin-bottom: 25px; }
+  .logo { width: 90px; }
+  .logo img { max-width: 80px; max-height: 65px; }
+  .company { flex: 1; padding: 0 25px; }
+  .company h1 { font-size: 22px; color: ${color}; margin-bottom: 6px; font-weight: 700; }
+  .company p { font-size: 11px; color: #555; margin: 2px 0; }
+  .os-badge { text-align: right; }
+  .os-box { background: linear-gradient(135deg, ${color}, ${color}dd); color: white; padding: 15px 22px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
+  .os-box small { font-size: 10px; display: block; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; }
+  .os-box strong { font-size: 20px; font-weight: 700; }
+  .os-date { font-size: 11px; color: #666; margin-top: 10px; }
+  
+  /* Sections */
+  .section { margin-bottom: 22px; }
+  .section-title { background: linear-gradient(90deg, #f8f9fa, white); border-left: 5px solid ${color}; padding: 10px 15px; font-size: 13px; font-weight: 700; color: #333; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
+  
+  /* Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 22px; }
+  
+  /* Data Table */
+  .data-box { background: #fafafa; border-radius: 8px; padding: 15px; }
+  .data-row { display: flex; padding: 8px 0; border-bottom: 1px solid #eee; }
+  .data-row:last-child { border-bottom: none; }
+  .data-label { width: 100px; color: #666; font-weight: 600; font-size: 11px; }
+  .data-value { flex: 1; color: #222; font-size: 12px; }
+  .data-value strong { color: #111; }
+  
+  /* Checklist */
+  .checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .check-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f9fafb; border-radius: 6px; font-size: 11px; }
+  .check-icon { width: 20px; height: 20px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+  .check-done .check-icon { background: #dcfce7; color: #16a34a; }
+  .check-pending .check-icon { background: #f3f4f6; color: #9ca3af; }
+  
+  /* Report */
+  .report-box { background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; border-radius: 10px; font-size: 12px; line-height: 1.8; min-height: 100px; }
+  .report-box p { margin-bottom: 12px; text-indent: 25px; text-align: justify; }
+  
+  /* Photos */
+  .photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; }
+  .photo-item { aspect-ratio: 1; border-radius: 12px; overflow: hidden; border: 2px solid #e5e7eb; background: #f9fafb; display: flex; align-items: center; justify-content: center; }
+  .photo-item img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  
+  /* Signatures */
+  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 40px; padding: 0 40px; }
+  .sig-col { text-align: center; }
+  .sig-img-box { height: 60px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 8px; }
+  .sig-img-box img { max-height: 55px; max-width: 160px; }
+  .sig-line { border-top: 2px solid #333; margin: 10px 0; }
+  .sig-name { font-weight: 700; font-size: 12px; color: #111; }
+  .sig-role { font-size: 11px; color: #666; margin-top: 3px; }
+  .sig-doc { font-size: 10px; color: #999; margin-top: 4px; }
+  
+  /* Footer */
+  .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #9ca3af; }
 </style>
-</head>
-<body>
 
-<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimir PDF</button>
-
-<!-- ===== CABEÇALHO ===== -->
-<table class="header-table">
-<tr>
-  <td class="logo-cell">${company.logo ? `<img src="${company.logo}" alt="Logo">` : ''}</td>
-  <td class="company-cell">
-    <div class="company-name">${company.name}</div>
-    <div class="company-info">
-      ${company.cnpj ? `<strong>CNPJ:</strong> ${company.cnpj}<br>` : ''}
-      ${company.address ? `${company.address}<br>` : ''}
-      ${[company.phone, company.email].filter(Boolean).join(' • ')}
+<!-- PÁGINA 1: DADOS -->
+<div id="page1" class="page">
+  <div class="header">
+    <div class="logo">
+      ${logo ? `<img src="${logo}" alt="Logo">` : ''}
     </div>
-  </td>
-  <td class="os-cell">
+    <div class="company">
+      <h1>${company.name}</h1>
+      ${company.cnpj ? `<p><strong>CNPJ:</strong> ${company.cnpj}</p>` : ''}
+      ${company.address ? `<p>${company.address}</p>` : ''}
+      <p>${[company.phone, company.email].filter(Boolean).join(' • ')}</p>
+    </div>
     <div class="os-badge">
-      <small>ORDEM DE SERVIÇO</small>
-      <strong>#${osNumber}</strong>
+      <div class="os-box">
+        <small>Ordem de Serviço</small>
+        <strong>#${osNumber}</strong>
+      </div>
+      <div class="os-date">${formatDate(order.created_at)}</div>
     </div>
-    <div class="os-date">${formatDate(order.created_at)}</div>
-  </td>
-</tr>
-</table>
+  </div>
 
-<!-- ===== DADOS EM 2 COLUNAS ===== -->
-<table style="width:100%;margin-bottom:15px;">
-<tr>
-  <td style="width:50%;padding-right:10px;vertical-align:top;">
+  <div class="grid-2">
     <div class="section">
-      <div class="section-title">DADOS DO CLIENTE</div>
-      <table class="data-table">
-        <tr><td class="label">Cliente:</td><td class="value"><strong>${order.clients?.name || '-'}</strong></td></tr>
-        <tr><td class="label">CNPJ/CPF:</td><td class="value">${order.clients?.cnpj_cpf || '-'}</td></tr>
-        <tr><td class="label">Endereço:</td><td class="value">${order.clients?.address || '-'}</td></tr>
-        <tr><td class="label">Contato:</td><td class="value">${order.clients?.phone || '-'}</td></tr>
-      </table>
+      <div class="section-title">Dados do Cliente</div>
+      <div class="data-box">
+        <div class="data-row"><span class="data-label">Cliente:</span><span class="data-value"><strong>${order.clients?.name || '-'}</strong></span></div>
+        <div class="data-row"><span class="data-label">CNPJ/CPF:</span><span class="data-value">${order.clients?.cnpj_cpf || '-'}</span></div>
+        <div class="data-row"><span class="data-label">Endereço:</span><span class="data-value">${order.clients?.address || '-'}</span></div>
+        <div class="data-row"><span class="data-label">Contato:</span><span class="data-value">${order.clients?.phone || '-'}</span></div>
+      </div>
     </div>
-  </td>
-  <td style="width:50%;padding-left:10px;vertical-align:top;">
     <div class="section">
-      <div class="section-title">DADOS DA EXECUÇÃO</div>
-      <table class="data-table">
-        <tr><td class="label">Serviço:</td><td class="value"><strong>${order.title || '-'}</strong></td></tr>
-        <tr><td class="label">Técnico:</td><td class="value">${techName}</td></tr>
-        <tr><td class="label">Início:</td><td class="value">${formatDateTime(order.checkin_at)}</td></tr>
-        <tr><td class="label">Término:</td><td class="value">${formatDateTime(order.completed_at)}</td></tr>
-      </table>
+      <div class="section-title">Dados da Execução</div>
+      <div class="data-box">
+        <div class="data-row"><span class="data-label">Serviço:</span><span class="data-value"><strong>${order.title || '-'}</strong></span></div>
+        <div class="data-row"><span class="data-label">Técnico:</span><span class="data-value">${techName}</span></div>
+        <div class="data-row"><span class="data-label">Início:</span><span class="data-value">${formatDateTime(order.checkin_at)}</span></div>
+        <div class="data-row"><span class="data-label">Término:</span><span class="data-value">${formatDateTime(order.completed_at)}</span></div>
+      </div>
     </div>
-  </td>
-</tr>
-</table>
+  </div>
 
-${hasTasks ? `
-<!-- ===== CHECKLIST ===== -->
-<div class="section">
-  <div class="section-title">CHECKLIST DE VERIFICAÇÃO</div>
-  <table class="checklist-table">
-    ${tasks.map((t: any, i: number) => `
-      <tr>
-        <td style="width:20px;" class="${t.is_completed ? 'check-done' : 'check-pending'}">${t.is_completed ? '✓' : '○'}</td>
-        <td class="${t.is_completed ? 'check-done' : ''}">${t.title}</td>
-      </tr>
-    `).join('')}
-  </table>
-</div>
-` : ''}
+  ${tasks.length > 0 ? `
+  <div class="section">
+    <div class="section-title">Checklist de Verificação</div>
+    <div class="checklist">
+      ${tasks.map(t => `
+        <div class="check-item ${t.is_completed ? 'check-done' : 'check-pending'}">
+          <span class="check-icon">${t.is_completed ? '✓' : '○'}</span>
+          <span>${t.title}</span>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+  ` : ''}
 
-<!-- ===== RELATÓRIO ===== -->
-<div class="section">
-  <div class="section-title">RELATÓRIO TÉCNICO / OBSERVAÇÕES</div>
-  <div class="report-box">${reportHTML}</div>
+  <div class="section">
+    <div class="section-title">Relatório Técnico / Observações</div>
+    <div class="report-box">
+      ${report.split('\n').filter(p => p.trim()).map(p => `<p>${p}</p>`).join('') || '<p><em>Nenhuma observação registrada.</em></p>'}
+    </div>
+  </div>
+
+  ${!hasPhotos ? `
+  <div class="signatures">
+    <div class="sig-col">
+      <div class="sig-img-box">${techSig ? `<img src="${techSig}" alt="Assinatura">` : ''}</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">${techName}</div>
+      <div class="sig-role">Técnico Responsável</div>
+      ${techDoc ? `<div class="sig-doc">CPF: ${techDoc}</div>` : ''}
+    </div>
+    <div class="sig-col">
+      <div class="sig-img-box">${clientSig ? `<img src="${clientSig}" alt="Assinatura">` : ''}</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">${order.signer_name || 'Responsável'}</div>
+      <div class="sig-role">Responsável pelo Cliente</div>
+      ${order.signer_doc ? `<div class="sig-doc">CPF: ${order.signer_doc}</div>` : ''}
+    </div>
+  </div>
+  <div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
+  ` : ''}
 </div>
 
 ${hasPhotos ? `
-<!-- ===== PÁGINA 2: FOTOS + ASSINATURAS ===== -->
-<div class="page-break">
+<!-- PÁGINA 2: FOTOS + ASSINATURAS -->
+<div id="page2" class="page">
   <div class="section">
-    <div class="section-title">REGISTRO FOTOGRÁFICO (${photos.length} foto${photos.length > 1 ? 's' : ''})</div>
-    <table class="photos-table">
-      ${(() => {
-        let rows = '';
-        for (let i = 0; i < photos.length; i += 3) {
-          rows += '<tr>';
-          for (let j = 0; j < 3; j++) {
-            if (photos[i + j]) {
-              rows += `<td class="photo-cell"><img src="${photos[i + j]}" class="photo-img" alt="Foto ${i + j + 1}"></td>`;
-            } else {
-              rows += '<td class="photo-cell"></td>';
-            }
-          }
-          rows += '</tr>';
-        }
-        return rows;
-      })()}
-    </table>
+    <div class="section-title">Registro Fotográfico (${photos.length} foto${photos.length > 1 ? 's' : ''})</div>
+    <div class="photos-grid">
+      ${photos.map((p, i) => `<div class="photo-item"><img src="${p}" alt="Foto ${i+1}"></div>`).join('')}
+    </div>
   </div>
+
+  <div class="signatures">
+    <div class="sig-col">
+      <div class="sig-img-box">${techSig ? `<img src="${techSig}" alt="Assinatura">` : ''}</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">${techName}</div>
+      <div class="sig-role">Técnico Responsável</div>
+      ${techDoc ? `<div class="sig-doc">CPF: ${techDoc}</div>` : ''}
+    </div>
+    <div class="sig-col">
+      <div class="sig-img-box">${clientSig ? `<img src="${clientSig}" alt="Assinatura">` : ''}</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">${order.signer_name || 'Responsável'}</div>
+      <div class="sig-role">Responsável pelo Cliente</div>
+      ${order.signer_doc ? `<div class="sig-doc">CPF: ${order.signer_doc}</div>` : ''}
+    </div>
+  </div>
+
+  <div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
 </div>
 ` : ''}
-
-<!-- ===== ASSINATURAS ===== -->
-<table class="sig-table">
-<tr>
-  <td class="sig-cell">
-    <div style="height:50px;display:flex;align-items:flex-end;justify-content:center;">
-      ${techSig ? `<img src="${techSig}" class="sig-img" alt="Assinatura Técnico">` : ''}
-    </div>
-    <div class="sig-line"></div>
-    <div class="sig-name">${techName}</div>
-    <div class="sig-role">Técnico Responsável</div>
-    ${techDoc ? `<div class="sig-doc">CPF: ${techDoc}</div>` : ''}
-  </td>
-  <td class="sig-cell">
-    <div style="height:50px;display:flex;align-items:flex-end;justify-content:center;">
-      ${order.signature_url ? `<img src="${order.signature_url}" class="sig-img" alt="Assinatura Cliente">` : ''}
-    </div>
-    <div class="sig-line"></div>
-    <div class="sig-name">${order.signer_name || order.clients?.responsible_name || 'Responsável'}</div>
-    <div class="sig-role">Responsável pelo Cliente</div>
-    ${order.signer_doc ? `<div class="sig-doc">CPF: ${order.signer_doc}</div>` : ''}
-  </td>
-</tr>
-</table>
-
-<div class="footer">
-  Documento gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
-</div>
-
-</body>
-</html>`;
-
-    w.document.write(html);
-    w.document.close();
-    
-  } catch (error) { 
-    console.error('Erro PDF:', error); 
-    alert('Erro ao gerar PDF'); 
-  }
+`;
 }
 
 
@@ -310,220 +355,182 @@ ${hasPhotos ? `
 // GERAR PDF DE ORÇAMENTO
 // ============================================
 export async function generateQuotePDF(quote: any) {
+  const loadingDiv = document.createElement('div');
+  loadingDiv.innerHTML = `<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999;"><div style="background:white;padding:30px 50px;border-radius:12px;text-align:center;"><div style="width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 15px;"></div><p>Gerando PDF...</p></div></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+  document.body.appendChild(loadingDiv);
+
   try {
     const company = await getCompanyConfig();
     const quoteNumber = quote.id?.slice(0, 8).toUpperCase() || 'ORC';
-    
-    const w = window.open('', '_blank');
-    if (!w) { alert('Permita pop-ups para gerar o PDF'); return; }
-    
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Orçamento #${quoteNumber}</title>
+    let logo = '';
+    if (company.logo) logo = await imageToBase64(company.logo);
+
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;';
+    container.innerHTML = `
 <style>
-@page { size: A4; margin: 15mm; }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: Arial, sans-serif; font-size: 11px; color: #333; }
-table { border-collapse: collapse; width: 100%; }
-.header { border-bottom: 3px solid ${company.color}; padding-bottom: 12px; margin-bottom: 20px; }
-.section { margin-bottom: 20px; }
-.section-title { background: #f5f5f5; border-left: 4px solid ${company.color}; padding: 8px 12px; font-weight: bold; margin-bottom: 10px; }
-.data-table td { padding: 6px 8px; border-bottom: 1px solid #eee; }
-.data-table .label { color: #666; width: 100px; font-weight: 600; }
-.items-table th { background: ${company.color}; color: white; padding: 8px; text-align: left; }
-.items-table td { padding: 8px; border-bottom: 1px solid #eee; }
-.total-box { background: ${company.color}; color: white; padding: 15px; border-radius: 6px; text-align: right; margin-top: 20px; }
-.total-box strong { font-size: 20px; display: block; margin-top: 5px; }
-.footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; text-align: center; font-size: 9px; color: #888; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+  .page { width: 794px; padding: 40px; background: white; }
+  .header { display: flex; align-items: center; border-bottom: 4px solid ${company.color}; padding-bottom: 20px; margin-bottom: 25px; }
+  .logo img { max-width: 80px; max-height: 65px; }
+  .company { flex: 1; padding: 0 25px; }
+  .company h1 { font-size: 22px; color: ${company.color}; }
+  .company p { font-size: 11px; color: #555; }
+  .section { margin-bottom: 22px; }
+  .section-title { background: #f8f9fa; border-left: 5px solid ${company.color}; padding: 10px 15px; font-size: 13px; font-weight: 700; margin-bottom: 15px; }
+  .data-box { background: #fafafa; border-radius: 8px; padding: 15px; }
+  .data-row { display: flex; padding: 8px 0; border-bottom: 1px solid #eee; }
+  .data-label { width: 100px; color: #666; font-weight: 600; font-size: 11px; }
+  .data-value { flex: 1; font-size: 12px; }
+  .total-box { background: ${company.color}; color: white; padding: 20px; border-radius: 10px; text-align: right; margin-top: 25px; }
+  .total-box span { font-size: 14px; opacity: 0.9; }
+  .total-box strong { font-size: 28px; display: block; margin-top: 5px; }
+  .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #999; }
 </style>
-</head>
-<body>
-<table class="header">
-<tr>
-  <td style="width:80px;">${company.logo ? `<img src="${company.logo}" style="max-width:70px;max-height:55px;">` : ''}</td>
-  <td style="padding:0 15px;">
-    <div style="font-size:16px;font-weight:bold;color:${company.color};">${company.name}</div>
-    <div style="font-size:9px;color:#555;">
-      ${company.cnpj ? `<strong>CNPJ:</strong> ${company.cnpj}<br>` : ''}
-      ${company.address || ''}<br>
-      ${[company.phone, company.email].filter(Boolean).join(' • ')}
+<div id="page1" class="page">
+  <div class="header">
+    <div class="logo">${logo ? `<img src="${logo}">` : ''}</div>
+    <div class="company">
+      <h1>${company.name}</h1>
+      ${company.cnpj ? `<p><strong>CNPJ:</strong> ${company.cnpj}</p>` : ''}
+      <p>${[company.phone, company.email].filter(Boolean).join(' • ')}</p>
     </div>
-  </td>
-  <td style="width:140px;text-align:right;">
-    <div style="background:${company.color};color:white;padding:10px 15px;border-radius:6px;display:inline-block;">
-      <small style="font-size:8px;display:block;opacity:0.9;">ORÇAMENTO</small>
-      <strong style="font-size:15px;">#${quoteNumber}</strong>
+    <div style="text-align:right;">
+      <div style="background:${company.color};color:white;padding:15px 22px;border-radius:10px;display:inline-block;">
+        <small style="font-size:10px;display:block;opacity:0.9;">ORÇAMENTO</small>
+        <strong style="font-size:20px;">#${quoteNumber}</strong>
+      </div>
+      <div style="font-size:11px;color:#666;margin-top:10px;">${formatDate(quote.created_at)}</div>
     </div>
-    <div style="font-size:9px;color:#666;margin-top:6px;">${formatDate(quote.created_at)}</div>
-  </td>
-</tr>
-</table>
+  </div>
+  <div class="section">
+    <div class="section-title">Dados do Cliente</div>
+    <div class="data-box">
+      <div class="data-row"><span class="data-label">Cliente:</span><span class="data-value"><strong>${quote.clients?.name || '-'}</strong></span></div>
+      <div class="data-row"><span class="data-label">CNPJ/CPF:</span><span class="data-value">${quote.clients?.cnpj_cpf || '-'}</span></div>
+      <div class="data-row"><span class="data-label">Contato:</span><span class="data-value">${quote.clients?.phone || '-'}</span></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Descrição do Serviço</div>
+    <div class="data-box"><p style="font-size:12px;line-height:1.6;">${quote.description || quote.title || 'Serviço técnico'}</p></div>
+  </div>
+  <div class="total-box">
+    <span>VALOR TOTAL</span>
+    <strong>R$ ${(quote.total_value || quote.value || 0).toFixed(2)}</strong>
+  </div>
+  <div class="footer">Orçamento válido por 30 dias • Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
+</div>`;
+    document.body.appendChild(container);
+    await new Promise(r => setTimeout(r, 300));
 
-<div class="section">
-  <div class="section-title">DADOS DO CLIENTE</div>
-  <table class="data-table">
-    <tr><td class="label">Cliente:</td><td><strong>${quote.clients?.name || quote.client_name || '-'}</strong></td></tr>
-    <tr><td class="label">CNPJ/CPF:</td><td>${quote.clients?.cnpj_cpf || '-'}</td></tr>
-    <tr><td class="label">Endereço:</td><td>${quote.clients?.address || '-'}</td></tr>
-    <tr><td class="label">Contato:</td><td>${quote.clients?.phone || '-'}</td></tr>
-  </table>
-</div>
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const page1 = container.querySelector('#page1') as HTMLElement;
+    const canvas = await html2canvas(page1, { scale: 2, useCORS: true });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgHeight = (canvas.height * 190) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 10, 10, 190, imgHeight);
+    pdf.save(`Orcamento_${quoteNumber}.pdf`);
 
-<div class="section">
-  <div class="section-title">DESCRIÇÃO DO SERVIÇO</div>
-  <p style="padding:10px;background:#fafafa;border-radius:4px;">${quote.description || quote.title || 'Serviço técnico especializado'}</p>
-</div>
-
-${quote.items && quote.items.length > 0 ? `
-<div class="section">
-  <div class="section-title">ITENS DO ORÇAMENTO</div>
-  <table class="items-table">
-    <thead><tr><th>Descrição</th><th style="width:60px;text-align:center;">Qtd</th><th style="width:90px;text-align:right;">Valor Unit.</th><th style="width:90px;text-align:right;">Total</th></tr></thead>
-    <tbody>
-      ${quote.items.map((item: any) => `
-        <tr>
-          <td>${item.description || item.name}</td>
-          <td style="text-align:center;">${item.quantity || 1}</td>
-          <td style="text-align:right;">R$ ${(item.unit_price || item.price || 0).toFixed(2)}</td>
-          <td style="text-align:right;">R$ ${((item.quantity || 1) * (item.unit_price || item.price || 0)).toFixed(2)}</td>
-        </tr>
-      `).join('')}
-    </tbody>
-  </table>
-</div>
-` : ''}
-
-<div class="total-box">
-  <span>VALOR TOTAL</span>
-  <strong>R$ ${(quote.total_value || quote.value || 0).toFixed(2)}</strong>
-</div>
-
-${quote.notes ? `
-<div class="section" style="margin-top:20px;">
-  <div class="section-title">OBSERVAÇÕES</div>
-  <p style="padding:10px;background:#fafafa;border-radius:4px;">${quote.notes}</p>
-</div>
-` : ''}
-
-<div class="footer">
-  Orçamento válido por 30 dias • Documento gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
-</div>
-</body>
-</html>`;
-
-    w.document.write(html);
-    w.document.close();
-  } catch (error) { console.error('Erro PDF:', error); alert('Erro ao gerar PDF'); }
+    document.body.removeChild(container);
+    document.body.removeChild(loadingDiv);
+  } catch (error) {
+    console.error('Erro:', error);
+    document.body.removeChild(loadingDiv);
+    alert('Erro ao gerar PDF');
+  }
 }
 
 // ============================================
 // GERAR PDF DE BANCO DE HORAS
 // ============================================
 export async function generateOvertimePDF(overtime: any) {
+  const loadingDiv = document.createElement('div');
+  loadingDiv.innerHTML = `<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999;"><div style="background:white;padding:30px 50px;border-radius:12px;text-align:center;"><div style="width:40px;height:40px;border:4px solid #e5e7eb;border-top-color:#3b82f6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 15px;"></div><p>Gerando PDF...</p></div></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>`;
+  document.body.appendChild(loadingDiv);
+
   try {
     const company = await getCompanyConfig();
     const overtimeNumber = overtime.id?.slice(0, 8).toUpperCase() || 'BH';
-    
     let techName = 'Técnico';
     if (overtime.technician_id) {
       const { data: tech } = await supabase.from('profiles').select('full_name').eq('id', overtime.technician_id).maybeSingle();
       if (tech) techName = tech.full_name || techName;
     }
-    
-    const w = window.open('', '_blank');
-    if (!w) { alert('Permita pop-ups para gerar o PDF'); return; }
-    
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Banco de Horas #${overtimeNumber}</title>
+    let logo = '';
+    if (company.logo) logo = await imageToBase64(company.logo);
+
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;';
+    container.innerHTML = `
 <style>
-@page { size: A4; margin: 15mm; }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: Arial, sans-serif; font-size: 11px; color: #333; }
-table { border-collapse: collapse; width: 100%; }
-.header { border-bottom: 3px solid ${company.color}; padding-bottom: 12px; margin-bottom: 20px; }
-.section { margin-bottom: 20px; }
-.section-title { background: #f5f5f5; border-left: 4px solid #f59e0b; padding: 8px 12px; font-weight: bold; margin-bottom: 10px; }
-.data-table td { padding: 6px 8px; border-bottom: 1px solid #eee; }
-.data-table .label { color: #666; width: 100px; font-weight: 600; }
-.hours-box { background: #fef3c7; border: 2px solid #f59e0b; padding: 20px; border-radius: 6px; text-align: center; margin: 20px 0; }
-.hours-box strong { font-size: 28px; color: #d97706; display: block; margin-top: 5px; }
-.sig-table { margin-top: 40px; }
-.sig-cell { width: 50%; text-align: center; padding: 0 30px; }
-.sig-line { border-top: 1px solid #333; margin: 40px 0 8px; }
-.footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; text-align: center; font-size: 9px; color: #888; }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+  .page { width: 794px; padding: 40px; background: white; }
+  .header { display: flex; align-items: center; border-bottom: 4px solid ${company.color}; padding-bottom: 20px; margin-bottom: 25px; }
+  .section { margin-bottom: 22px; }
+  .section-title { background: #f8f9fa; border-left: 5px solid #f59e0b; padding: 10px 15px; font-size: 13px; font-weight: 700; margin-bottom: 15px; }
+  .data-box { background: #fafafa; border-radius: 8px; padding: 15px; }
+  .data-row { display: flex; padding: 8px 0; border-bottom: 1px solid #eee; }
+  .data-label { width: 100px; color: #666; font-weight: 600; font-size: 11px; }
+  .data-value { flex: 1; font-size: 12px; }
+  .hours-box { background: #fef3c7; border: 3px solid #f59e0b; padding: 25px; border-radius: 12px; text-align: center; margin: 25px 0; }
+  .hours-box span { font-size: 14px; color: #92400e; }
+  .hours-box strong { font-size: 36px; color: #d97706; display: block; margin-top: 8px; }
+  .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 50px; padding: 0 40px; }
+  .sig-col { text-align: center; }
+  .sig-line { border-top: 2px solid #333; margin: 50px 0 10px; }
+  .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #999; }
 </style>
-</head>
-<body>
-<table class="header">
-<tr>
-  <td style="width:80px;">${company.logo ? `<img src="${company.logo}" style="max-width:70px;max-height:55px;">` : ''}</td>
-  <td style="padding:0 15px;">
-    <div style="font-size:16px;font-weight:bold;color:${company.color};">${company.name}</div>
-    <div style="font-size:9px;color:#555;">
-      ${company.cnpj ? `<strong>CNPJ:</strong> ${company.cnpj}<br>` : ''}
-      ${company.address || ''}<br>
-      ${[company.phone, company.email].filter(Boolean).join(' • ')}
+<div id="page1" class="page">
+  <div class="header">
+    <div style="width:90px;">${logo ? `<img src="${logo}" style="max-width:80px;max-height:65px;">` : ''}</div>
+    <div style="flex:1;padding:0 25px;">
+      <h1 style="font-size:22px;color:${company.color};">${company.name}</h1>
+      ${company.cnpj ? `<p style="font-size:11px;color:#555;"><strong>CNPJ:</strong> ${company.cnpj}</p>` : ''}
     </div>
-  </td>
-  <td style="width:140px;text-align:right;">
-    <div style="background:#f59e0b;color:white;padding:10px 15px;border-radius:6px;display:inline-block;">
-      <small style="font-size:8px;display:block;opacity:0.9;">BANCO DE HORAS</small>
-      <strong style="font-size:15px;">#${overtimeNumber}</strong>
+    <div style="text-align:right;">
+      <div style="background:#f59e0b;color:white;padding:15px 22px;border-radius:10px;display:inline-block;">
+        <small style="font-size:10px;display:block;opacity:0.9;">BANCO DE HORAS</small>
+        <strong style="font-size:20px;">#${overtimeNumber}</strong>
+      </div>
     </div>
-    <div style="font-size:9px;color:#666;margin-top:6px;">${formatDate(overtime.date || overtime.created_at)}</div>
-  </td>
-</tr>
-</table>
+  </div>
+  <div class="section">
+    <div class="section-title">Informações do Registro</div>
+    <div class="data-box">
+      <div class="data-row"><span class="data-label">Técnico:</span><span class="data-value"><strong>${techName}</strong></span></div>
+      <div class="data-row"><span class="data-label">Cliente:</span><span class="data-value">${overtime.clients?.name || '-'}</span></div>
+      <div class="data-row"><span class="data-label">Data:</span><span class="data-value">${formatDate(overtime.date || overtime.created_at)}</span></div>
+      <div class="data-row"><span class="data-label">Tipo:</span><span class="data-value">${overtime.type === 'extra' ? 'Hora Extra' : 'Compensação'}</span></div>
+    </div>
+  </div>
+  <div class="hours-box">
+    <span>TOTAL DE HORAS</span>
+    <strong>${overtime.hours || overtime.total_hours || 0}h</strong>
+  </div>
+  ${overtime.description ? `<div class="section"><div class="section-title">Descrição</div><div class="data-box"><p style="font-size:12px;line-height:1.6;">${overtime.description}</p></div></div>` : ''}
+  <div class="sig-grid">
+    <div class="sig-col"><div class="sig-line"></div><div style="font-weight:700;">${techName}</div><div style="font-size:11px;color:#666;">Técnico</div></div>
+    <div class="sig-col"><div class="sig-line"></div><div style="font-weight:700;">Responsável</div><div style="font-size:11px;color:#666;">Aprovação</div></div>
+  </div>
+  <div class="footer">Gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
+</div>`;
+    document.body.appendChild(container);
+    await new Promise(r => setTimeout(r, 300));
 
-<div class="section">
-  <div class="section-title">INFORMAÇÕES DO REGISTRO</div>
-  <table class="data-table">
-    <tr><td class="label">Técnico:</td><td><strong>${techName}</strong></td></tr>
-    <tr><td class="label">Cliente:</td><td>${overtime.clients?.name || overtime.client_name || '-'}</td></tr>
-    <tr><td class="label">Data:</td><td>${formatDate(overtime.date || overtime.created_at)}</td></tr>
-    <tr><td class="label">Tipo:</td><td>${overtime.type === 'extra' ? 'Hora Extra' : overtime.type === 'compensation' ? 'Compensação' : overtime.type || '-'}</td></tr>
-  </table>
-</div>
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const page1 = container.querySelector('#page1') as HTMLElement;
+    const canvas = await html2canvas(page1, { scale: 2, useCORS: true });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgHeight = (canvas.height * 190) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 10, 10, 190, imgHeight);
+    pdf.save(`BancoHoras_${overtimeNumber}.pdf`);
 
-<div class="hours-box">
-  <span style="font-size:12px;color:#92400e;">TOTAL DE HORAS</span>
-  <strong>${overtime.hours || overtime.total_hours || 0}h</strong>
-</div>
-
-${overtime.description || overtime.notes ? `
-<div class="section">
-  <div class="section-title">DESCRIÇÃO / JUSTIFICATIVA</div>
-  <p style="padding:15px;background:#fafafa;border-radius:4px;line-height:1.6;">${overtime.description || overtime.notes}</p>
-</div>
-` : ''}
-
-<table class="sig-table">
-<tr>
-  <td class="sig-cell">
-    <div class="sig-line"></div>
-    <div style="font-weight:bold;">${techName}</div>
-    <div style="font-size:9px;color:#666;">Técnico</div>
-  </td>
-  <td class="sig-cell">
-    <div class="sig-line"></div>
-    <div style="font-weight:bold;">Responsável</div>
-    <div style="font-size:9px;color:#666;">Aprovação</div>
-  </td>
-</tr>
-</table>
-
-<div class="footer">
-  Documento gerado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
-</div>
-</body>
-</html>`;
-
-    w.document.write(html);
-    w.document.close();
-  } catch (error) { console.error('Erro PDF:', error); alert('Erro ao gerar PDF'); }
+    document.body.removeChild(container);
+    document.body.removeChild(loadingDiv);
+  } catch (error) {
+    console.error('Erro:', error);
+    document.body.removeChild(loadingDiv);
+    alert('Erro ao gerar PDF');
+  }
 }
