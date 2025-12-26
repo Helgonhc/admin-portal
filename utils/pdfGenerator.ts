@@ -2,8 +2,16 @@ import { supabase } from '../lib/supabase';
 
 const formatDateTime = (dateString: string) => {
   if (!dateString) return '-';
+  // Usar timezone de São Paulo/Brasília
   const d = new Date(dateString);
-  return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  return d.toLocaleString('pt-BR', { 
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
 
 const formatOrderId = (id: string, dateString: string) => {
