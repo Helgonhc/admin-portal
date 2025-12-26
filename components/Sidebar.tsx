@@ -30,6 +30,7 @@ import {
   UserCog,
   Download,
   FileCheck,
+  TrendingUp,
 } from 'lucide-react';
 
 // Menu items com permissões necessárias
@@ -39,6 +40,7 @@ import {
 // permission: ['perm1', 'perm2'] = verifica se tem QUALQUER uma das permissões
 const menuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: null },
+  { name: 'Insights & BI', href: '/dashboard/performance', icon: TrendingUp, permission: 'can_view_reports' },
   { name: 'Clientes', href: '/dashboard/clients', icon: Building2, permission: 'can_view_all_clients' },
   { name: 'Equipamentos', href: '/dashboard/equipments', icon: Wrench, permission: 'can_create_equipments' },
   { name: 'Ordens de Serviço', href: '/dashboard/orders', icon: ClipboardList, permission: null },
@@ -175,10 +177,10 @@ export default function Sidebar() {
 
               {/* Cargo/Role */}
               <span className={`text-xs px-2 py-0.5 rounded-full mt-1 ${profile?.role === 'super_admin'
-                  ? 'bg-purple-100 text-purple-700'
-                  : profile?.role === 'admin'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-green-100 text-green-700'
+                ? 'bg-purple-100 text-purple-700'
+                : profile?.role === 'admin'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-green-100 text-green-700'
                 }`}>
                 {profile?.role === 'super_admin' ? '⭐ Super Admin' :
                   profile?.role === 'admin' ? '👑 Administrador' : '🔧 Técnico'}

@@ -114,9 +114,12 @@ export async function generateServiceOrderPDF(order: any) {
     }
 
     const { data: tasks } = await supabase.from('order_tasks').select('*').eq('order_id', order.id).order('created_at');
+    const { data: orderItems } = await supabase.from('service_order_items').select('*').eq('order_id', order.id).order('created_at');
+
     const osNumber = formatOrderId(order.id, order.created_at);
     const photos = order.photos_url || order.photos || [];
     const color = company.color;
+    const totalItems = orderItems?.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0) || 0;
 
     const w = window.open('', '_blank');
     if (!w) return;
@@ -160,14 +163,43 @@ export async function generateServiceOrderPDF(order: any) {
       <div class="section-h"><h2>Checklist de Verificação</h2></div>
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">
         ${tasks.map((t: any) => `
-          <div style="display: flex; align-items: center; padding: 4px 8px; background: #f8fafc; border-radius: 4px; border: 1px solid #f1f5f9;">
-            <div style="width:12px; height:12px; border:1.5px solid ${t.is_completed ? color : '#cbd5e1'}; border-radius:2px; margin-right:8px; display:flex; align-items:center; justify-content:center; background:${t.is_completed ? color : 'transparent'};">
-              ${t.is_completed ? '<span style="color:white; font-size:8px;">✓</span>' : ''}
+          <div style="padding: 3px 6px; background: #f8fafc; border-radius: 4px; border: 0.5px solid #e2e8f0; display: flex; align-items: center; gap: 5px;">
+            <div style="width:10px; height:10px; border:1px solid ${t.is_completed ? color : '#cbd5e1'}; border-radius:2px; background:${t.is_completed ? color : 'transparent'}; display:flex; align-items:center; justify-content:center;">
+              ${t.is_completed ? '<span style="color:white; font-size:7px;">✓</span>' : ''}
             </div>
-            <span style="font-size:9.5px;">${t.title}</span>
+            <span style="font-size:8.5px; color:#1e293b;">${t.title}</span>
           </div>
         `).join('')}
       </div>
+    </div>` : ''}
+
+    ${orderItems && orderItems.length > 0 ? `
+    <div class="section">
+      <div class="section-h"><h2>Materiais e Serviços</h2></div>
+      <table style="width:100%; border-collapse: collapse; margin-top: 5px;">
+        <thead>
+          <tr style="background:#f1f5f9; text-align:left;">
+            <th style="padding:5px 10px; font-size:8px; text-transform:uppercase; color:#64748b; border:1px solid #e2e8f0;">Descrição</th>
+            <th style="padding:5px 10px; font-size:8px; text-transform:uppercase; color:#64748b; border:1px solid #e2e8f0; text-align:center; width:50px;">Qtd</th>
+            <th style="padding:5px 10px; font-size:8px; text-transform:uppercase; color:#64748b; border:1px solid #e2e8f0; text-align:right; width:80px;">Unitário</th>
+            <th style="padding:5px 10px; font-size:8px; text-transform:uppercase; color:#64748b; border:1px solid #e2e8f0; text-align:right; width:80px;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${orderItems.map((item: any) => `
+            <tr>
+              <td style="padding:5px 10px; border:1px solid #e2e8f0;">${item.description}</td>
+              <td style="padding:5px 10px; border:1px solid #e2e8f0; text-align:center;">${item.quantity}</td>
+              <td style="padding:5px 10px; border:1px solid #e2e8f0; text-align:right;">R$ ${item.unit_price.toFixed(2)}</td>
+              <td style="padding:5px 10px; border:1px solid #e2e8f0; text-align:right; font-weight:700;">R$ ${(item.quantity * item.unit_price).toFixed(2)}</td>
+            </tr>
+          `).join('')}
+          <tr style="background:#f8fafc;">
+            <td colspan="3" style="padding:8px 10px; border:1px solid #e2e8f0; text-align:right; font-size:9px; font-weight:700; text-transform:uppercase;">Valor Total dos Itens:</td>
+            <td style="padding:8px 10px; border:1px solid #e2e8f0; text-align:right; font-size:11px; font-weight:800; color:${color};">R$ ${totalItems.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>` : ''}
 
     <div class="section">

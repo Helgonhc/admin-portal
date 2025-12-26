@@ -39,8 +39,8 @@ export type ServiceOrder = {
   technician_id?: string;
   title: string;
   description?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'pendente' | 'em_andamento' | 'concluido' | 'cancelado' | 'aguardando_peca';
+  priority: 'baixa' | 'media' | 'alta' | 'urgente';
   scheduled_date?: string;
   completed_at?: string;
   signature?: string;
@@ -73,8 +73,8 @@ export type Ticket = {
   equipment_id?: string;
   title: string;
   description?: string;
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'aberto' | 'em_andamento' | 'resolvido' | 'fechado';
+  priority: 'baixa' | 'media' | 'alta' | 'urgente';
   created_by?: string;
   assigned_to?: string;
   photos?: string[];

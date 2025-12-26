@@ -4,15 +4,17 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../../lib/supabase';
 import { useAuthStore } from '../../../../store/authStore';
-import { 
-  ArrowLeft, Trash2, Loader2, Calendar, Clock, User, MapPin, 
+import {
+  ArrowLeft, Trash2, Loader2, Calendar, Clock, User, MapPin,
   FileText, Camera, PenTool, Check, Play, Pause, CheckCircle,
   Phone, MessageCircle, Navigation, Edit, Copy, List, Save, X,
-  Upload, Image as ImageIcon, Download, FileDown, Pencil
+  Upload, Image as ImageIcon, Download, FileDown, Pencil, History,
+  Plus, Eye, Package
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { generateServiceOrderPDF } from '../../../../utils/pdfGenerator';
+import { createAuditLog } from '../../../../utils/auditUtils';
 
 export default function OrderDetailsPage() {
   const params = useParams();
@@ -21,29 +23,41 @@ export default function OrderDetailsPage() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'report' | 'evidence'>('info');
-  
+  const [activeTab, setActiveTab] = useState<'info' | 'items' | 'report' | 'evidence' | 'history'>('info');
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
+  const [addingItem, setAddingItem] = useState(false);
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [itemFormData, setItemFormData] = useState({
+    product_id: '',
+    description: '',
+    quantity: 1,
+    unit_price: 0,
+    item_type: 'product' as 'product' | 'service'
+  });
+
   // Relatório
   const [reportText, setReportText] = useState('');
   const [savingReport, setSavingReport] = useState(false);
-  
+
   // Checklist
   const [tasks, setTasks] = useState<any[]>([]);
   const [checklistModels, setChecklistModels] = useState<any[]>([]);
   const [showChecklistModal, setShowChecklistModal] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  
+
   // Fotos
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Assinatura
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signerName, setSignerName] = useState('');
   const [signerDoc, setSignerDoc] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  
+
   // Edição
   const [showEditModal, setShowEditModal] = useState(false);
   const [editData, setEditData] = useState({
@@ -93,8 +107,10 @@ export default function OrderDetailsPage() {
       setReportText(data.execution_report || '');
       if (data.signer_name) setSignerName(data.signer_name);
       if (data.signer_doc) setSignerDoc(data.signer_doc);
-      
+
       await loadTasks();
+      await loadOrderItems();
+      await loadAvailableProducts();
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao carregar dados');
@@ -111,6 +127,100 @@ export default function OrderDetailsPage() {
       .eq('order_id', params.id)
       .order('created_at');
     setTasks(data || []);
+  }
+
+  async function loadOrderItems() {
+    const { data } = await supabase
+      .from('service_order_items')
+      .select('*')
+      .eq('order_id', params.id)
+      .order('created_at');
+    setOrderItems(data || []);
+  }
+
+  async function loadAvailableProducts() {
+    const { data } = await supabase
+      .from('inventory_items')
+      .select('id, name, quantity, unit_price')
+      .gt('quantity', 0)
+      .order('name');
+    setAvailableProducts(data || []);
+  }
+
+  async function addOrderItem() {
+    if (!itemFormData.description && !itemFormData.product_id) {
+      toast.error('Informe a descrição ou selecione um produto');
+      return;
+    }
+
+    setAddingItem(true);
+    try {
+      const { data, error } = await supabase
+        .from('service_order_items')
+        .insert([{
+          order_id: params.id,
+          product_id: itemFormData.item_type === 'product' ? (itemFormData.product_id || null) : null,
+          description: itemFormData.description || (availableProducts.find(p => p.id === itemFormData.product_id)?.name),
+          quantity: itemFormData.quantity,
+          unit_price: itemFormData.unit_price,
+          item_type: itemFormData.item_type
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setOrderItems([...orderItems, data]);
+      setShowItemModal(false);
+      setItemFormData({ product_id: '', description: '', quantity: 1, unit_price: 0, item_type: 'product' });
+      toast.success('Item adicionado!');
+
+      // Se for produto, atualizar estoque localmente pra UX
+      if (itemFormData.item_type === 'product' && itemFormData.product_id) {
+        setAvailableProducts(prev => prev.map(p =>
+          p.id === itemFormData.product_id ? { ...p, quantity: p.quantity - itemFormData.quantity } : p
+        ));
+      }
+    } catch (error: any) {
+      toast.error('Erro ao adicionar item: ' + error.message);
+    } finally {
+      setAddingItem(false);
+    }
+  }
+
+  async function removeOrderItem(item: any) {
+    if (!confirm('Remover este item? O estoque será devolvido se for um produto.')) return;
+
+    try {
+      const { error } = await supabase
+        .from('service_order_items')
+        .delete()
+        .eq('id', item.id);
+
+      if (error) throw error;
+
+      setOrderItems(orderItems.filter(i => i.id !== item.id));
+      toast.success('Item removido!');
+
+      // Devolver estoque localmente pra UX
+      if (item.item_type === 'product' && item.product_id) {
+        setAvailableProducts(prev => prev.map(p =>
+          p.id === item.product_id ? { ...p, quantity: p.quantity + item.quantity } : p
+        ));
+      }
+    } catch (error: any) {
+      toast.error('Erro ao remover: ' + error.message);
+    }
+  }
+
+  async function loadHistory() {
+    const { data } = await supabase
+      .from('audit_logs')
+      .select('*, profiles:user_id(full_name)')
+      .eq('target_table', 'service_orders')
+      .eq('target_id', params.id)
+      .order('created_at', { ascending: false });
+    setAuditLogs(data || []);
   }
 
   async function loadEditData() {
@@ -199,7 +309,7 @@ export default function OrderDetailsPage() {
       if (editData.scheduled_at) {
         updateData.scheduled_at = editData.scheduled_at;
       }
-      
+
       // Datas de execução
       if (editData.checkin_at) {
         updateData.checkin_at = editData.checkin_at;
@@ -218,6 +328,19 @@ export default function OrderDetailsPage() {
 
       if (error) throw error;
 
+      // Auditoria
+      if (profile?.id) {
+        await createAuditLog({
+          userId: profile.id,
+          action: 'UPDATE',
+          table: 'service_orders',
+          recordId: params.id as string,
+          oldData: order,
+          newData: updateData,
+          description: `OS #${order.id.slice(0, 6).toUpperCase()} editada manualmente pelo admin.`
+        });
+      }
+
       // Atualizar também o reportText local
       setReportText(editData.execution_report);
 
@@ -234,23 +357,23 @@ export default function OrderDetailsPage() {
   async function handleEditPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
+
     setUploadingEdit(true);
     try {
       const newUrls: string[] = [];
-      
+
       for (const file of Array.from(files)) {
         const fileName = `${params.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from('os-photos')
           .upload(fileName, file, { contentType: file.type });
-        
+
         if (uploadError) throw uploadError;
-        
+
         const { data } = supabase.storage.from('os-photos').getPublicUrl(fileName);
         newUrls.push(data.publicUrl);
       }
-      
+
       setEditData({ ...editData, photos_url: [...editData.photos_url, ...newUrls] });
       toast.success(`${newUrls.length} foto(s) adicionada(s)!`);
     } catch (error: any) {
@@ -278,12 +401,12 @@ export default function OrderDetailsPage() {
       .from('checklist_model_items')
       .select('item_description')
       .eq('model_id', modelId);
-    
+
     if (items && items.length > 0) {
-      const tasksToInsert = items.map(i => ({ 
-        order_id: params.id, 
-        title: i.item_description, 
-        is_completed: false 
+      const tasksToInsert = items.map(i => ({
+        order_id: params.id,
+        title: i.item_description,
+        is_completed: false
       }));
       await supabase.from('order_tasks').insert(tasksToInsert);
       await loadTasks();
@@ -294,7 +417,7 @@ export default function OrderDetailsPage() {
 
   async function toggleTask(task: any) {
     const newStatus = !task.is_completed;
-    setTasks(tasks.map(t => t.id === task.id ? {...t, is_completed: newStatus} : t));
+    setTasks(tasks.map(t => t.id === task.id ? { ...t, is_completed: newStatus } : t));
     await supabase.from('order_tasks').update({ is_completed: newStatus }).eq('id', task.id);
   }
 
@@ -323,7 +446,7 @@ export default function OrderDetailsPage() {
       .from('service_orders')
       .update({ execution_report: reportText })
       .eq('id', params.id);
-    
+
     setSavingReport(false);
     if (error) {
       toast.error('Erro ao salvar');
@@ -344,14 +467,14 @@ export default function OrderDetailsPage() {
       // Preencher com data/hora atual como padrão (ou usar a existente)
       const now = new Date();
       const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-      
+
       // Se já tem checkin, usar ele, senão usar agora
       let checkinValue = localDateTime;
       if (order.checkin_at) {
         const checkinDate = new Date(order.checkin_at);
         checkinValue = new Date(checkinDate.getTime() - checkinDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       }
-      
+
       setConcluirData({
         checkin_at: checkinValue,
         completed_at: localDateTime,
@@ -365,21 +488,34 @@ export default function OrderDetailsPage() {
     try {
       const updates: any = { status: newStatus };
       const now = new Date().toISOString();
-      
+
       if (newStatus === 'em_andamento' && order.status === 'pendente') {
         updates.checkin_at = now;
       }
-      
+
       const { error } = await supabase
         .from('service_orders')
         .update(updates)
         .eq('id', params.id);
-      
+
       if (error) throw error;
-      
+
+      // Auditoria
+      if (profile?.id) {
+        await createAuditLog({
+          userId: profile.id,
+          action: 'UPDATE',
+          table: 'service_orders',
+          recordId: params.id as string,
+          oldData: { status: order.status },
+          newData: { status: newStatus },
+          description: `Status da OS #${order.id.slice(0, 6).toUpperCase()} alterado para ${newStatus}.`
+        });
+      }
+
       // Enviar notificações sobre mudança de status
       await sendStatusChangeNotifications(newStatus);
-      
+
       toast.success('Status atualizado!');
       loadOrder();
     } catch (error: any) {
@@ -433,7 +569,7 @@ export default function OrderDetailsPage() {
     try {
       const osId = order.id.slice(0, 6).toUpperCase();
       const clientName = order.clients?.name || 'Cliente';
-      
+
       // Mensagens de status
       const statusMessages: Record<string, { title: string; message: string; emoji: string }> = {
         em_andamento: {
@@ -522,29 +658,29 @@ export default function OrderDetailsPage() {
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
+
     setUploading(true);
     try {
       const newUrls: string[] = [];
-      
+
       for (const file of Array.from(files)) {
         const fileName = `${params.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from('os-photos')
           .upload(fileName, file, { contentType: file.type });
-        
+
         if (uploadError) throw uploadError;
-        
+
         const { data } = supabase.storage.from('os-photos').getPublicUrl(fileName);
         newUrls.push(data.publicUrl);
       }
-      
+
       const updatedPhotos = [...(order.photos_url || []), ...newUrls];
       await supabase
         .from('service_orders')
         .update({ photos_url: updatedPhotos })
         .eq('id', params.id);
-      
+
       setOrder({ ...order, photos_url: updatedPhotos });
       toast.success(`${newUrls.length} foto(s) adicionada(s)!`);
     } catch (error: any) {
@@ -585,13 +721,20 @@ export default function OrderDetailsPage() {
     if (!phone) return toast.error('Cliente sem telefone');
     const num = phone.length <= 11 ? '55' + phone : phone;
     const osId = order.id.slice(0, 6).toUpperCase();
-    const clientName = order.clients?.name?.split(' ')[0];
-    
+    const clientName = order.clients?.name?.split(' ')[0] || 'cliente';
+    const technicianName = order.technician?.full_name?.split(' ')[0] || 'nosso técnico';
+
     let msg = "";
     switch (messageType) {
-      case 'way': msg = `Olá ${clientName}, técnico a caminho para OS #${osId}.`; break;
-      case 'arrived': msg = `Olá ${clientName}, cheguei no local para OS #${osId}.`; break;
-      case 'finished': msg = `Olá ${clientName}, serviço OS #${osId} finalizado.`; break;
+      case 'way':
+        msg = `*CHAMEI APP - Informativo*\n\nOlá ${clientName}, o técnico ${technicianName} já está a caminho para o atendimento da *OS #${osId}*.\n\nPrevisão de chegada em instantes.`;
+        break;
+      case 'arrived':
+        msg = `*CHAMEI APP - Informativo*\n\nOlá ${clientName}, o técnico ${technicianName} acabou de chegar para realizar o serviço da *OS #${osId}*.`;
+        break;
+      case 'finished':
+        msg = `*CHAMEI APP - Serviço Concluído*\n\nOlá ${clientName}, o serviço da *OS #${osId}* foi finalizado com sucesso! em breve você receberá o relatório técnico completo.\n\nAgradecemos a preferência!`;
+        break;
     }
     window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
   }
@@ -657,22 +800,22 @@ export default function OrderDetailsPage() {
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-800">OS #{order.id.slice(0,6).toUpperCase()}</h1>
+            <h1 className="text-2xl font-bold text-gray-800">OS #{order.id.slice(0, 6).toUpperCase()}</h1>
             <button onClick={() => router.push(`/dashboard/orders/new?clone=${order.id}`)} className="p-1.5 hover:bg-gray-100 rounded" title="Duplicar">
               <Copy size={16} className="text-gray-500" />
             </button>
           </div>
           <p className="text-gray-500">{order.clients?.name}</p>
         </div>
-        <button 
+        <button
           onClick={loadEditData}
           className="btn btn-secondary"
           title="Editar OS"
         >
           <Pencil size={18} /> Editar
         </button>
-        <button 
-          onClick={() => generateServiceOrderPDF(order)} 
+        <button
+          onClick={() => generateServiceOrderPDF(order)}
           className="btn btn-secondary"
           title="Gerar PDF"
         >
@@ -687,15 +830,16 @@ export default function OrderDetailsPage() {
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
         {[
           { id: 'info', icon: FileText, label: 'Dados' },
+          { id: 'items', icon: Package, label: 'Peças/Serviços' },
           { id: 'report', icon: Edit, label: 'Relatório' },
           { id: 'evidence', icon: Camera, label: 'Evidências' },
+          { id: 'history', icon: History, label: 'Histórico' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${
-              activeTab === tab.id ? 'bg-white shadow text-indigo-600' : 'text-gray-600 hover:text-gray-800'
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === tab.id ? 'bg-white shadow text-indigo-600' : 'text-gray-600 hover:text-gray-800'
+              }`}
           >
             <tab.icon size={18} />
             <span className="font-medium">{tab.label}</span>
@@ -712,7 +856,7 @@ export default function OrderDetailsPage() {
             <p className="text-lg font-medium">{order.clients?.name}</p>
             {order.clients?.address && <p className="text-sm text-gray-500">📍 {order.clients.address}</p>}
             {order.clients?.phone && <p className="text-sm text-gray-500">📱 {order.clients.phone}</p>}
-            
+
             <div className="flex gap-2 mt-4">
               <button onClick={openMaps} className="btn btn-secondary flex-1">
                 <Navigation size={18} /> Rota GPS
@@ -731,7 +875,7 @@ export default function OrderDetailsPage() {
             <h3 className="font-semibold text-gray-800 mb-3">🔧 Serviço</h3>
             <p className="text-lg font-bold text-gray-800">{order.title}</p>
             {order.description && <p className="text-gray-600 mt-2">{order.description}</p>}
-            
+
             <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-xs text-gray-500">Prioridade</p>
@@ -775,76 +919,155 @@ export default function OrderDetailsPage() {
         </div>
       )}
 
+      {activeTab === 'items' && (
+        <div className="space-y-4">
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <Package size={20} className="text-indigo-500" /> Peças e Serviços Utilizados
+              </h3>
+              <button
+                onClick={() => setShowItemModal(true)}
+                className="btn btn-primary text-sm gap-2"
+              >
+                <Plus size={16} /> Adicionar Item
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-400 border-b dark:border-gray-800">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider">Descrição</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider">Tipo</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-center">Qtd</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-right">Unitário</th>
+                    <th className="px-4 py-3 font-semibold uppercase tracking-wider text-right">Total</th>
+                    <th className="px-4 py-3 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y dark:divide-gray-800">
+                  {orderItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12 text-gray-400 italic">
+                        Nenhum item adicionado a esta ordem.
+                      </td>
+                    </tr>
+                  ) : (
+                    orderItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                        <td className="px-4 py-4 font-medium text-gray-800 dark:text-gray-200">
+                          {item.description}
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${item.item_type === 'product' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                            }`}>
+                            {item.item_type === 'product' ? 'Peça' : 'Serviço'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center font-bold">{item.quantity}</td>
+                        <td className="px-4 py-4 text-right">R$ {item.unit_price.toFixed(2)}</td>
+                        <td className="px-4 py-4 text-right font-bold text-gray-900 dark:text-white">
+                          R$ {(item.quantity * item.unit_price).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <button
+                            onClick={() => removeOrderItem(item)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {orderItems.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-gray-50/50 dark:bg-gray-800/20 font-bold text-gray-900 dark:text-white">
+                      <td colSpan={4} className="px-4 py-4 text-right uppercase tracking-widest text-xs">Total Geral:</td>
+                      <td className="px-4 py-4 text-right text-lg">
+                        R$ {orderItems.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0).toFixed(2)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'report' && (
         <div className="space-y-4">
           {/* Checklist */}
           <div className="card">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-800">✅ Checklist Técnico</h3>
-              <button onClick={loadChecklistModels} className="text-sm text-indigo-600 hover:underline">
-                + Importar Modelo
+              <button onClick={loadChecklistModels} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                <Plus size={14} /> Importar Modelo
               </button>
             </div>
-            
-            <div className="space-y-2 mb-4">
-              {tasks.map((task) => (
-                <div key={task.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg group">
-                  <button
-                    onClick={() => toggleTask(task)}
-                    className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                      task.is_completed ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'
-                    }`}
-                  >
-                    {task.is_completed && <Check size={12} className="text-white" />}
-                  </button>
-                  <span className={`flex-1 ${task.is_completed ? 'line-through text-gray-400' : ''}`}>
-                    {task.title}
-                  </span>
-                  <button 
-                    onClick={() => deleteTask(task.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-50 rounded"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-              {tasks.length === 0 && (
-                <p className="text-gray-400 text-sm italic">Nenhum item de verificação</p>
+
+            <div className="space-y-2 mb-6">
+              {tasks.length === 0 ? (
+                <p className="text-center py-4 text-gray-400 text-sm italic">Nenhum item definido</p>
+              ) : (
+                tasks.map((task) => (
+                  <div key={task.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl group transition-all border border-transparent hover:border-gray-200">
+                    <button
+                      onClick={() => toggleTask(task)}
+                      className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${task.is_completed ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300 bg-white'
+                        }`}
+                    >
+                      {task.is_completed && <Check size={14} className="text-white" />}
+                    </button>
+                    <span className={`flex-1 text-sm ${task.is_completed ? 'line-through text-gray-400' : 'text-gray-700 font-medium'}`}>
+                      {task.title}
+                    </span>
+                    <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
               )}
             </div>
-            
+
             <div className="flex gap-2">
               <input
                 type="text"
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addTask()}
-                placeholder="Adicionar item..."
-                className="input flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && addTask()}
+                placeholder="Novo item de verificação..."
+                className="input flex-1 text-sm"
               />
-              <button onClick={addTask} className="btn btn-secondary">
-                Adicionar
-              </button>
+              <button onClick={addTask} className="btn btn-secondary text-sm px-6">Adicionar</button>
             </div>
           </div>
 
-          {/* Relatório */}
+          {/* Relatório Técnico */}
           <div className="card">
-            <h3 className="font-semibold text-gray-800 mb-3">📝 Relatório Técnico</h3>
+            <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <Edit size={18} className="text-indigo-500" /> Relatório Técnico
+            </h3>
             <textarea
               value={reportText}
               onChange={(e) => setReportText(e.target.value)}
-              placeholder="Descreva os serviços realizados, peças trocadas, observações..."
-              className="input min-h-[200px]"
+              placeholder="Descreva detalhadamente as atividades realizadas, peças ou produtos utilizados, e observações gerais..."
+              className="input min-h-[300px] text-sm leading-relaxed"
             />
-            <button 
-              onClick={saveReport} 
-              disabled={savingReport}
-              className="btn btn-primary mt-3"
-            >
-              {savingReport ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              Salvar Relatório
-            </button>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={saveReport}
+                disabled={savingReport}
+                className="btn btn-primary px-8"
+              >
+                {savingReport ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                Salvar Relatório
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -853,7 +1076,7 @@ export default function OrderDetailsPage() {
         <div className="space-y-4">
           {/* Fotos */}
           <div className="card">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-800">📷 Fotos ({order.photos_url?.length || 0})</h3>
               <input
                 ref={fileInputRef}
@@ -863,171 +1086,185 @@ export default function OrderDetailsPage() {
                 onChange={handlePhotoUpload}
                 className="hidden"
               />
-              <button 
+              <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="btn btn-secondary"
+                className="btn btn-secondary text-sm"
               >
                 {uploading ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-                Adicionar Fotos
+                Fazer Upload
               </button>
             </div>
-            
+
             {order.photos_url && order.photos_url.length > 0 ? (
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {order.photos_url.map((photo: string, index: number) => (
-                  <div key={index} className="relative group">
-                    <img 
-                      src={photo} 
-                      alt={`Foto ${index + 1}`} 
-                      className="rounded-lg object-cover h-32 w-full cursor-pointer hover:opacity-90"
-                      onClick={() => window.open(photo, '_blank')}
+                  <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-gray-100 shadow-sm">
+                    <img
+                      src={photo}
+                      alt={`Evidência ${index + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
-                    <button
-                      onClick={() => deletePhoto(photo)}
-                      className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X size={14} />
-                    </button>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => window.open(photo, '_blank')}
+                        className="p-2 bg-white/20 hover:bg-white/40 rounded-full text-white backdrop-blur-sm"
+                        title="Ver tela cheia"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      <button
+                        onClick={() => deletePhoto(photo)}
+                        className="p-2 bg-red-500/80 hover:bg-red-500 rounded-full text-white backdrop-blur-sm"
+                        title="Excluir"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-400">
-                <ImageIcon size={48} className="mx-auto mb-2 opacity-50" />
-                <p>Nenhuma foto adicionada</p>
+              <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                <ImageIcon size={48} className="mx-auto mb-3 text-gray-300" />
+                <p className="text-gray-500 font-medium">Nenhuma foto anexada ainda</p>
+                <p className="text-xs text-gray-400 mt-1">Anexe fotos de antes, durante e depois da execução</p>
               </div>
             )}
           </div>
 
           {/* Assinatura */}
           <div className="card">
-            <h3 className="font-semibold text-gray-800 mb-3">✍️ Assinatura do Cliente</h3>
-            
+            <h3 className="font-semibold text-gray-800 mb-4">✍️ Assinatura do Cliente</h3>
+
             {order.signature_url ? (
-              <div className="text-center">
-                <img src={order.signature_url} alt="Assinatura" className="max-h-32 mx-auto border rounded-lg" />
-                {order.signer_name && <p className="mt-2 font-medium">{order.signer_name}</p>}
-                {order.signer_doc && <p className="text-sm text-gray-500">Doc: {order.signer_doc}</p>}
+              <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm max-w-md mx-auto">
+                <img src={order.signature_url} alt="Assinatura" className="max-h-40 mx-auto" />
+                <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+                  <p className="font-bold text-gray-900">{order.signer_name}</p>
+                  <p className="text-sm text-gray-500">Documento: {order.signer_doc}</p>
+                </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-400">
-                <PenTool size={48} className="mx-auto mb-2 opacity-50" />
-                <p>Assinatura não coletada</p>
-                <p className="text-sm">Use o app mobile para coletar assinatura</p>
+              <div className="text-center py-12 bg-amber-50 rounded-xl border-2 border-dashed border-amber-200">
+                <PenTool size={48} className="mx-auto mb-3 text-amber-300" />
+                <p className="text-amber-700 font-medium">Assinatura não coletada</p>
+                <p className="text-xs text-amber-600 mt-1">Utilize o aplicativo técnico para coletar a assinatura digital</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Ações de Status */}
-      <div className="card">
-        <h3 className="font-semibold text-gray-800 mb-3">⚡ Alterar Status</h3>
+      {/* Ações de Status e Botão Excluir */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4 border-t border-gray-100">
         <div className="flex flex-wrap gap-2">
           {order.status === 'pendente' && (
-            <button onClick={() => updateStatus('em_andamento')} disabled={processing} className="btn btn-primary">
+            <button onClick={() => updateStatus('em_andamento')} disabled={processing} className="btn btn-primary gap-2">
               <Play size={18} /> Iniciar Execução
             </button>
           )}
           {order.status === 'em_andamento' && (
             <>
-              <button onClick={() => updateStatus('pausado')} disabled={processing} className="btn btn-secondary">
+              <button onClick={() => updateStatus('pausado')} disabled={processing} className="btn bg-amber-500 hover:bg-amber-600 text-white gap-2 border-none">
                 <Pause size={18} /> Pausar
               </button>
-              <button onClick={() => updateStatus('concluido')} disabled={processing} className="btn btn-success">
-                <CheckCircle size={18} /> Concluir OS
+              <button onClick={() => updateStatus('concluido')} disabled={processing} className="btn btn-success gap-2">
+                <CheckCircle size={18} /> Finalizar OS
               </button>
             </>
           )}
           {order.status === 'pausado' && (
-            <button onClick={() => updateStatus('em_andamento')} disabled={processing} className="btn btn-primary">
-              <Play size={18} /> Retomar
+            <button onClick={() => updateStatus('em_andamento')} disabled={processing} className="btn btn-primary gap-2">
+              <Play size={18} /> Retomar Execução
             </button>
           )}
           {order.status === 'concluido' && (
-            <button onClick={() => updateStatus('em_andamento')} disabled={processing} className="btn btn-warning !bg-amber-500 hover:!bg-amber-600 !text-white">
+            <button onClick={() => updateStatus('em_andamento')} disabled={processing} className="btn bg-amber-100 text-amber-700 hover:bg-amber-200 border-none gap-2">
               <Play size={18} /> Reabrir OS
             </button>
           )}
+          {order.status !== 'cancelado' && (
+            <button onClick={() => updateStatus('cancelado')} disabled={processing} className="btn btn-danger-outline gap-2">
+              <X size={18} /> Cancelar Chamado
+            </button>
+          )}
           {order.status === 'cancelado' && (
-            <button onClick={() => updateStatus('pendente')} disabled={processing} className="btn btn-primary">
+            <button onClick={() => updateStatus('pendente')} disabled={processing} className="btn btn-primary gap-2">
               <Play size={18} /> Reativar OS
             </button>
           )}
-          {order.status !== 'cancelado' && order.status !== 'concluido' && (
-            <button onClick={() => updateStatus('cancelado')} disabled={processing} className="btn btn-danger">
-              <X size={18} /> Cancelar
-            </button>
-          )}
         </div>
-      </div>
 
-      {/* Excluir */}
-      <div className="flex justify-end">
-        <button onClick={handleDelete} disabled={processing} className="btn btn-danger">
-          <Trash2 size={20} /> Excluir OS
+        <button onClick={handleDelete} disabled={processing} className="btn btn-danger-ghost px-4 gap-2">
+          <Trash2 size={18} /> Excluir OS Permanentemente
         </button>
       </div>
+
+      {/* MODALS */}
 
       {/* Modal Checklist */}
       {showChecklistModal && (
         <div className="modal-overlay" onClick={() => setShowChecklistModal(false)}>
-          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-bold text-gray-800">Importar Checklist</h2>
+          <div className="modal-content max-w-md animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-800">Modelos de Checklist</h2>
+              <button onClick={() => setShowChecklistModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X size={20} className="text-gray-500" />
+              </button>
             </div>
-            <div className="p-6 max-h-96 overflow-y-auto">
+            <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">
               {checklistModels.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">Nenhum modelo de checklist cadastrado</p>
-              ) : (
-                <div className="space-y-2">
-                  {checklistModels.map((model) => (
-                    <button
-                      key={model.id}
-                      onClick={() => importChecklist(model.id)}
-                      className="w-full p-3 text-left border rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <p className="font-medium">{model.name}</p>
-                      {model.description && <p className="text-sm text-gray-500">{model.description}</p>}
-                    </button>
-                  ))}
+                <div className="text-center py-6 text-gray-500">
+                  <List size={32} className="mx-auto mb-2 opacity-20" />
+                  <p>Nenhum modelo cadastrado</p>
                 </div>
+              ) : (
+                checklistModels.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => importChecklist(model.id)}
+                    className="w-full p-4 text-left border rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group"
+                  >
+                    <p className="font-bold text-gray-800 group-hover:text-indigo-700">{model.name}</p>
+                    {model.description && <p className="text-sm text-gray-500 mt-1">{model.description}</p>}
+                  </button>
+                ))
               )}
             </div>
-            <div className="p-6 border-t bg-gray-50">
-              <button onClick={() => setShowChecklistModal(false)} className="btn btn-secondary w-full">
-                Fechar
-              </button>
+            <div className="p-6 border-t bg-gray-50 text-right">
+              <button onClick={() => setShowChecklistModal(false)} className="btn btn-secondary px-8">Fechar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Editar OS */}
+      {/* Modal Editar OS Completa */}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-content max-w-3xl" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="p-6 border-b bg-gradient-to-r from-amber-500 to-orange-600">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <Pencil className="w-6 h-6 text-white" />
+          <div className="modal-content max-w-3xl animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b bg-gradient-to-r from-amber-500 to-orange-600 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md">
+                  <Pencil className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">Editar Ordem de Serviço</h2>
-                  <p className="text-white/70 text-sm">OS #{order.id.slice(0,6).toUpperCase()} - Edição completa</p>
+                  <h2 className="text-xl font-bold text-white">Editar OS Completa</h2>
+                  <p className="text-white/70 text-xs">Ajuste todos os parâmetros do chamado</p>
                 </div>
               </div>
+              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-white/10 rounded-lg text-white">
+                <X size={24} />
+              </button>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-              {/* Seção: Cliente e Equipamento */}
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">1</span>
-                  Identificação
-                </h3>
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto bg-gray-50/50">
+              {/* Seção 1: Identificação */}
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 font-bold text-xs">1</div>
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Identificação do Cliente</h3>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Cliente</label>
@@ -1053,7 +1290,7 @@ export default function OrderDetailsPage() {
                       className="input"
                       disabled={!editData.client_id}
                     >
-                      <option value="">Selecione (opcional)</option>
+                      <option value="">Selecione um equipamento</option>
                       {equipments.map((eq) => (
                         <option key={eq.id} value={eq.id}>{eq.name} {eq.model && `- ${eq.model}`}</option>
                       ))}
@@ -1062,44 +1299,40 @@ export default function OrderDetailsPage() {
                 </div>
               </div>
 
-              {/* Seção: Detalhes do Serviço */}
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">2</span>
-                  Detalhes do Serviço
-                </h3>
+              {/* Seção 2: Detalhes do Serviço */}
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 font-bold text-xs">2</div>
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Detalhes do Serviço</h3>
+                </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="label flex items-center gap-1">
-                      <span>Título</span>
-                      <span className="text-red-500">*</span>
-                    </label>
+                    <label className="label">Título da OS</label>
                     <input
                       type="text"
                       value={editData.title}
                       onChange={(e) => setEditData({ ...editData, title: e.target.value })}
                       className="input"
-                      placeholder="Ex: Manutenção preventiva, Reparo de equipamento..."
+                      placeholder="Ex: Manutenção preventiva ar-condicionado"
                     />
                   </div>
                   <div>
-                    <label className="label">Descrição</label>
+                    <label className="label">Descrição Detalhada</label>
                     <textarea
                       value={editData.description}
                       onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                      className="input min-h-[80px] resize-none"
-                      placeholder="Descreva detalhadamente o serviço..."
+                      className="input min-h-[100px] resize-none"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Seção: Atribuição e Agendamento */}
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">3</span>
-                  Atribuição e Agendamento
-                </h3>
+              {/* Seção 3: Atribuição */}
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600 font-bold text-xs">3</div>
+                  <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Atribuição e Prazo</h3>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Técnico Responsável</label>
@@ -1108,53 +1341,38 @@ export default function OrderDetailsPage() {
                       onChange={(e) => setEditData({ ...editData, technician_id: e.target.value })}
                       className="input"
                     >
-                      <option value="">Selecione (opcional)</option>
+                      <option value="">Nenhum técnico atribuído</option>
                       {technicians.map((tech) => (
                         <option key={tech.id} value={tech.id}>{tech.full_name}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="label">Data Agendada</label>
-                    <div className="relative">
-                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                      <input
-                        type="date"
-                        value={editData.scheduled_at}
-                        onChange={(e) => setEditData({ ...editData, scheduled_at: e.target.value })}
-                        className="input pl-10"
-                      />
-                    </div>
+                    <label className="label">Data de Agendamento</label>
+                    <input
+                      type="date"
+                      value={editData.scheduled_at}
+                      onChange={(e) => setEditData({ ...editData, scheduled_at: e.target.value })}
+                      className="input"
+                    />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                   <div>
                     <label className="label">Prioridade</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { value: 'baixa', label: 'Baixa', color: 'bg-green-100 border-green-300 text-green-700', dot: 'bg-green-500' },
-                        { value: 'media', label: 'Média', color: 'bg-amber-100 border-amber-300 text-amber-700', dot: 'bg-amber-500' },
-                        { value: 'alta', label: 'Alta', color: 'bg-orange-100 border-orange-300 text-orange-700', dot: 'bg-orange-500' },
-                        { value: 'urgente', label: 'Urgente', color: 'bg-red-100 border-red-300 text-red-700', dot: 'bg-red-500' },
-                      ].map((p) => (
-                        <button
-                          key={p.value}
-                          type="button"
-                          onClick={() => setEditData({ ...editData, priority: p.value })}
-                          className={`px-3 py-2 rounded-lg border-2 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
-                            editData.priority === p.value
-                              ? `${p.color} border-current shadow-sm`
-                              : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${p.dot}`}></span>
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
+                    <select
+                      value={editData.priority}
+                      onChange={(e) => setEditData({ ...editData, priority: e.target.value })}
+                      className="input"
+                    >
+                      <option value="baixa">Baixa</option>
+                      <option value="media">Média</option>
+                      <option value="alta">Alta</option>
+                      <option value="urgente">Urgente</option>
+                    </select>
                   </div>
                   <div>
-                    <label className="label">Status</label>
+                    <label className="label">Status do Chamado</label>
                     <select
                       value={editData.status}
                       onChange={(e) => setEditData({ ...editData, status: e.target.value })}
@@ -1170,205 +1388,220 @@ export default function OrderDetailsPage() {
                 </div>
               </div>
 
-              {/* Seção: Datas de Execução */}
-              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 text-xs font-bold">4</span>
-                  ⏰ Datas de Execução
-                </h3>
+              {/* Seção 4: Datas de Execução */}
+              <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">4</div>
+                  <h3 className="text-sm font-bold text-emerald-800 uppercase tracking-wider">Datas de Execução Real</h3>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="label">Início (Check-in)</label>
+                    <label className="label !text-emerald-700 font-semibold">Check-in (Início)</label>
                     <input
                       type="datetime-local"
                       value={editData.checkin_at}
                       onChange={(e) => setEditData({ ...editData, checkin_at: e.target.value })}
-                      className="input"
+                      className="input !border-emerald-200 focus:!border-emerald-500"
                     />
                   </div>
                   <div>
-                    <label className="label">Conclusão</label>
+                    <label className="label !text-emerald-700 font-semibold">Coclusão</label>
                     <input
                       type="datetime-local"
                       value={editData.completed_at}
                       onChange={(e) => setEditData({ ...editData, completed_at: e.target.value })}
-                      className="input"
+                      className="input !border-emerald-200 focus:!border-emerald-500"
                     />
                   </div>
                   <div>
-                    <label className="label">Checkout</label>
+                    <label className="label !text-emerald-700 font-semibold">Check-out (Final)</label>
                     <input
                       type="datetime-local"
                       value={editData.checkout_at}
                       onChange={(e) => setEditData({ ...editData, checkout_at: e.target.value })}
-                      className="input"
+                      className="input !border-emerald-200 focus:!border-emerald-500"
                     />
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">💡 Edite as datas para corrigir horários de execução</p>
-              </div>
-
-              {/* Seção: Relatório Técnico */}
-              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">5</span>
-                  📝 Relatório Técnico
-                </h3>
-                <textarea
-                  value={editData.execution_report}
-                  onChange={(e) => setEditData({ ...editData, execution_report: e.target.value })}
-                  className="input min-h-[150px] resize-none"
-                  placeholder="Descreva os serviços realizados, peças trocadas, observações técnicas..."
-                />
-              </div>
-
-              {/* Seção: Fotos */}
-              <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                  <span className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-xs font-bold">6</span>
-                  📷 Fotos ({editData.photos_url.length})
-                </h3>
-                
-                <input
-                  ref={editFileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleEditPhotoUpload}
-                  className="hidden"
-                />
-                
-                {editData.photos_url.length > 0 ? (
-                  <div className="grid grid-cols-4 gap-3 mb-4">
-                    {editData.photos_url.map((photo, index) => (
-                      <div key={index} className="relative group">
-                        <img 
-                          src={photo} 
-                          alt={`Foto ${index + 1}`} 
-                          className="rounded-lg object-cover h-24 w-full cursor-pointer hover:opacity-90"
-                          onClick={() => window.open(photo, '_blank')}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeEditPhoto(photo)}
-                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-400 mb-4">
-                    <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Nenhuma foto</p>
-                  </div>
-                )}
-                
-                <button 
-                  type="button"
-                  onClick={() => editFileInputRef.current?.click()}
-                  disabled={uploadingEdit}
-                  className="btn btn-secondary w-full"
-                >
-                  {uploadingEdit ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
-                  Adicionar Fotos
-                </button>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="p-6 border-t bg-gray-50 flex items-center justify-between">
-              <p className="text-xs text-gray-400">
-                <span className="text-red-500">*</span> Campos obrigatórios
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowEditModal(false)} className="btn btn-secondary">
-                  Cancelar
-                </button>
-                <button 
-                  onClick={handleSaveEdit} 
-                  disabled={savingEdit || !editData.title.trim()} 
-                  className="btn btn-primary"
-                >
-                  {savingEdit ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                  Salvar Alterações
-                </button>
-              </div>
+            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+              <button onClick={() => setShowEditModal(false)} className="btn btn-secondary px-6">Cancelar</button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={savingEdit || !editData.title.trim()}
+                className="btn btn-primary px-8"
+              >
+                {savingEdit ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                Salvar Alterações
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Concluir OS */}
+      {/* Modal Conclusão de OS */}
       {showConcluirModal && (
         <div className="modal-overlay" onClick={() => setShowConcluirModal(false)}>
-          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="p-6 border-b bg-gradient-to-r from-emerald-500 to-green-600">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-white">Concluir Ordem de Serviço</h2>
-                  <p className="text-white/70 text-sm">OS #{order.id.slice(0,6).toUpperCase()}</p>
-                </div>
+          <div className="modal-content max-w-md animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b bg-emerald-500 text-white rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <CheckCircle size={24} />
+                <h2 className="text-xl font-bold">Concluir Ordem de Serviço</h2>
               </div>
             </div>
-
             <div className="p-6 space-y-4">
-              <p className="text-gray-600 text-sm">
-                Informe as datas de início e conclusão do serviço:
-              </p>
-              
+              <p className="text-gray-600 text-sm">Confirme os horários de execução real para finalizar este chamado.</p>
+
               <div>
-                <label className="label flex items-center gap-1">
-                  <span>📅 Data/Hora de Início</span>
-                  <span className="text-red-500">*</span>
-                </label>
+                <label className="label">Data/Hora de Início (Real)</label>
                 <input
                   type="datetime-local"
                   value={concluirData.checkin_at}
                   onChange={(e) => setConcluirData({ ...concluirData, checkin_at: e.target.value })}
                   className="input"
                 />
-                <p className="text-xs text-gray-400 mt-1">Quando o serviço foi iniciado</p>
               </div>
 
               <div>
-                <label className="label flex items-center gap-1">
-                  <span>✅ Data/Hora de Conclusão</span>
-                  <span className="text-red-500">*</span>
-                </label>
+                <label className="label">Data/Hora de Conclusão (Real)</label>
                 <input
                   type="datetime-local"
                   value={concluirData.completed_at}
                   onChange={(e) => setConcluirData({ ...concluirData, completed_at: e.target.value, checkout_at: e.target.value })}
                   className="input"
                 />
-                <p className="text-xs text-gray-400 mt-1">Quando o serviço foi finalizado</p>
               </div>
 
-              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
-                <p className="text-sm text-emerald-700">
-                  💡 Permite datas retroativas para lançamentos posteriores
-                </p>
+              <div className="bg-emerald-50 p-4 rounded-xl text-xs text-emerald-800 border border-emerald-100 italic">
+                Informar os horários corretos é essencial para o cálculo preciso de SLA e métricas de desempenho.
+              </div>
+            </div>
+            <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+              <button onClick={() => setShowConcluirModal(false)} className="btn btn-secondary px-6">Cancelar</button>
+              <button
+                onClick={handleConcluirOS}
+                disabled={processing || !concluirData.checkin_at || !concluirData.completed_at}
+                className="btn btn-success px-8"
+              >
+                {processing ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
+                Confirmar Conclusão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Adicionar Peça/Serviço */}
+      {showItemModal && (
+        <div className="modal-overlay" onClick={() => setShowItemModal(false)}>
+          <div className="modal-content max-w-lg animate-scaleIn" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b bg-indigo-600 text-white rounded-t-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Package size={24} />
+                <h2 className="text-xl font-bold">Adicionar Peça ou Serviço</h2>
+              </div>
+              <button onClick={() => setShowItemModal(false)} className="p-2 hover:bg-white/10 rounded-lg">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="flex p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                <button
+                  onClick={() => setItemFormData({ ...itemFormData, item_type: 'product', product_id: '', description: '', unit_price: 0 })}
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${itemFormData.item_type === 'product' ? 'bg-white dark:bg-gray-700 shadow text-indigo-600' : 'text-gray-500'}`}
+                >
+                  Peça (Estoque)
+                </button>
+                <button
+                  onClick={() => setItemFormData({ ...itemFormData, item_type: 'service', product_id: '', description: '', unit_price: 0 })}
+                  className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${itemFormData.item_type === 'service' ? 'bg-white dark:bg-gray-700 shadow text-indigo-600' : 'text-gray-500'}`}
+                >
+                  Serviço / Diversos
+                </button>
+              </div>
+
+              {itemFormData.item_type === 'product' ? (
+                <div>
+                  <label className="label">Selecionar Produto</label>
+                  <select
+                    className="input"
+                    value={itemFormData.product_id}
+                    onChange={(e) => {
+                      const prod = availableProducts.find(p => p.id === e.target.value);
+                      setItemFormData({
+                        ...itemFormData,
+                        product_id: e.target.value,
+                        unit_price: prod?.unit_price || 0,
+                        description: prod?.name || ''
+                      });
+                    }}
+                  >
+                    <option value="">Selecione um produto...</option>
+                    {availableProducts.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} (Saldo: {p.quantity}) - R$ {p.unit_price.toFixed(2)}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="label">Descrição do Serviço</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Ex: Mão de obra técnica, Deslocamento..."
+                    value={itemFormData.description}
+                    onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Quantidade</label>
+                  <input
+                    type="number"
+                    className="input"
+                    min="1"
+                    value={itemFormData.quantity}
+                    onChange={(e) => setItemFormData({ ...itemFormData, quantity: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="label">Valor Unitário (R$)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    step="0.01"
+                    value={itemFormData.unit_price}
+                    onChange={(e) => setItemFormData({ ...itemFormData, unit_price: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                <span className="text-gray-500 text-sm font-medium uppercase tracking-wider">Subtotal:</span>
+                <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                  R$ {(itemFormData.quantity * itemFormData.unit_price).toFixed(2)}
+                </span>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="p-6 border-t bg-gray-50 flex gap-3 justify-end">
-              <button onClick={() => setShowConcluirModal(false)} className="btn btn-secondary">
+            <div className="p-6 border-t bg-gray-50 dark:bg-gray-800/30 flex justify-end gap-3">
+              <button
+                onClick={() => setShowItemModal(false)}
+                className="btn btn-secondary px-6"
+              >
                 Cancelar
               </button>
-              <button 
-                onClick={handleConcluirOS} 
-                disabled={processing || !concluirData.checkin_at || !concluirData.completed_at} 
-                className="btn btn-success"
+              <button
+                onClick={addOrderItem}
+                disabled={addingItem || (!itemFormData.product_id && !itemFormData.description)}
+                className="btn btn-primary px-8"
               >
-                {processing ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
-                Concluir OS
+                {addingItem ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
+                Confirmar Adição
               </button>
             </div>
           </div>
