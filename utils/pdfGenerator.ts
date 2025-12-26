@@ -1,14 +1,4 @@
 import { supabase } from '../lib/supabase';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
-// Extend jsPDF type for autotable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    lastAutoTable: { finalY: number };
-  }
-}
 
 const formatDateTime = (dateString: string) => {
   if (!dateString) return '-';
@@ -35,408 +25,180 @@ async function getCompanyConfig() {
   };
 }
 
-// Converter hex para RGB
-function hexToRgb(hex: string): [number, number, number] {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [37, 99, 235];
-}
-
-// Carregar imagem como base64
-async function loadImageAsBase64(url: string): Promise<string | null> {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
-}
-
 export async function generateServiceOrderPDF(order: any) {
   try {
     const company = await getCompanyConfig();
-    let technicianName = 'Técnico Responsável', technicianSignature = '', technicianDoc = '';
+    let techName = 'Técnico Responsável', techSig = '', techDoc = '';
     
     if (order.technician_id) {
       const { data: tech } = await supabase.from('profiles').select('full_name, signature_url, cpf').eq('id', order.technician_id).maybeSingle();
-      if (tech) { 
-        technicianName = tech.full_name || technicianName; 
-        technicianSignature = tech.signature_url || ''; 
-        technicianDoc = tech.cpf || ''; 
-      }
+      if (tech) { techName = tech.full_name || techName; techSig = tech.signature_url || ''; techDoc = tech.cpf || ''; }
     }
 
     const { data: tasks } = await supabase.from('order_tasks').select('*').eq('order_id', order.id).order('created_at');
     const osNumber = formatOrderId(order.id, order.created_at);
     const photos = order.photos_url || order.photos || [];
     const report = order.execution_report || order.description || '';
+    const c = company.color;
 
-    // Criar PDF
-    const doc = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 15;
-    const contentWidth = pageWidth - (margin * 2);
-    const rgb = hexToRgb(company.color);
-    let y = margin;
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>OS #${osNumber}</title>
+<style>
+@page { size: A4; margin: 10mm; }
+@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; font-size: 11px; color: #333; }
+</style></head><body>`;
 
-    // ========== CABEÇALHO ==========
-    // Logo
-    if (company.logo) {
-      try {
-        const logoBase64 = await loadImageAsBase64(company.logo);
-        if (logoBase64) {
-          doc.addImage(logoBase64, 'PNG', margin, y, 20, 20);
-        }
-      } catch (e) { console.log('Erro ao carregar logo'); }
-    }
-
-    // Nome da empresa
-    doc.setFontSize(16);
-    doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-    doc.setFont('helvetica', 'bold');
-    doc.text(company.name, margin + 25, y + 7);
-
-    // Dados da empresa
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.setFont('helvetica', 'normal');
-    let companyY = y + 12;
-    if (company.cnpj) { doc.text(`CNPJ: ${company.cnpj}`, margin + 25, companyY); companyY += 4; }
-    if (company.address) { doc.text(company.address, margin + 25, companyY); companyY += 4; }
-    doc.text([company.phone, company.email].filter(Boolean).join(' | '), margin + 25, companyY);
-
-    // Badge OS (direita)
-    const badgeWidth = 45;
-    const badgeX = pageWidth - margin - badgeWidth;
-    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-    doc.roundedRect(badgeX, y, badgeWidth, 18, 3, 3, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.text('ORDEM DE SERVIÇO', badgeX + badgeWidth/2, y + 6, { align: 'center' });
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`#${osNumber}`, badgeX + badgeWidth/2, y + 13, { align: 'center' });
+    const w = window.open('', '_blank');
+    if (!w) { alert('Permita pop-ups'); return; }
     
-    // Data abaixo do badge
-    doc.setTextColor(100, 100, 100);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(new Date(order.created_at).toLocaleDateString('pt-BR'), badgeX + badgeWidth/2, y + 22, { align: 'center' });
-
-    // Linha separadora
-    y += 28;
-    doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
-    doc.setLineWidth(0.8);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 8;
-
-    // ========== DADOS CLIENTE E SERVIÇO ==========
-    const boxWidth = (contentWidth - 5) / 2;
-    const boxHeight = 32;
-
-    // Box Cliente
-    doc.setFillColor(248, 249, 250);
-    doc.setDrawColor(220, 220, 220);
-    doc.roundedRect(margin, y, boxWidth, boxHeight, 2, 2, 'FD');
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-    doc.text('CLIENTE', margin + 5, y + 6);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text(order.clients?.name || '-', margin + 5, y + 13);
-    doc.setFont('helvetica', 'normal');
-    doc.text(order.clients?.cnpj || order.clients?.cnpj_cpf || '-', margin + 5, y + 18);
-    doc.text(order.clients?.address || '-', margin + 5, y + 23, { maxWidth: boxWidth - 10 });
-    doc.text(order.clients?.phone || '-', margin + 5, y + 28);
-
-    // Box Serviço
-    const boxX2 = margin + boxWidth + 5;
-    doc.setFillColor(248, 249, 250);
-    doc.roundedRect(boxX2, y, boxWidth, boxHeight, 2, 2, 'FD');
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(rgb[0], rgb[1], rgb[2]);
-    doc.text('SERVIÇO', boxX2 + 5, y + 6);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text(order.title || '-', boxX2 + 5, y + 13, { maxWidth: boxWidth - 10 });
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Técnico: ${technicianName}`, boxX2 + 5, y + 18);
-    doc.text(`Início: ${formatDateTime(order.checkin_at)}`, boxX2 + 5, y + 23);
-    doc.text(`Término: ${formatDateTime(order.completed_at)}`, boxX2 + 5, y + 28);
-
-    y += boxHeight + 8;
-
-    // ========== CHECKLIST ==========
-    if (tasks && tasks.length > 0) {
-      // Título
-      doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-      doc.roundedRect(margin, y, contentWidth, 7, 2, 2, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text('CHECKLIST', margin + 5, y + 5);
-      y += 9;
-
-      // Items em 2 colunas
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(8);
-      const half = Math.ceil(tasks.length / 2);
-      const col1 = tasks.slice(0, half);
-      const col2 = tasks.slice(half);
-      
-      let checkY = y;
-      col1.forEach((t: any, i: number) => {
-        const icon = t.is_completed ? '✓' : '○';
-        doc.setTextColor(t.is_completed ? 22 : 150, t.is_completed ? 163 : 150, t.is_completed ? 74 : 150);
-        doc.text(`${icon} ${t.title}`, margin + 3, checkY + (i * 5));
-      });
-      col2.forEach((t: any, i: number) => {
-        const icon = t.is_completed ? '✓' : '○';
-        doc.setTextColor(t.is_completed ? 22 : 150, t.is_completed ? 163 : 150, t.is_completed ? 74 : 150);
-        doc.text(`${icon} ${t.title}`, margin + contentWidth/2, checkY + (i * 5));
-      });
-      
-      y += Math.max(col1.length, col2.length) * 5 + 5;
-    }
-
-    // ========== RELATÓRIO TÉCNICO ==========
-    // Título
-    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-    doc.roundedRect(margin, y, contentWidth, 7, 2, 2, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO TÉCNICO', margin + 5, y + 5);
-    y += 9;
-
-    // Conteúdo do relatório
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    const reportText = report || 'Nenhuma observação registrada.';
-    const splitReport = doc.splitTextToSize(reportText, contentWidth - 10);
-    
-    // Verificar se precisa de nova página
-    const reportHeight = splitReport.length * 4.5 + 10;
-    if (y + reportHeight > pageHeight - 60) {
-      doc.addPage();
-      y = margin;
-    }
-    
-    // Box do relatório
-    doc.setFillColor(250, 250, 250);
-    doc.setDrawColor(220, 220, 220);
-    doc.roundedRect(margin, y, contentWidth, reportHeight, 2, 2, 'FD');
-    doc.text(splitReport, margin + 5, y + 6);
-    y += reportHeight + 5;
-
-    // ========== FOTOS E ASSINATURAS (PÁGINA DEDICADA) ==========
+    w.document.write(html);
+    w.document.write(buildPage1(company, order, osNumber, techName, tasks || [], report, c));
     if (photos.length > 0) {
-      // SEMPRE nova página para fotos
-      doc.addPage();
-      y = margin;
-
-      // Título FOTOS
-      doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-      doc.roundedRect(margin, y, contentWidth, 7, 2, 2, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`REGISTRO FOTOGRÁFICO (${photos.length} foto${photos.length > 1 ? 's' : ''})`, margin + 5, y + 5);
-      y += 10;
-
-      // Grid de fotos - 4 por linha, fotos menores para caber mais
-      const photoSize = (contentWidth - 15) / 4;
-      let photoX = margin;
-      let photoY = y;
-      
-      for (let i = 0; i < photos.length; i++) {
-        // Nova linha a cada 4 fotos
-        if (i > 0 && i % 4 === 0) {
-          photoX = margin;
-          photoY += photoSize + 5;
-        }
-
-        try {
-          const imgBase64 = await loadImageAsBase64(photos[i]);
-          if (imgBase64) {
-            doc.setFillColor(245, 245, 245);
-            doc.setDrawColor(200, 200, 200);
-            doc.roundedRect(photoX, photoY, photoSize, photoSize, 3, 3, 'FD');
-            doc.addImage(imgBase64, 'JPEG', photoX + 2, photoY + 2, photoSize - 4, photoSize - 4);
-          }
-        } catch (e) {
-          doc.setFillColor(240, 240, 240);
-          doc.roundedRect(photoX, photoY, photoSize, photoSize, 3, 3, 'F');
-        }
-        
-        photoX += photoSize + 5;
-      }
-      
-      // Calcular quantas linhas de fotos
-      const numRows = Math.ceil(photos.length / 4);
-      y = photoY + photoSize + 15;
-
-      // ========== ASSINATURAS (logo após as fotos) ==========
-      const sigWidth = (contentWidth - 20) / 2;
-      const sigY = y;
-
-      // Assinatura Técnico
-      doc.setFillColor(248, 249, 250);
-      doc.roundedRect(margin, sigY, sigWidth, 40, 2, 2, 'F');
-      
-      if (technicianSignature) {
-        try {
-          const sigBase64 = await loadImageAsBase64(technicianSignature);
-          if (sigBase64) {
-            doc.addImage(sigBase64, 'PNG', margin + sigWidth/2 - 20, sigY + 3, 40, 15);
-          }
-        } catch (e) {}
-      }
-      
-      doc.setDrawColor(50, 50, 50);
-      doc.line(margin + 15, sigY + 22, margin + sigWidth - 15, sigY + 22);
-      
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.text(technicianName, margin + sigWidth/2, sigY + 28, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(100, 100, 100);
-      doc.text('Técnico Responsável', margin + sigWidth/2, sigY + 33, { align: 'center' });
-      if (technicianDoc) {
-        doc.text(`CPF: ${technicianDoc}`, margin + sigWidth/2, sigY + 37, { align: 'center' });
-      }
-
-      // Assinatura Cliente
-      const sig2X = margin + sigWidth + 20;
-      doc.setFillColor(248, 249, 250);
-      doc.roundedRect(sig2X, sigY, sigWidth, 40, 2, 2, 'F');
-      
-      if (order.signature_url) {
-        try {
-          const sigBase64 = await loadImageAsBase64(order.signature_url);
-          if (sigBase64) {
-            doc.addImage(sigBase64, 'PNG', sig2X + sigWidth/2 - 20, sigY + 3, 40, 15);
-          }
-        } catch (e) {}
-      }
-      
-      doc.setDrawColor(50, 50, 50);
-      doc.line(sig2X + 15, sigY + 22, sig2X + sigWidth - 15, sigY + 22);
-      
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.text(order.signer_name || 'Responsável', sig2X + sigWidth/2, sigY + 28, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(100, 100, 100);
-      doc.text('Cliente', sig2X + sigWidth/2, sigY + 33, { align: 'center' });
-      if (order.signer_doc) {
-        doc.text(`CPF: ${order.signer_doc}`, sig2X + sigWidth/2, sigY + 37, { align: 'center' });
-      }
-
+      w.document.write(buildPage2(photos, techName, techSig, techDoc, order, c));
     } else {
-      // SEM FOTOS - assinaturas na mesma página
-      const sigWidth = (contentWidth - 20) / 2;
-      const sigY = y + 10;
-
-      // Assinatura Técnico
-      doc.setFillColor(248, 249, 250);
-      doc.roundedRect(margin, sigY, sigWidth, 40, 2, 2, 'F');
-      
-      if (technicianSignature) {
-        try {
-          const sigBase64 = await loadImageAsBase64(technicianSignature);
-          if (sigBase64) {
-            doc.addImage(sigBase64, 'PNG', margin + sigWidth/2 - 20, sigY + 3, 40, 15);
-          }
-        } catch (e) {}
-      }
-      
-      doc.setDrawColor(50, 50, 50);
-      doc.line(margin + 15, sigY + 22, margin + sigWidth - 15, sigY + 22);
-      
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.text(technicianName, margin + sigWidth/2, sigY + 28, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(100, 100, 100);
-      doc.text('Técnico Responsável', margin + sigWidth/2, sigY + 33, { align: 'center' });
-      if (technicianDoc) {
-        doc.text(`CPF: ${technicianDoc}`, margin + sigWidth/2, sigY + 37, { align: 'center' });
-      }
-
-      // Assinatura Cliente
-      const sig2X = margin + sigWidth + 20;
-      doc.setFillColor(248, 249, 250);
-      doc.roundedRect(sig2X, sigY, sigWidth, 40, 2, 2, 'F');
-      
-      if (order.signature_url) {
-        try {
-          const sigBase64 = await loadImageAsBase64(order.signature_url);
-          if (sigBase64) {
-            doc.addImage(sigBase64, 'PNG', sig2X + sigWidth/2 - 20, sigY + 3, 40, 15);
-          }
-        } catch (e) {}
-      }
-      
-      doc.setDrawColor(50, 50, 50);
-      doc.line(sig2X + 15, sigY + 22, sig2X + sigWidth - 15, sigY + 22);
-      
-      doc.setTextColor(50, 50, 50);
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'bold');
-      doc.text(order.signer_name || 'Responsável', sig2X + sigWidth/2, sigY + 28, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(100, 100, 100);
-      doc.text('Cliente', sig2X + sigWidth/2, sigY + 33, { align: 'center' });
-      if (order.signer_doc) {
-        doc.text(`CPF: ${order.signer_doc}`, sig2X + sigWidth/2, sigY + 37, { align: 'center' });
-      }
+      w.document.write(buildSignatures(techName, techSig, techDoc, order));
     }
-
-    // ========== RODAPÉ EM TODAS AS PÁGINAS ==========
-    const totalPages = doc.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      doc.setFontSize(6);
-      doc.setTextColor(150, 150, 150);
-      doc.text(`Documento gerado em ${new Date().toLocaleString('pt-BR')} - Página ${i} de ${totalPages}`, pageWidth/2, pageHeight - 8, { align: 'center' });
-    }
-
-    // Salvar/Abrir PDF
-    doc.save(`OS_${osNumber}.pdf`);
-
-  } catch (error) { 
-    console.error('Erro PDF:', error); 
-    alert('Erro ao gerar PDF'); 
-  }
+    w.document.write(`<div style="text-align:center;font-size:9px;color:#999;margin-top:20px;border-top:1px solid #ddd;padding-top:8px">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div></body></html>`);
+    w.document.close();
+    
+    setTimeout(() => w.print(), 500);
+  } catch (error) { console.error('Erro PDF:', error); alert('Erro ao gerar PDF'); }
 }
 
 
-// ========== ORÇAMENTO PDF (mantém HTML por simplicidade) ==========
+function buildPage1(company: any, order: any, osNumber: string, techName: string, tasks: any[], report: string, c: string) {
+  return `
+<!-- CABEÇALHO -->
+<table style="width:100%;border-bottom:2px solid ${c};padding-bottom:8px;margin-bottom:12px">
+<tr>
+<td style="width:60px;vertical-align:middle">${company.logo ? `<img src="${company.logo}" style="max-width:50px;max-height:50px">` : ''}</td>
+<td style="vertical-align:middle;padding-left:8px">
+<div style="font-size:16px;font-weight:bold;color:${c}">${company.name}</div>
+${company.cnpj ? `<div style="font-size:9px;color:#666">CNPJ: ${company.cnpj}</div>` : ''}
+${company.address ? `<div style="font-size:9px;color:#666">${company.address}</div>` : ''}
+<div style="font-size:9px;color:#666">${[company.phone, company.email].filter(Boolean).join(' | ')}</div>
+</td>
+<td style="width:120px;text-align:right;vertical-align:middle">
+<div style="background:${c};color:#fff;padding:8px 12px;border-radius:5px;display:inline-block">
+<div style="font-size:8px">ORDEM DE SERVIÇO</div>
+<div style="font-size:14px;font-weight:bold">#${osNumber}</div>
+</div>
+<div style="font-size:9px;color:#666;margin-top:4px">${new Date(order.created_at).toLocaleDateString('pt-BR')}</div>
+</td>
+</tr>
+</table>
+
+<!-- CLIENTE E SERVIÇO -->
+<table style="width:100%;margin-bottom:12px">
+<tr>
+<td style="width:50%;vertical-align:top;padding-right:6px">
+<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:10px">
+<div style="font-size:10px;font-weight:bold;color:${c};border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:6px">CLIENTE</div>
+<div style="font-size:10px;font-weight:bold">${order.clients?.name || '-'}</div>
+<div style="font-size:9px;color:#555">${order.clients?.cnpj || order.clients?.cnpj_cpf || '-'}</div>
+<div style="font-size:9px;color:#555">${order.clients?.address || '-'}</div>
+<div style="font-size:9px;color:#555">${order.clients?.phone || '-'}</div>
+</div>
+</td>
+<td style="width:50%;vertical-align:top;padding-left:6px">
+<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:10px">
+<div style="font-size:10px;font-weight:bold;color:${c};border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:6px">SERVIÇO</div>
+<div style="font-size:10px;font-weight:bold">${order.title || '-'}</div>
+<div style="font-size:9px;color:#555">Técnico: ${techName}</div>
+<div style="font-size:9px;color:#555">Início: ${formatDateTime(order.checkin_at)}</div>
+<div style="font-size:9px;color:#555">Término: ${formatDateTime(order.completed_at)}</div>
+</div>
+</td>
+</tr>
+</table>
+
+${tasks.length > 0 ? `
+<!-- CHECKLIST -->
+<div style="margin-bottom:12px">
+<div style="background:${c};color:#fff;padding:5px 10px;font-size:10px;font-weight:bold;border-radius:4px 4px 0 0">CHECKLIST</div>
+<div style="background:#f9f9f9;border:1px solid #ddd;border-top:none;border-radius:0 0 4px 4px;padding:8px">
+<table style="width:100%"><tr>
+<td style="width:50%;vertical-align:top">${tasks.slice(0, Math.ceil(tasks.length/2)).map(t => `<div style="font-size:9px;padding:2px 0;color:${t.is_completed ? '#16a34a' : '#999'}">${t.is_completed ? '✓' : '○'} ${t.title}</div>`).join('')}</td>
+<td style="width:50%;vertical-align:top">${tasks.slice(Math.ceil(tasks.length/2)).map(t => `<div style="font-size:9px;padding:2px 0;color:${t.is_completed ? '#16a34a' : '#999'}">${t.is_completed ? '✓' : '○'} ${t.title}</div>`).join('')}</td>
+</tr></table>
+</div>
+</div>
+` : ''}
+
+<!-- RELATÓRIO -->
+<div style="margin-bottom:12px">
+<div style="background:${c};color:#fff;padding:5px 10px;font-size:10px;font-weight:bold;border-radius:4px 4px 0 0">RELATÓRIO TÉCNICO</div>
+<div style="background:#f9f9f9;border:1px solid #ddd;border-top:none;border-radius:0 0 4px 4px;padding:10px;font-size:10px;line-height:1.5;white-space:pre-wrap;min-height:50px">${report || 'Nenhuma observação registrada.'}</div>
+</div>
+`;
+}
+
+
+function buildPage2(photos: string[], techName: string, techSig: string, techDoc: string, order: any, c: string) {
+  return `
+<!-- QUEBRA DE PÁGINA -->
+<div style="page-break-before:always"></div>
+
+<!-- FOTOS -->
+<div style="margin-bottom:15px">
+<div style="background:${c};color:#fff;padding:5px 10px;font-size:10px;font-weight:bold;border-radius:4px 4px 0 0">REGISTRO FOTOGRÁFICO (${photos.length} foto${photos.length > 1 ? 's' : ''})</div>
+<div style="background:#f9f9f9;border:1px solid #ddd;border-top:none;border-radius:0 0 4px 4px;padding:10px">
+<table style="width:100%">
+${(() => {
+  let html = '';
+  for (let i = 0; i < photos.length; i += 4) {
+    html += '<tr>';
+    for (let j = i; j < i + 4; j++) {
+      if (j < photos.length) {
+        html += `<td style="width:25%;padding:4px;vertical-align:top"><div style="background:#eee;border:1px solid #ddd;border-radius:8px;overflow:hidden;text-align:center"><img src="${photos[j]}" style="width:100%;height:auto;max-height:100px;object-fit:contain;display:block"></div></td>`;
+      } else {
+        html += '<td style="width:25%;padding:4px"></td>';
+      }
+    }
+    html += '</tr>';
+  }
+  return html;
+})()}
+</table>
+</div>
+</div>
+
+${buildSignatures(techName, techSig, techDoc, order)}
+`;
+}
+
+function buildSignatures(techName: string, techSig: string, techDoc: string, order: any) {
+  return `
+<!-- ASSINATURAS -->
+<table style="width:100%;margin-top:20px">
+<tr>
+<td style="width:50%;text-align:center;padding:0 15px">
+<div style="background:#f5f5f5;border-radius:5px;padding:10px">
+${techSig ? `<img src="${techSig}" style="height:35px;margin-bottom:5px">` : '<div style="height:30px"></div>'}
+<div style="border-top:1px solid #333;margin:5px 15px"></div>
+<div style="font-size:9px;font-weight:bold">${techName}</div>
+<div style="font-size:8px;color:#666">Técnico Responsável</div>
+${techDoc ? `<div style="font-size:7px;color:#999">CPF: ${techDoc}</div>` : ''}
+</div>
+</td>
+<td style="width:50%;text-align:center;padding:0 15px">
+<div style="background:#f5f5f5;border-radius:5px;padding:10px">
+${order.signature_url ? `<img src="${order.signature_url}" style="height:35px;margin-bottom:5px">` : '<div style="height:30px"></div>'}
+<div style="border-top:1px solid #333;margin:5px 15px"></div>
+<div style="font-size:9px;font-weight:bold">${order.signer_name || 'Responsável'}</div>
+<div style="font-size:8px;color:#666">Cliente</div>
+${order.signer_doc ? `<div style="font-size:7px;color:#999">CPF: ${order.signer_doc}</div>` : ''}
+</div>
+</td>
+</tr>
+</table>
+`;
+}
+
+
+// ========== ORÇAMENTO ==========
 export async function generateQuotePDF(quote: any) {
   try {
     const company = await getCompanyConfig();
@@ -452,43 +214,63 @@ export async function generateQuotePDF(quote: any) {
     const validUntil = quote.valid_until ? new Date(quote.valid_until).toLocaleDateString('pt-BR') : '-';
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Orçamento</title>
-<style>
-@page{margin:15mm;size:A4}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10pt;color:#333}
-.header{display:flex;align-items:center;border-bottom:2px solid ${c};padding-bottom:10px;margin-bottom:15px}
-.logo{width:50px;height:50px;margin-right:10px}.logo img{max-width:100%;max-height:100%}
-.company{flex:1}.company h1{font-size:14pt;color:${c}}.company p{font-size:8pt;color:#666}
-.badge{background:${c};color:#fff;padding:10px 15px;border-radius:5px;text-align:center}
-.badge small{font-size:7pt;display:block}.badge strong{font-size:12pt}
-.grid{display:flex;gap:10px;margin-bottom:15px}.box{flex:1;background:#f5f5f5;border:1px solid #ddd;border-radius:5px;padding:10px}
-.box-title{font-size:9pt;font-weight:bold;color:${c};border-bottom:1px solid #ddd;padding-bottom:5px;margin-bottom:8px}
-.box p{font-size:8pt;margin:3px 0}
-table{width:100%;border-collapse:collapse;margin:15px 0}th{background:${c};color:#fff;padding:8px;text-align:left;font-size:9pt}
-td{padding:8px;border-bottom:1px solid #eee;font-size:9pt}.total{background:#f0f0f0;font-weight:bold}
-.total td{font-size:11pt;color:${c}}.validity{text-align:center;padding:10px;background:#f0fdf4;border:1px solid #86efac;border-radius:5px;margin-top:15px}
-.footer{margin-top:20px;text-align:center;font-size:7pt;color:#999;border-top:1px solid #ddd;padding-top:10px}
-</style></head><body>
-<div class="header">
-<div class="logo">${company.logo ? `<img src="${company.logo}"/>` : ''}</div>
-<div class="company"><h1>${company.name}</h1>${company.cnpj ? `<p>CNPJ: ${company.cnpj}</p>` : ''}<p>${[company.phone, company.email].filter(Boolean).join(' | ')}</p></div>
-<div class="badge"><small>ORÇAMENTO</small><strong>#${quoteNumber}</strong></div>
+<style>@page{margin:12mm;size:A4}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;color:#333}</style></head><body>
+<table style="width:100%;border-bottom:2px solid ${c};padding-bottom:8px;margin-bottom:12px">
+<tr>
+<td style="width:60px;vertical-align:middle">${company.logo ? `<img src="${company.logo}" style="max-width:50px;max-height:50px">` : ''}</td>
+<td style="vertical-align:middle;padding-left:8px">
+<div style="font-size:16px;font-weight:bold;color:${c}">${company.name}</div>
+${company.cnpj ? `<div style="font-size:9px;color:#666">CNPJ: ${company.cnpj}</div>` : ''}
+<div style="font-size:9px;color:#666">${[company.phone, company.email].filter(Boolean).join(' | ')}</div>
+</td>
+<td style="width:120px;text-align:right;vertical-align:middle">
+<div style="background:${c};color:#fff;padding:8px 12px;border-radius:5px;display:inline-block">
+<div style="font-size:8px">ORÇAMENTO</div>
+<div style="font-size:14px;font-weight:bold">#${quoteNumber}</div>
 </div>
-<div class="grid">
-<div class="box"><div class="box-title">CLIENTE</div><p><strong>${clientData?.name || '-'}</strong></p><p>${clientData?.cnpj || '-'}</p><p>${clientData?.phone || '-'} | ${clientData?.email || '-'}</p></div>
-<div class="box"><div class="box-title">ORÇAMENTO</div><p><strong>${quote.title || 'Orçamento de Serviços'}</strong></p><p>Status: ${quote.status === 'approved' ? 'Aprovado' : quote.status === 'rejected' ? 'Rejeitado' : 'Pendente'}</p><p>Validade: ${validUntil}</p></div>
+</td>
+</tr>
+</table>
+<table style="width:100%;margin-bottom:12px">
+<tr>
+<td style="width:50%;vertical-align:top;padding-right:6px">
+<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:10px">
+<div style="font-size:10px;font-weight:bold;color:${c};border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:6px">CLIENTE</div>
+<div style="font-size:10px;font-weight:bold">${clientData?.name || '-'}</div>
+<div style="font-size:9px;color:#555">${clientData?.cnpj || '-'}</div>
+<div style="font-size:9px;color:#555">${clientData?.phone || '-'} | ${clientData?.email || '-'}</div>
 </div>
-<table><thead><tr><th>Descrição</th><th style="width:60px;text-align:right">Qtd</th><th style="width:90px;text-align:right">Valor Unit.</th><th style="width:90px;text-align:right">Subtotal</th></tr></thead>
-<tbody>${items.length > 0 ? items.map((i: any) => `<tr><td>${i.description || i.name || '-'}</td><td style="text-align:right">${i.quantity || 1}</td><td style="text-align:right">R$ ${(i.unit_price || 0).toFixed(2)}</td><td style="text-align:right">R$ ${((i.quantity || 1) * (i.unit_price || 0)).toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:#999">Nenhum item</td></tr>'}
-<tr class="total"><td colspan="3" style="text-align:right">TOTAL:</td><td style="text-align:right">R$ ${total.toFixed(2)}</td></tr></tbody></table>
-${quote.description ? `<div style="background:#fffbeb;border:1px solid #fcd34d;padding:10px;border-radius:5px;font-size:9pt"><strong>Observações:</strong> ${quote.description}</div>` : ''}
-<div class="validity"><p style="font-size:10pt;color:#166534">Orçamento válido até <strong>${validUntil}</strong></p></div>
-<div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div>
+</td>
+<td style="width:50%;vertical-align:top;padding-left:6px">
+<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:10px">
+<div style="font-size:10px;font-weight:bold;color:${c};border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:6px">ORÇAMENTO</div>
+<div style="font-size:10px;font-weight:bold">${quote.title || 'Orçamento de Serviços'}</div>
+<div style="font-size:9px;color:#555">Status: ${quote.status === 'approved' ? 'Aprovado' : quote.status === 'rejected' ? 'Rejeitado' : 'Pendente'}</div>
+<div style="font-size:9px;color:#555">Validade: ${validUntil}</div>
+</div>
+</td>
+</tr>
+</table>
+<table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+<tr style="background:${c};color:#fff"><th style="padding:6px;text-align:left;font-size:10px">Descrição</th><th style="padding:6px;text-align:right;width:50px;font-size:10px">Qtd</th><th style="padding:6px;text-align:right;width:80px;font-size:10px">Valor Unit.</th><th style="padding:6px;text-align:right;width:80px;font-size:10px">Subtotal</th></tr>
+${items.length > 0 ? items.map((i: any, idx: number) => `<tr style="background:${idx % 2 ? '#f9f9f9' : '#fff'}"><td style="padding:6px;font-size:10px">${i.description || i.name || '-'}</td><td style="padding:6px;text-align:right;font-size:10px">${i.quantity || 1}</td><td style="padding:6px;text-align:right;font-size:10px">R$ ${(i.unit_price || 0).toFixed(2)}</td><td style="padding:6px;text-align:right;font-size:10px">R$ ${((i.quantity || 1) * (i.unit_price || 0)).toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="4" style="padding:10px;text-align:center;color:#999;font-size:10px">Nenhum item</td></tr>'}
+<tr style="background:#f0f0f0;font-weight:bold"><td colspan="3" style="padding:8px;text-align:right;font-size:11px">TOTAL:</td><td style="padding:8px;text-align:right;font-size:12px;color:${c}">R$ ${total.toFixed(2)}</td></tr>
+</table>
+${quote.description ? `<div style="background:#fffbeb;border:1px solid #fcd34d;padding:10px;border-radius:4px;font-size:10px;margin-bottom:12px"><strong>Observações:</strong> ${quote.description}</div>` : ''}
+<div style="text-align:center;padding:10px;background:#f0fdf4;border:1px solid #86efac;border-radius:4px"><span style="font-size:11px;color:#166534">Orçamento válido até <strong>${validUntil}</strong></span></div>
+<div style="text-align:center;font-size:9px;color:#999;margin-top:20px;border-top:1px solid #ddd;padding-top:8px">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div>
 </body></html>`;
 
-    openPrintWindow(html);
+    const w = window.open('', '_blank');
+    if (!w) { alert('Permita pop-ups'); return; }
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 500);
   } catch (error) { console.error('Erro PDF:', error); alert('Erro ao gerar PDF'); }
 }
 
-// ========== BANCO DE HORAS PDF ==========
+
+// ========== BANCO DE HORAS ==========
 export async function generateOvertimePDF(entry: any) {
   try {
     const company = await getCompanyConfig();
@@ -499,50 +281,77 @@ export async function generateOvertimePDF(entry: any) {
     const statusColor = entry.status === 'aprovado' ? '#16a34a' : entry.status === 'rejeitado' ? '#dc2626' : '#f59e0b';
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Banco de Horas</title>
-<style>
-@page{margin:15mm;size:A4}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10pt;color:#333}
-.header{display:flex;align-items:center;border-bottom:2px solid ${c};padding-bottom:10px;margin-bottom:15px}
-.logo{width:50px;height:50px;margin-right:10px}.logo img{max-width:100%;max-height:100%}
-.company{flex:1}.company h1{font-size:14pt;color:${c}}.company p{font-size:8pt;color:#666}
-.badge{background:${c};color:#fff;padding:10px 15px;border-radius:5px;text-align:center}
-.badge small{font-size:7pt;display:block}.badge strong{font-size:12pt}
-.status{text-align:center;padding:12px;background:${statusColor}20;border:2px solid ${statusColor};border-radius:5px;margin-bottom:15px}
-.status p{font-size:14pt;font-weight:bold;color:${statusColor}}
-.hours{text-align:center;padding:25px;background:#f5f5f5;border-radius:8px;margin-bottom:15px}
-.hours .value{font-size:40pt;font-weight:bold;color:${c}}.hours .label{font-size:11pt;color:#666}.hours .type{font-size:12pt;color:#333;font-weight:600;margin-top:5px}
-.grid{display:flex;gap:10px;margin-bottom:15px}.box{flex:1;background:#f5f5f5;border:1px solid #ddd;border-radius:5px;padding:10px}
-.box-title{font-size:9pt;font-weight:bold;color:${c};border-bottom:1px solid #ddd;padding-bottom:5px;margin-bottom:8px}.box p{font-size:8pt;margin:3px 0}
-.sigs{display:flex;margin-top:25px}.sig{flex:1;text-align:center;padding:0 20px}
-.sig-img{height:40px}.sig-line{border-top:1px solid #333;margin:5px 20px}.sig-name{font-size:9pt;font-weight:bold}.sig-role{font-size:8pt;color:#666}
-.footer{margin-top:20px;text-align:center;font-size:7pt;color:#999;border-top:1px solid #ddd;padding-top:10px}
-</style></head><body>
-<div class="header">
-<div class="logo">${company.logo ? `<img src="${company.logo}"/>` : ''}</div>
-<div class="company"><h1>${company.name}</h1>${company.cnpj ? `<p>CNPJ: ${company.cnpj}</p>` : ''}<p>${[company.phone, company.email].filter(Boolean).join(' | ')}</p></div>
-<div class="badge"><small>BANCO DE HORAS</small><strong>#${entryNumber}</strong></div>
+<style>@page{margin:12mm;size:A4}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:11px;color:#333}</style></head><body>
+<table style="width:100%;border-bottom:2px solid ${c};padding-bottom:8px;margin-bottom:12px">
+<tr>
+<td style="width:60px;vertical-align:middle">${company.logo ? `<img src="${company.logo}" style="max-width:50px;max-height:50px">` : ''}</td>
+<td style="vertical-align:middle;padding-left:8px">
+<div style="font-size:16px;font-weight:bold;color:${c}">${company.name}</div>
+${company.cnpj ? `<div style="font-size:9px;color:#666">CNPJ: ${company.cnpj}</div>` : ''}
+<div style="font-size:9px;color:#666">${[company.phone, company.email].filter(Boolean).join(' | ')}</div>
+</td>
+<td style="width:120px;text-align:right;vertical-align:middle">
+<div style="background:${c};color:#fff;padding:8px 12px;border-radius:5px;display:inline-block">
+<div style="font-size:8px">BANCO DE HORAS</div>
+<div style="font-size:14px;font-weight:bold">#${entryNumber}</div>
 </div>
-<div class="status"><p>${statusLabel}</p></div>
-<div class="hours"><div class="value">${entry.total_hours}h</div><div class="label">Total de Horas</div><div class="type">${typeLabel}</div></div>
-<div class="grid">
-<div class="box"><div class="box-title">FUNCIONÁRIO</div><p><strong>${entry.profiles?.full_name || '-'}</strong></p><p>CPF: ${entry.profiles?.cpf || '-'}</p></div>
-<div class="box"><div class="box-title">LANÇAMENTO</div><p>Data: ${new Date(entry.entry_date + 'T00:00:00').toLocaleDateString('pt-BR')}</p><p>Entrada: ${entry.start_time?.substring(0, 5) || '-'} | Saída: ${entry.end_time?.substring(0, 5) || '-'}</p></div>
+</td>
+</tr>
+</table>
+<div style="text-align:center;padding:12px;background:${statusColor}20;border:2px solid ${statusColor};border-radius:5px;margin-bottom:12px">
+<span style="font-size:16px;font-weight:bold;color:${statusColor}">${statusLabel}</span>
 </div>
-${entry.reason ? `<div style="background:#fffbeb;border:1px solid #fcd34d;padding:10px;border-radius:5px;font-size:9pt;margin-bottom:15px"><strong>Motivo:</strong> ${entry.reason}</div>` : ''}
-<div class="sigs">
-<div class="sig">${entry.employee_signature ? `<img src="${entry.employee_signature}" class="sig-img"/>` : '<div style="height:35px"></div>'}<div class="sig-line"></div><div class="sig-name">${entry.profiles?.full_name || 'Funcionário'}</div><div class="sig-role">Funcionário</div></div>
-<div class="sig">${entry.admin_signature ? `<img src="${entry.admin_signature}" class="sig-img"/>` : '<div style="height:35px"></div>'}<div class="sig-line"></div><div class="sig-name">${entry.approver?.full_name || 'Responsável'}</div><div class="sig-role">Aprovador</div></div>
+<div style="text-align:center;padding:20px;background:#f5f5f5;border-radius:8px;margin-bottom:12px">
+<div style="font-size:40px;font-weight:bold;color:${c}">${entry.total_hours}h</div>
+<div style="font-size:12px;color:#666">Total de Horas</div>
+<div style="font-size:13px;color:#333;font-weight:600;margin-top:5px">${typeLabel}</div>
 </div>
-<div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div>
+<table style="width:100%;margin-bottom:12px">
+<tr>
+<td style="width:50%;vertical-align:top;padding-right:6px">
+<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:10px">
+<div style="font-size:10px;font-weight:bold;color:${c};border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:6px">FUNCIONÁRIO</div>
+<div style="font-size:10px;font-weight:bold">${entry.profiles?.full_name || '-'}</div>
+<div style="font-size:9px;color:#555">CPF: ${entry.profiles?.cpf || '-'}</div>
+</div>
+</td>
+<td style="width:50%;vertical-align:top;padding-left:6px">
+<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:10px">
+<div style="font-size:10px;font-weight:bold;color:${c};border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:6px">LANÇAMENTO</div>
+<div style="font-size:9px;color:#555">Data: ${new Date(entry.entry_date + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
+<div style="font-size:9px;color:#555">Entrada: ${entry.start_time?.substring(0, 5) || '-'} | Saída: ${entry.end_time?.substring(0, 5) || '-'}</div>
+</div>
+</td>
+</tr>
+</table>
+${entry.reason ? `<div style="background:#fffbeb;border:1px solid #fcd34d;padding:10px;border-radius:4px;font-size:10px;margin-bottom:12px"><strong>Motivo:</strong> ${entry.reason}</div>` : ''}
+<table style="width:100%;margin-top:20px">
+<tr>
+<td style="width:50%;text-align:center;padding:0 15px">
+<div style="background:#f5f5f5;border-radius:5px;padding:10px">
+${entry.employee_signature ? `<img src="${entry.employee_signature}" style="height:35px;margin-bottom:5px">` : '<div style="height:30px"></div>'}
+<div style="border-top:1px solid #333;margin:5px 15px"></div>
+<div style="font-size:9px;font-weight:bold">${entry.profiles?.full_name || 'Funcionário'}</div>
+<div style="font-size:8px;color:#666">Funcionário</div>
+</div>
+</td>
+<td style="width:50%;text-align:center;padding:0 15px">
+<div style="background:#f5f5f5;border-radius:5px;padding:10px">
+${entry.admin_signature ? `<img src="${entry.admin_signature}" style="height:35px;margin-bottom:5px">` : '<div style="height:30px"></div>'}
+<div style="border-top:1px solid #333;margin:5px 15px"></div>
+<div style="font-size:9px;font-weight:bold">${entry.approver?.full_name || 'Responsável'}</div>
+<div style="font-size:8px;color:#666">Aprovador</div>
+</div>
+</td>
+</tr>
+</table>
+<div style="text-align:center;font-size:9px;color:#999;margin-top:20px;border-top:1px solid #ddd;padding-top:8px">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div>
 </body></html>`;
 
-    openPrintWindow(html);
+    const w = window.open('', '_blank');
+    if (!w) { alert('Permita pop-ups'); return; }
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => w.print(), 500);
   } catch (error) { console.error('Erro PDF:', error); alert('Erro ao gerar PDF'); }
-}
-
-function openPrintWindow(html: string) {
-  const w = window.open('', '_blank');
-  if (!w) { alert('Permita pop-ups para gerar o PDF'); return; }
-  w.document.write(html);
-  w.document.close();
-  w.onload = () => setTimeout(() => w.print(), 300);
 }
