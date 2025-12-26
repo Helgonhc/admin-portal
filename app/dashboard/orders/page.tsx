@@ -487,9 +487,9 @@ export default function OrdersPage() {
                         value={formData.scheduled_date}
                         onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
                         className="input pl-10"
-                        min={new Date().toISOString().split('T')[0]}
                       />
                     </div>
+                    <p className="text-xs text-gray-400 mt-1">Permite datas retroativas</p>
                   </div>
                 </div>
               </div>

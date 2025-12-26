@@ -8,7 +8,7 @@ import {
   ArrowLeft, Trash2, Loader2, Calendar, Clock, User, MapPin, 
   FileText, Camera, PenTool, Check, Play, Pause, CheckCircle,
   Phone, MessageCircle, Navigation, Edit, Copy, List, Save, X,
-  Upload, Image as ImageIcon, Download, FileDown
+  Upload, Image as ImageIcon, Download, FileDown, Pencil
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -43,6 +43,23 @@ export default function OrderDetailsPage() {
   const [signerDoc, setSignerDoc] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  
+  // Edição
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editData, setEditData] = useState({
+    title: '',
+    description: '',
+    client_id: '',
+    equipment_id: '',
+    technician_id: '',
+    priority: '',
+    scheduled_at: '',
+    status: '',
+  });
+  const [clients, setClients] = useState<any[]>([]);
+  const [equipments, setEquipments] = useState<any[]>([]);
+  const [technicians, setTechnicians] = useState<any[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -79,6 +96,103 @@ export default function OrderDetailsPage() {
       .eq('order_id', params.id)
       .order('created_at');
     setTasks(data || []);
+  }
+
+  async function loadEditData() {
+    // Carregar clientes
+    const { data: clientsData } = await supabase
+      .from('clients')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    setClients(clientsData || []);
+
+    // Carregar técnicos
+    const { data: techniciansData } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('role', ['admin', 'technician', 'super_admin'])
+      .eq('is_active', true)
+      .order('full_name');
+    setTechnicians(techniciansData || []);
+
+    // Carregar equipamentos do cliente atual
+    if (order?.client_id) {
+      const { data: equipmentsData } = await supabase
+        .from('equipments')
+        .select('id, name, model')
+        .eq('client_id', order.client_id)
+        .eq('status', 'active')
+        .order('name');
+      setEquipments(equipmentsData || []);
+    }
+
+    // Preencher dados atuais
+    setEditData({
+      title: order?.title || '',
+      description: order?.description || '',
+      client_id: order?.client_id || '',
+      equipment_id: order?.equipment_id || '',
+      technician_id: order?.technician_id || '',
+      priority: order?.priority || 'media',
+      scheduled_at: order?.scheduled_at ? order.scheduled_at.split('T')[0] : '',
+      status: order?.status || 'pendente',
+    });
+
+    setShowEditModal(true);
+  }
+
+  async function loadEquipmentsForClient(clientId: string) {
+    if (!clientId) {
+      setEquipments([]);
+      return;
+    }
+    const { data } = await supabase
+      .from('equipments')
+      .select('id, name, model')
+      .eq('client_id', clientId)
+      .eq('status', 'active')
+      .order('name');
+    setEquipments(data || []);
+  }
+
+  async function handleSaveEdit() {
+    if (!editData.title.trim()) {
+      toast.error('Título é obrigatório');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const updateData: any = {
+        title: editData.title,
+        description: editData.description,
+        client_id: editData.client_id || null,
+        equipment_id: editData.equipment_id || null,
+        technician_id: editData.technician_id || null,
+        priority: editData.priority,
+        status: editData.status,
+      };
+
+      if (editData.scheduled_at) {
+        updateData.scheduled_at = editData.scheduled_at;
+      }
+
+      const { error } = await supabase
+        .from('service_orders')
+        .update(updateData)
+        .eq('id', params.id);
+
+      if (error) throw error;
+
+      toast.success('OS atualizada com sucesso!');
+      setShowEditModal(false);
+      loadOrder();
+    } catch (error: any) {
+      toast.error('Erro ao salvar: ' + error.message);
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function loadChecklistModels() {
@@ -425,6 +539,13 @@ export default function OrderDetailsPage() {
           <p className="text-gray-500">{order.clients?.name}</p>
         </div>
         <button 
+          onClick={loadEditData}
+          className="btn btn-secondary"
+          title="Editar OS"
+        >
+          <Pencil size={18} /> Editar
+        </button>
+        <button 
           onClick={() => generateServiceOrderPDF(order)} 
           className="btn btn-secondary"
           title="Gerar PDF"
@@ -742,6 +863,197 @@ export default function OrderDetailsPage() {
               <button onClick={() => setShowChecklistModal(false)} className="btn btn-secondary w-full">
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar OS */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-content max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-6 border-b bg-gradient-to-r from-amber-500 to-orange-600">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Pencil className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Editar Ordem de Serviço</h2>
+                  <p className="text-white/70 text-sm">OS #{order.id.slice(0,6).toUpperCase()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
+              {/* Seção: Cliente e Equipamento */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">1</span>
+                  Identificação
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Cliente</label>
+                    <select
+                      value={editData.client_id}
+                      onChange={(e) => {
+                        setEditData({ ...editData, client_id: e.target.value, equipment_id: '' });
+                        loadEquipmentsForClient(e.target.value);
+                      }}
+                      className="input"
+                    >
+                      <option value="">Selecione um cliente</option>
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>{client.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Equipamento</label>
+                    <select
+                      value={editData.equipment_id}
+                      onChange={(e) => setEditData({ ...editData, equipment_id: e.target.value })}
+                      className="input"
+                      disabled={!editData.client_id}
+                    >
+                      <option value="">Selecione (opcional)</option>
+                      {equipments.map((eq) => (
+                        <option key={eq.id} value={eq.id}>{eq.name} {eq.model && `- ${eq.model}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção: Detalhes do Serviço */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">2</span>
+                  Detalhes do Serviço
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="label flex items-center gap-1">
+                      <span>Título</span>
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editData.title}
+                      onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                      className="input"
+                      placeholder="Ex: Manutenção preventiva, Reparo de equipamento..."
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Descrição</label>
+                    <textarea
+                      value={editData.description}
+                      onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                      className="input min-h-[100px] resize-none"
+                      placeholder="Descreva detalhadamente o serviço..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção: Atribuição e Agendamento */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold">3</span>
+                  Atribuição e Agendamento
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Técnico Responsável</label>
+                    <select
+                      value={editData.technician_id}
+                      onChange={(e) => setEditData({ ...editData, technician_id: e.target.value })}
+                      className="input"
+                    >
+                      <option value="">Selecione (opcional)</option>
+                      {technicians.map((tech) => (
+                        <option key={tech.id} value={tech.id}>{tech.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Data Agendada</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <input
+                        type="date"
+                        value={editData.scheduled_at}
+                        onChange={(e) => setEditData({ ...editData, scheduled_at: e.target.value })}
+                        className="input pl-10"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">Permite datas retroativas</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="label">Prioridade</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { value: 'baixa', label: 'Baixa', color: 'bg-green-100 border-green-300 text-green-700', dot: 'bg-green-500' },
+                        { value: 'media', label: 'Média', color: 'bg-amber-100 border-amber-300 text-amber-700', dot: 'bg-amber-500' },
+                        { value: 'alta', label: 'Alta', color: 'bg-orange-100 border-orange-300 text-orange-700', dot: 'bg-orange-500' },
+                        { value: 'urgente', label: 'Urgente', color: 'bg-red-100 border-red-300 text-red-700', dot: 'bg-red-500' },
+                      ].map((p) => (
+                        <button
+                          key={p.value}
+                          type="button"
+                          onClick={() => setEditData({ ...editData, priority: p.value })}
+                          className={`px-3 py-2 rounded-lg border-2 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                            editData.priority === p.value
+                              ? `${p.color} border-current shadow-sm`
+                              : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className={`w-2 h-2 rounded-full ${p.dot}`}></span>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Status</label>
+                    <select
+                      value={editData.status}
+                      onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+                      className="input"
+                    >
+                      <option value="pendente">Pendente</option>
+                      <option value="em_andamento">Em Andamento</option>
+                      <option value="pausado">Pausado</option>
+                      <option value="concluido">Concluído</option>
+                      <option value="cancelado">Cancelado</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t bg-gray-50 flex items-center justify-between">
+              <p className="text-xs text-gray-400">
+                <span className="text-red-500">*</span> Campos obrigatórios
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowEditModal(false)} className="btn btn-secondary">
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleSaveEdit} 
+                  disabled={savingEdit || !editData.title.trim()} 
+                  className="btn btn-primary"
+                >
+                  {savingEdit ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                  Salvar Alterações
+                </button>
+              </div>
             </div>
           </div>
         </div>
