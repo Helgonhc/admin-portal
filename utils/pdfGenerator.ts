@@ -154,9 +154,9 @@ body { font-family: Arial, sans-serif; font-size: 9px; color: #333; line-height:
 .check-pending { color: #999; }
 .check-pending::before { content: "○ "; }
 .report-box { background: #fafafa; border: 1px solid #ddd; padding: 10px; border-radius: 4px; font-size: 9px; line-height: 1.5; white-space: pre-wrap; min-height: 50px; }
-.photos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
-.photo-item { height: 120px; border-radius: 6px; overflow: hidden; border: 1px solid #ddd; }
-.photo-item img { width: 100%; height: 100%; object-fit: cover; }
+.photos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
+.photo-item { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; background: #f5f5f5; }
+.photo-item img { width: 100%; height: auto; max-height: 200px; object-fit: contain; display: block; }
 .signatures { display: table; width: 100%; margin-top: 25px; page-break-inside: avoid; }
 .sig-col { display: table-cell; width: 50%; text-align: center; padding: 0 20px; }
 .sig-img { height: 45px; margin-bottom: -5px; }

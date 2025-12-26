@@ -105,43 +105,16 @@ export default function ManageClientUsersPage() {
       });
 
       if (rpcError) {
-        // Se a função SQL não existir, tentar Edge Function como fallback
-        console.log('Função SQL não disponível, tentando Edge Function...');
-        
-        const { data: sessionData } = await supabase.auth.getSession();
-        
-        if (!sessionData.session) {
-          throw new Error('Sessão expirada. Faça login novamente.');
-        }
-
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${sessionData.session.access_token}`,
-            },
-            body: JSON.stringify({
-              email: newUserEmail.trim().toLowerCase(),
-              password: newUserPassword,
-              fullName: newUserName.trim(),
-              phone: null,
-              role: 'client',
-              clientId: params.id,
-            }),
-          }
-        );
-
-        const edgeResult = await response.json();
-
-        if (!response.ok) {
-          throw new Error(edgeResult.error || 'Erro ao criar usuário');
-        }
-      } else if (result && !result.success) {
+        console.error('Erro na função SQL:', rpcError);
+        throw new Error(`Erro ao criar usuário: ${rpcError.message}. Execute o SQL CRIAR_USUARIO_SEM_AFETAR_SESSAO.sql no Supabase.`);
+      }
+      
+      if (result && !result.success) {
         throw new Error(result.error || 'Erro ao criar usuário');
-      } else if (result && result.success) {
-        // Atualizar o profile com o client_id (a função SQL não faz isso automaticamente para clientes)
+      }
+      
+      if (result && result.success) {
+        // Atualizar o profile com o client_id
         await supabase
           .from('profiles')
           .update({ client_id: params.id })
