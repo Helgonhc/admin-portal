@@ -93,68 +93,62 @@ export default function ManageClientUsersPage() {
     setCreating(true);
 
     try {
-      // 1. Criar usuário usando signUp
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUserEmail,
-        password: newUserPassword,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: {
-            full_name: newUserName,
-            role: 'client'
-          }
-        }
+      // Usar função SQL para criar usuário (não afeta sessão do admin/APK)
+      const { data: result, error: rpcError } = await supabase.rpc('create_user_admin', {
+        p_email: newUserEmail.trim().toLowerCase(),
+        p_password: newUserPassword,
+        p_full_name: newUserName.trim(),
+        p_role: 'client',
+        p_phone: null,
+        p_cpf: null,
+        p_cargo: null,
       });
 
-      if (authError) throw new Error(authError.message);
-      if (!authData.user) throw new Error('Usuário não foi criado');
-
-      // 2. Criar profile diretamente
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email: newUserEmail,
-          full_name: newUserName,
-          role: 'client',
-          client_id: params.id,
-          is_active: true
-        });
-
-      // Se já existe (trigger criou), faz UPDATE
-      if (insertError) {
-        console.log('Profile pode já existir, tentando update...');
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            email: newUserEmail,
-            full_name: newUserName,
-            role: 'client',
-            client_id: params.id,
-            is_active: true
-          })
-          .eq('id', authData.user.id);
-
-        if (updateError) {
-          console.error('Erro ao criar/atualizar profile:', updateError);
-          throw new Error('Erro ao criar perfil do usuário');
+      if (rpcError) {
+        // Se a função SQL não existir, tentar Edge Function como fallback
+        console.log('Função SQL não disponível, tentando Edge Function...');
+        
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (!sessionData.session) {
+          throw new Error('Sessão expirada. Faça login novamente.');
         }
-      }
 
-      // 3. Forçar envio de email de confirmação
-      try {
-        await supabase.auth.resend({
-          type: 'signup',
-          email: newUserEmail,
-          options: {
-            emailRedirectTo: window.location.origin
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionData.session.access_token}`,
+            },
+            body: JSON.stringify({
+              email: newUserEmail.trim().toLowerCase(),
+              password: newUserPassword,
+              fullName: newUserName.trim(),
+              phone: null,
+              role: 'client',
+              clientId: params.id,
+            }),
           }
-        });
-      } catch (e) {
-        console.log('Erro ao enviar email:', e);
+        );
+
+        const edgeResult = await response.json();
+
+        if (!response.ok) {
+          throw new Error(edgeResult.error || 'Erro ao criar usuário');
+        }
+      } else if (result && !result.success) {
+        throw new Error(result.error || 'Erro ao criar usuário');
+      } else if (result && result.success) {
+        // Atualizar o profile com o client_id (a função SQL não faz isso automaticamente para clientes)
+        await supabase
+          .from('profiles')
+          .update({ client_id: params.id })
+          .eq('id', result.user_id);
       }
 
-      // 4. Sucesso!
+      // Sucesso!
       setShowModal(false);
       setNewUserName('');
       setNewUserEmail('');

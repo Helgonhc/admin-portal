@@ -146,37 +146,53 @@ export default function UsersPage() {
         if (error) throw error;
         toast.success('Usuário atualizado!');
       } else {
-        // Usar Edge Function para criar usuário (não afeta sessão do admin)
-        const { data: sessionData } = await supabase.auth.getSession();
-        
-        if (!sessionData.session) {
-          throw new Error('Sessão expirada. Faça login novamente.');
-        }
+        // Tentar usar função SQL para criar usuário (não afeta sessão do admin)
+        const { data: result, error: rpcError } = await supabase.rpc('create_user_admin', {
+          p_email: formData.email.trim().toLowerCase(),
+          p_password: formData.password,
+          p_full_name: formData.full_name.trim(),
+          p_role: formData.role,
+          p_phone: formData.phone?.trim() || null,
+          p_cpf: formData.cpf?.trim() || null,
+          p_cargo: formData.cargo?.trim() || null,
+        });
 
-        // Chamar Edge Function create-user
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${sessionData.session.access_token}`,
-            },
-            body: JSON.stringify({
-              email: formData.email.trim().toLowerCase(),
-              password: formData.password,
-              fullName: formData.full_name.trim(),
-              phone: formData.phone?.trim() || null,
-              role: formData.role,
-              cpf: formData.cpf?.trim() || null,
-              cargo: formData.cargo?.trim() || null,
-            }),
+        if (rpcError) {
+          // Se a função SQL não existir, tentar Edge Function como fallback
+          console.log('Função SQL não disponível, tentando Edge Function...');
+          
+          const { data: sessionData } = await supabase.auth.getSession();
+          
+          if (!sessionData.session) {
+            throw new Error('Sessão expirada. Faça login novamente.');
           }
-        );
 
-        const result = await response.json();
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${sessionData.session.access_token}`,
+              },
+              body: JSON.stringify({
+                email: formData.email.trim().toLowerCase(),
+                password: formData.password,
+                fullName: formData.full_name.trim(),
+                phone: formData.phone?.trim() || null,
+                role: formData.role,
+                cpf: formData.cpf?.trim() || null,
+                cargo: formData.cargo?.trim() || null,
+              }),
+            }
+          );
 
-        if (!response.ok) {
+          const edgeResult = await response.json();
+
+          if (!response.ok) {
+            throw new Error(edgeResult.error || 'Erro ao criar usuário');
+          }
+        } else if (result && !result.success) {
           throw new Error(result.error || 'Erro ao criar usuário');
         }
 

@@ -407,7 +407,7 @@ export default function ClientsPage() {
     setPortalModalVisible(true);
   }
 
-  // Criar acesso ao portal
+  // Criar acesso ao portal (usando função SQL para não afetar sessão do admin/APK)
   async function handleCreatePortalAccess() {
     if (!portalEmail.trim()) {
       toast.error('Email é obrigatório');
@@ -422,48 +422,66 @@ export default function ClientsPage() {
     setCreatingPortal(true);
 
     try {
-      // 1. Criar usuário usando signUp
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: portalEmail,
-        password: portalPassword,
-        options: {
-          data: {
-            full_name: selectedClient.responsible_name || selectedClient.name,
-            role: 'client'
-          }
-        }
+      // Usar função SQL para criar usuário (não afeta sessão do admin/APK)
+      const { data: result, error: rpcError } = await supabase.rpc('create_user_admin', {
+        p_email: portalEmail.trim().toLowerCase(),
+        p_password: portalPassword,
+        p_full_name: (selectedClient.responsible_name || selectedClient.name).trim(),
+        p_role: 'client',
+        p_phone: selectedClient.phone || null,
+        p_cpf: null,
+        p_cargo: null,
       });
 
-      if (authError) throw new Error(authError.message);
-      if (!authData.user) throw new Error('Usuário não foi criado');
+      if (rpcError) {
+        // Se a função SQL não existir, tentar Edge Function como fallback
+        console.log('Função SQL não disponível, tentando Edge Function...');
+        
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (!sessionData.session) {
+          throw new Error('Sessão expirada. Faça login novamente.');
+        }
 
-      // 2. Aguardar um pouco para o auth processar
-      await new Promise(resolve => setTimeout(resolve, 500));
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${sessionData.session.access_token}`,
+            },
+            body: JSON.stringify({
+              email: portalEmail.trim().toLowerCase(),
+              password: portalPassword,
+              fullName: (selectedClient.responsible_name || selectedClient.name).trim(),
+              phone: selectedClient.phone || null,
+              role: 'client',
+              clientId: selectedClient.id,
+            }),
+          }
+        );
 
-      // 3. CRIAR profile diretamente (UPSERT - cria ou atualiza)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: authData.user.id,
-          email: portalEmail,
-          full_name: selectedClient.responsible_name || selectedClient.name,
-          role: 'client',
-          client_id: selectedClient.id,
-          phone: selectedClient.phone || null,
-          is_active: true,
-          created_at: new Date().toISOString()
-        }, { onConflict: 'id' });
+        const edgeResult = await response.json();
 
-      if (profileError) {
-        console.error('Erro ao criar profile:', profileError);
-        throw new Error('Erro ao criar perfil: ' + profileError.message);
+        if (!response.ok) {
+          throw new Error(edgeResult.error || 'Erro ao criar usuário');
+        }
+      } else if (result && !result.success) {
+        throw new Error(result.error || 'Erro ao criar usuário');
+      } else if (result && result.success) {
+        // Atualizar o profile com o client_id (a função SQL não faz isso automaticamente para clientes)
+        await supabase
+          .from('profiles')
+          .update({ client_id: selectedClient.id })
+          .eq('id', result.user_id);
       }
 
-      // 4. Atualizar cliente com portal liberado
+      // Atualizar cliente com portal liberado
       await supabase
         .from('clients')
         .update({ 
-          email: portalEmail,
+          email: portalEmail.trim().toLowerCase(),
           portal_enabled: true,
           portal_blocked: false
         })
