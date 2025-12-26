@@ -47,12 +47,6 @@ export async function generateServiceOrderPDF(order: any) {
 
 function buildOrderPDF(company: any, order: any, osNumber: string, techName: string, techSig: string, techDoc: string, tasks: any[], report: string, photos: string[]) {
   const c = company.color;
-  
-  // Formatar relatório com parágrafos
-  const formatReport = (text: string) => {
-    if (!text) return '<p style="color:#666;font-style:italic">Nenhuma observação registrada.</p>';
-    return text.split(/\n+/).filter(p => p.trim()).map(p => `<p style="margin-bottom:8px;text-indent:20px">${p.trim()}</p>`).join('');
-  };
 
   return `<!DOCTYPE html>
 <html>
@@ -60,262 +54,158 @@ function buildOrderPDF(company: any, order: any, osNumber: string, techName: str
 <meta charset="utf-8">
 <title>OS #${osNumber}</title>
 <style>
-@page { margin: 15mm; size: A4; }
+@page { margin: 12mm; size: A4; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.5; }
+body { font-family: Arial, sans-serif; font-size: 9pt; color: #333; line-height: 1.4; }
 
-/* HEADER */
-.header {
-  display: flex;
-  align-items: center;
-  padding-bottom: 15px;
-  border-bottom: 3px solid ${c};
-  margin-bottom: 20px;
-}
-.logo { width: 70px; height: 70px; margin-right: 15px; }
-.logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.company-info { flex: 1; }
-.company-info h1 { font-size: 16pt; color: ${c}; margin-bottom: 3px; }
-.company-info p { font-size: 8pt; color: #666; margin: 2px 0; }
-.os-number {
-  background: ${c};
-  color: white;
-  padding: 12px 20px;
-  border-radius: 8px;
-  text-align: center;
-}
-.os-number small { font-size: 7pt; display: block; opacity: 0.9; }
-.os-number strong { font-size: 14pt; }
-.os-number .date { font-size: 8pt; margin-top: 5px; opacity: 0.9; }
+.header { display: table; width: 100%; border-bottom: 2px solid ${c}; padding-bottom: 10px; margin-bottom: 15px; }
+.header-logo { display: table-cell; width: 60px; vertical-align: middle; }
+.header-logo img { max-width: 55px; max-height: 55px; }
+.header-info { display: table-cell; vertical-align: middle; padding-left: 10px; }
+.header-info h1 { font-size: 14pt; color: ${c}; }
+.header-info p { font-size: 7pt; color: #666; }
+.header-os { display: table-cell; width: 120px; vertical-align: middle; text-align: right; }
+.os-box { background: ${c}; color: #fff; padding: 8px 12px; border-radius: 5px; display: inline-block; }
+.os-box small { font-size: 6pt; display: block; }
+.os-box strong { font-size: 12pt; }
 
-/* SEÇÕES */
-.section {
-  margin-bottom: 20px;
-  page-break-inside: avoid;
-}
-.section-header {
-  background: ${c};
-  color: white;
-  padding: 8px 15px;
-  font-size: 11pt;
-  font-weight: 600;
-  border-radius: 6px 6px 0 0;
-  margin-bottom: 0;
-}
-.section-content {
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
-  border-top: none;
-  border-radius: 0 0 6px 6px;
-  padding: 15px;
-}
+.row { display: table; width: 100%; margin-bottom: 12px; }
+.col { display: table-cell; width: 50%; vertical-align: top; }
+.col:first-child { padding-right: 8px; }
+.col:last-child { padding-left: 8px; }
 
-/* GRID DE DADOS */
-.data-grid {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-.data-box {
-  flex: 1;
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 15px;
-  page-break-inside: avoid;
-}
-.data-box-title {
-  font-size: 10pt;
-  font-weight: 700;
-  color: ${c};
-  border-bottom: 2px solid ${c};
-  padding-bottom: 8px;
-  margin-bottom: 10px;
-}
-.data-row {
-  display: flex;
-  padding: 5px 0;
-  border-bottom: 1px solid #eee;
-}
-.data-row:last-child { border-bottom: none; }
-.data-label { width: 90px; font-weight: 600; color: #555; font-size: 9pt; }
-.data-value { flex: 1; color: #222; font-size: 9pt; }
+.box { background: #f5f5f5; border: 1px solid #ddd; border-radius: 5px; padding: 10px; height: 100%; }
+.box-title { font-size: 9pt; font-weight: bold; color: ${c}; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 8px; }
+.box-row { font-size: 8pt; padding: 3px 0; }
+.box-row b { color: #222; }
 
-/* CHECKLIST */
-.checklist-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-.check-item {
-  padding: 6px 10px;
-  background: white;
-  border-radius: 4px;
-  font-size: 9pt;
-}
-.check-done { color: #16a34a; border-left: 3px solid #16a34a; }
-.check-done::before { content: "✓ "; font-weight: bold; }
-.check-pending { color: #9ca3af; border-left: 3px solid #ddd; }
-.check-pending::before { content: "○ "; }
+.section { margin-bottom: 15px; }
+.section-title { background: ${c}; color: #fff; padding: 6px 10px; font-size: 9pt; font-weight: bold; border-radius: 4px 4px 0 0; }
+.section-body { background: #f9f9f9; border: 1px solid #ddd; border-top: none; border-radius: 0 0 4px 4px; padding: 10px; }
 
-/* RELATÓRIO */
-.report-content {
-  background: white;
-  padding: 15px;
-  border-radius: 6px;
-  font-size: 10pt;
-  line-height: 1.7;
-  text-align: justify;
-}
+.checklist { display: table; width: 100%; }
+.check-col { display: table-cell; width: 50%; vertical-align: top; }
+.check-item { font-size: 8pt; padding: 2px 0; }
+.check-ok { color: #16a34a; }
+.check-no { color: #999; }
 
-/* FOTOS */
-.photos-section {
-  page-break-before: auto;
-  page-break-inside: avoid;
-}
-.photos-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-.photo-item {
-  background: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 12px;
-  overflow: hidden;
-  aspect-ratio: 1;
-}
-.photo-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 11px;
-}
+.report { font-size: 9pt; line-height: 1.6; white-space: pre-wrap; }
 
-/* ASSINATURAS */
-.signatures {
-  display: flex;
-  gap: 40px;
-  margin-top: 30px;
-  page-break-inside: avoid;
-}
-.signature-box {
-  flex: 1;
-  text-align: center;
-  padding: 15px;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-.sig-image { height: 50px; margin-bottom: 5px; }
-.sig-line { border-top: 2px solid #333; margin: 10px 30px; }
-.sig-name { font-weight: 600; font-size: 10pt; }
-.sig-role { font-size: 8pt; color: #666; margin-top: 2px; }
-.sig-doc { font-size: 7pt; color: #999; margin-top: 3px; }
+.photos { display: table; width: 100%; }
+.photo-row { display: table-row; }
+.photo-cell { display: table-cell; width: 25%; padding: 4px; vertical-align: top; }
+.photo-box { background: #eee; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; text-align: center; }
+.photo-box img { width: 100%; height: auto; max-height: 120px; object-fit: contain; display: block; }
 
-/* FOOTER */
-.footer {
-  margin-top: 25px;
-  padding-top: 10px;
-  border-top: 1px solid #ddd;
-  text-align: center;
-  font-size: 7pt;
-  color: #999;
-}
+.sigs { display: table; width: 100%; margin-top: 20px; }
+.sig { display: table-cell; width: 50%; text-align: center; padding: 0 20px; }
+.sig-img { height: 40px; }
+.sig-line { border-top: 1px solid #333; margin: 5px 20px; }
+.sig-name { font-size: 8pt; font-weight: bold; }
+.sig-role { font-size: 7pt; color: #666; }
+
+.footer { margin-top: 15px; text-align: center; font-size: 6pt; color: #999; border-top: 1px solid #ddd; padding-top: 8px; }
 </style>
 </head>
 <body>
 
-<!-- CABEÇALHO -->
 <div class="header">
-  <div class="logo">
-    ${company.logo ? `<img src="${company.logo}" />` : ''}
-  </div>
-  <div class="company-info">
+  <div class="header-logo">${company.logo ? `<img src="${company.logo}"/>` : ''}</div>
+  <div class="header-info">
     <h1>${company.name}</h1>
     ${company.cnpj ? `<p>CNPJ: ${company.cnpj}</p>` : ''}
     ${company.address ? `<p>${company.address}</p>` : ''}
-    <p>${[company.phone, company.email].filter(Boolean).join(' • ')}</p>
+    <p>${[company.phone, company.email].filter(Boolean).join(' | ')}</p>
   </div>
-  <div class="os-number">
-    <small>ORDEM DE SERVIÇO</small>
-    <strong>#${osNumber}</strong>
-    <div class="date">${new Date(order.created_at).toLocaleDateString('pt-BR')}</div>
+  <div class="header-os">
+    <div class="os-box"><small>ORDEM DE SERVIÇO</small><strong>#${osNumber}</strong></div>
+    <p style="font-size:7pt;color:#666;margin-top:4px">${new Date(order.created_at).toLocaleDateString('pt-BR')}</p>
   </div>
 </div>
 
-<!-- DADOS DO CLIENTE E SERVIÇO -->
-<div class="data-grid">
-  <div class="data-box">
-    <div class="data-box-title">👤 DADOS DO CLIENTE</div>
-    <div class="data-row"><span class="data-label">Cliente:</span><span class="data-value"><strong>${order.clients?.name || '-'}</strong></span></div>
-    <div class="data-row"><span class="data-label">CNPJ/CPF:</span><span class="data-value">${order.clients?.cnpj || order.clients?.cnpj_cpf || '-'}</span></div>
-    <div class="data-row"><span class="data-label">Endereço:</span><span class="data-value">${order.clients?.address || '-'}</span></div>
-    <div class="data-row"><span class="data-label">Telefone:</span><span class="data-value">${order.clients?.phone || '-'}</span></div>
+<div class="row">
+  <div class="col">
+    <div class="box">
+      <div class="box-title">CLIENTE</div>
+      <div class="box-row"><b>${order.clients?.name || '-'}</b></div>
+      <div class="box-row">${order.clients?.cnpj || order.clients?.cnpj_cpf || '-'}</div>
+      <div class="box-row">${order.clients?.address || '-'}</div>
+      <div class="box-row">${order.clients?.phone || '-'}</div>
+    </div>
   </div>
-  <div class="data-box">
-    <div class="data-box-title">🔧 DADOS DO SERVIÇO</div>
-    <div class="data-row"><span class="data-label">Serviço:</span><span class="data-value"><strong>${order.title}</strong></span></div>
-    <div class="data-row"><span class="data-label">Técnico:</span><span class="data-value">${techName}</span></div>
-    <div class="data-row"><span class="data-label">Início:</span><span class="data-value">${formatDateTime(order.checkin_at)}</span></div>
-    <div class="data-row"><span class="data-label">Término:</span><span class="data-value">${formatDateTime(order.completed_at)}</span></div>
+  <div class="col">
+    <div class="box">
+      <div class="box-title">SERVIÇO</div>
+      <div class="box-row"><b>${order.title}</b></div>
+      <div class="box-row">Técnico: ${techName}</div>
+      <div class="box-row">Início: ${formatDateTime(order.checkin_at)}</div>
+      <div class="box-row">Término: ${formatDateTime(order.completed_at)}</div>
+    </div>
   </div>
 </div>
 
 ${tasks.length > 0 ? `
-<!-- CHECKLIST -->
 <div class="section">
-  <div class="section-header">✅ CHECKLIST DE VERIFICAÇÃO</div>
-  <div class="section-content">
-    <div class="checklist-grid">
-      ${tasks.map(t => `<div class="check-item ${t.is_completed ? 'check-done' : 'check-pending'}">${t.title}</div>`).join('')}
+  <div class="section-title">CHECKLIST</div>
+  <div class="section-body">
+    <div class="checklist">
+      <div class="check-col">${tasks.slice(0, Math.ceil(tasks.length/2)).map(t => `<div class="check-item ${t.is_completed ? 'check-ok' : 'check-no'}">${t.is_completed ? '✓' : '○'} ${t.title}</div>`).join('')}</div>
+      <div class="check-col">${tasks.slice(Math.ceil(tasks.length/2)).map(t => `<div class="check-item ${t.is_completed ? 'check-ok' : 'check-no'}">${t.is_completed ? '✓' : '○'} ${t.title}</div>`).join('')}</div>
     </div>
   </div>
 </div>
 ` : ''}
 
-<!-- RELATÓRIO TÉCNICO -->
 <div class="section">
-  <div class="section-header">📝 RELATÓRIO TÉCNICO</div>
-  <div class="section-content">
-    <div class="report-content">
-      ${formatReport(report)}
-    </div>
+  <div class="section-title">RELATÓRIO TÉCNICO</div>
+  <div class="section-body">
+    <div class="report">${report || 'Nenhuma observação registrada.'}</div>
   </div>
 </div>
 
 ${photos.length > 0 ? `
-<!-- REGISTRO FOTOGRÁFICO -->
-<div class="section photos-section">
-  <div class="section-header">📷 REGISTRO FOTOGRÁFICO (${photos.length} foto${photos.length > 1 ? 's' : ''})</div>
-  <div class="section-content">
-    <div class="photos-grid">
-      ${photos.map(p => `<div class="photo-item"><img src="${p}" /></div>`).join('')}
+<div class="section">
+  <div class="section-title">FOTOS (${photos.length})</div>
+  <div class="section-body">
+    <div class="photos">
+      ${(() => {
+        let html = '';
+        for (let i = 0; i < photos.length; i += 4) {
+          html += '<div class="photo-row">';
+          for (let j = i; j < i + 4 && j < photos.length; j++) {
+            html += `<div class="photo-cell"><div class="photo-box"><img src="${photos[j]}"/></div></div>`;
+          }
+          // Preencher células vazias
+          for (let k = photos.length; k < i + 4; k++) {
+            html += '<div class="photo-cell"></div>';
+          }
+          html += '</div>';
+        }
+        return html;
+      })()}
     </div>
   </div>
 </div>
 ` : ''}
 
-<!-- ASSINATURAS -->
-<div class="signatures">
-  <div class="signature-box">
-    ${techSig ? `<img src="${techSig}" class="sig-image" />` : '<div style="height:40px"></div>'}
+<div class="sigs">
+  <div class="sig">
+    ${techSig ? `<img src="${techSig}" class="sig-img"/>` : '<div style="height:35px"></div>'}
     <div class="sig-line"></div>
     <div class="sig-name">${techName}</div>
     <div class="sig-role">Técnico Responsável</div>
-    ${techDoc ? `<div class="sig-doc">CPF: ${techDoc}</div>` : ''}
+    ${techDoc ? `<p style="font-size:6pt;color:#999">CPF: ${techDoc}</p>` : ''}
   </div>
-  <div class="signature-box">
-    ${order.signature_url ? `<img src="${order.signature_url}" class="sig-image" />` : '<div style="height:40px"></div>'}
+  <div class="sig">
+    ${order.signature_url ? `<img src="${order.signature_url}" class="sig-img"/>` : '<div style="height:35px"></div>'}
     <div class="sig-line"></div>
     <div class="sig-name">${order.signer_name || 'Responsável'}</div>
     <div class="sig-role">Cliente</div>
-    ${order.signer_doc ? `<div class="sig-doc">CPF: ${order.signer_doc}</div>` : ''}
+    ${order.signer_doc ? `<p style="font-size:6pt;color:#999">CPF: ${order.signer_doc}</p>` : ''}
   </div>
 </div>
 
-<div class="footer">
-  Documento gerado em ${new Date().toLocaleString('pt-BR')}
-</div>
+<div class="footer">Documento gerado em ${new Date().toLocaleString('pt-BR')}</div>
 
 </body>
 </html>`;
