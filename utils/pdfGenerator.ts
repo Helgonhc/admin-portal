@@ -176,8 +176,8 @@ body { font-family: Arial, sans-serif; font-size: 9px; color: #333; line-height:
 .check-done::before { content: "✓ "; font-weight: bold; }
 .check-pending { color: #999; }
 .check-pending::before { content: "○ "; }
-.report-box { background: #fafafa; border: 1px solid #ddd; padding: 15px; border-radius: 6px; font-size: 10px; line-height: 1.7; min-height: 60px; text-align: justify; }
-.report-box p { margin-bottom: 10px; text-indent: 2em; }
+.report-box { background: #fafafa; border: 1px solid #ddd; padding: 15px; border-radius: 6px; font-size: 10px; line-height: 1.8; min-height: 60px; }
+.report-box p { margin-bottom: 12px; text-align: justify; }
 .report-box p:last-child { margin-bottom: 0; }
 .photos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px; }
 .photo-item { border-radius: 8px; overflow: hidden; border: 1px solid #ddd; background: #f5f5f5; }

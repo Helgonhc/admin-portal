@@ -71,9 +71,12 @@ export default function OrderDetailsPage() {
   // Modal de Conclusão
   const [showConcluirModal, setShowConcluirModal] = useState(false);
   const [concluirData, setConcluirData] = useState({
+    checkin_at: '',
     completed_at: '',
     checkout_at: '',
-  });  useEffect(() => {
+  });
+
+  useEffect(() => {
     loadOrder();
   }, [params.id]);
 
@@ -338,10 +341,19 @@ export default function OrderDetailsPage() {
         setActiveTab('report');
         return;
       }
-      // Preencher com data/hora atual como padrão
+      // Preencher com data/hora atual como padrão (ou usar a existente)
       const now = new Date();
       const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      
+      // Se já tem checkin, usar ele, senão usar agora
+      let checkinValue = localDateTime;
+      if (order.checkin_at) {
+        const checkinDate = new Date(order.checkin_at);
+        checkinValue = new Date(checkinDate.getTime() - checkinDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      }
+      
       setConcluirData({
+        checkin_at: checkinValue,
         completed_at: localDateTime,
         checkout_at: localDateTime,
       });
@@ -378,6 +390,10 @@ export default function OrderDetailsPage() {
   }
 
   async function handleConcluirOS() {
+    if (!concluirData.checkin_at) {
+      toast.error('Selecione a data de início');
+      return;
+    }
     if (!concluirData.completed_at) {
       toast.error('Selecione a data de conclusão');
       return;
@@ -387,6 +403,7 @@ export default function OrderDetailsPage() {
     try {
       const updates: any = {
         status: 'concluido',
+        checkin_at: concluirData.checkin_at,
         completed_at: concluirData.completed_at,
         checkout_at: concluirData.checkout_at || concluirData.completed_at,
         execution_report: reportText,
@@ -1302,12 +1319,26 @@ export default function OrderDetailsPage() {
 
             <div className="p-6 space-y-4">
               <p className="text-gray-600 text-sm">
-                Selecione a data e hora de conclusão da OS:
+                Informe as datas de início e conclusão do serviço:
               </p>
               
               <div>
                 <label className="label flex items-center gap-1">
-                  <span>Data/Hora de Conclusão</span>
+                  <span>📅 Data/Hora de Início</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={concluirData.checkin_at}
+                  onChange={(e) => setConcluirData({ ...concluirData, checkin_at: e.target.value })}
+                  className="input"
+                />
+                <p className="text-xs text-gray-400 mt-1">Quando o serviço foi iniciado</p>
+              </div>
+
+              <div>
+                <label className="label flex items-center gap-1">
+                  <span>✅ Data/Hora de Conclusão</span>
                   <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -1316,23 +1347,12 @@ export default function OrderDetailsPage() {
                   onChange={(e) => setConcluirData({ ...concluirData, completed_at: e.target.value, checkout_at: e.target.value })}
                   className="input"
                 />
-                <p className="text-xs text-gray-400 mt-1">Permite datas retroativas para lançamentos posteriores</p>
-              </div>
-
-              <div>
-                <label className="label">Data/Hora de Checkout (opcional)</label>
-                <input
-                  type="datetime-local"
-                  value={concluirData.checkout_at}
-                  onChange={(e) => setConcluirData({ ...concluirData, checkout_at: e.target.value })}
-                  className="input"
-                />
-                <p className="text-xs text-gray-400 mt-1">Se diferente da conclusão</p>
+                <p className="text-xs text-gray-400 mt-1">Quando o serviço foi finalizado</p>
               </div>
 
               <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
                 <p className="text-sm text-emerald-700">
-                  ✅ O relatório técnico será salvo automaticamente junto com a conclusão.
+                  💡 Permite datas retroativas para lançamentos posteriores
                 </p>
               </div>
             </div>
@@ -1344,7 +1364,7 @@ export default function OrderDetailsPage() {
               </button>
               <button 
                 onClick={handleConcluirOS} 
-                disabled={processing || !concluirData.completed_at} 
+                disabled={processing || !concluirData.checkin_at || !concluirData.completed_at} 
                 className="btn btn-success"
               >
                 {processing ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
