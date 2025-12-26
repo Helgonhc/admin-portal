@@ -20,6 +20,10 @@ import {
 import Link from 'next/link';
 import { Skeleton, DashboardSkeleton } from '../../components/Skeleton';
 import { getStatusColor, getStatusLabel } from '../../utils/statusUtils';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
 
 interface DashboardStats {
   totalClients: number;
@@ -38,7 +42,11 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [recentTickets, setRecentTickets] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [statusChartData, setStatusChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const COLORS = ['#4f46e5', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6'];
 
   useEffect(() => {
     loadDashboard();
@@ -90,6 +98,33 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(5);
 
+      // Dados para o Gráfico de Volume (Últimos 7 dias)
+      const { data: last7DaysOrders } = await supabase
+        .from('service_orders')
+        .select('created_at')
+        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+      const dailyData = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000);
+        const dateString = date.toISOString().split('T')[0];
+        const count = last7DaysOrders?.filter(o => o.created_at.startsWith(dateString)).length || 0;
+        return {
+          day: date.toLocaleDateString('pt-BR', { weekday: 'short' }),
+          quantidade: count
+        };
+      });
+      setChartData(dailyData);
+
+      // Dados para o Gráfico de Status (Pie)
+      const { data: allOrdersStatus } = await supabase.from('service_orders').select('status');
+      const statusCounts: Record<string, number> = {};
+      allOrdersStatus?.forEach(o => {
+        const label = getStatusLabel(o.status);
+        statusCounts[label] = (statusCounts[label] || 0) + 1;
+      });
+      const pieData = Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
+      setStatusChartData(pieData);
+
       setRecentOrders(orders || []);
 
       const { data: tickets } = await supabase
@@ -103,7 +138,6 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('💥 Erro ao carregar dashboard:', error);
     } finally {
-      // Pequeno delay para suavizar a transição do skeleton
       setTimeout(() => setLoading(false), 500);
     }
   }
