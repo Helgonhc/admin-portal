@@ -62,12 +62,12 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#333;line-heigh
 .os-badge small{font-size:6pt;display:block;opacity:.8}
 .os-badge strong{font-size:12pt}
 .os-date{font-size:7pt;color:#666;margin-top:4px;text-align:center}
-.grid{display:flex;gap:12px;margin-bottom:10px}
+.grid{display:flex;gap:12px;margin-bottom:10px;page-break-inside:avoid}
 .grid .box{flex:1;background:#f8f9fa;border:1px solid #e9ecef;border-radius:6px;padding:10px}
 .box-title{font-size:8pt;font-weight:700;color:${c};border-bottom:1px solid #dee2e6;padding-bottom:4px;margin-bottom:6px}
 .box p{font-size:8pt;margin:3px 0}
 .box p strong{color:#222}
-.section{margin-bottom:10px}
+.section{margin-bottom:10px;page-break-inside:avoid}
 .section-title{background:linear-gradient(90deg,${c},${c}dd);color:#fff;padding:6px 10px;font-size:9pt;font-weight:600;border-radius:4px;margin-bottom:8px}
 .checklist{columns:2;column-gap:15px}
 .check-item{font-size:8pt;padding:3px 0;break-inside:avoid}
@@ -76,9 +76,9 @@ body{font-family:'Segoe UI',Arial,sans-serif;font-size:9pt;color:#333;line-heigh
 .check-pending{color:#9ca3af}
 .check-pending::before{content:"○ "}
 .report{background:#fff;border:1px solid #ddd;border-left:3px solid ${c};padding:12px;font-size:9pt;line-height:1.6;white-space:pre-wrap;min-height:40px}
-.photos{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.photo{aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid #ddd;background:#f5f5f5;display:flex;align-items:center;justify-content:center}
-.photo img{max-width:100%;max-height:100%;object-fit:contain}
+.photos{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;page-break-inside:avoid}
+.photo{aspect-ratio:1;border-radius:16px;overflow:hidden;border:1px solid #ddd;background:#f5f5f5;display:flex;align-items:center;justify-content:center}
+.photo img{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px}
 .signatures{display:flex;margin-top:20px;page-break-inside:avoid}
 .sig{flex:1;text-align:center;padding:0 20px}
 .sig-img{height:40px;margin-bottom:-5px}
