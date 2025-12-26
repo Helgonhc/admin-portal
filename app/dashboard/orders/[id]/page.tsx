@@ -55,11 +55,15 @@ export default function OrderDetailsPage() {
     priority: '',
     scheduled_at: '',
     status: '',
+    execution_report: '',
+    photos_url: [] as string[],
   });
   const [clients, setClients] = useState<any[]>([]);
   const [equipments, setEquipments] = useState<any[]>([]);
   const [technicians, setTechnicians] = useState<any[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [uploadingEdit, setUploadingEdit] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadOrder();
@@ -137,6 +141,8 @@ export default function OrderDetailsPage() {
       priority: order?.priority || 'media',
       scheduled_at: order?.scheduled_at ? order.scheduled_at.split('T')[0] : '',
       status: order?.status || 'pendente',
+      execution_report: order?.execution_report || '',
+      photos_url: order?.photos_url || [],
     });
 
     setShowEditModal(true);
@@ -172,6 +178,8 @@ export default function OrderDetailsPage() {
         technician_id: editData.technician_id || null,
         priority: editData.priority,
         status: editData.status,
+        execution_report: editData.execution_report,
+        photos_url: editData.photos_url,
       };
 
       if (editData.scheduled_at) {
@@ -185,6 +193,9 @@ export default function OrderDetailsPage() {
 
       if (error) throw error;
 
+      // Atualizar também o reportText local
+      setReportText(editData.execution_report);
+
       toast.success('OS atualizada com sucesso!');
       setShowEditModal(false);
       loadOrder();
@@ -193,6 +204,40 @@ export default function OrderDetailsPage() {
     } finally {
       setSavingEdit(false);
     }
+  }
+
+  async function handleEditPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setUploadingEdit(true);
+    try {
+      const newUrls: string[] = [];
+      
+      for (const file of Array.from(files)) {
+        const fileName = `${params.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from('os-photos')
+          .upload(fileName, file, { contentType: file.type });
+        
+        if (uploadError) throw uploadError;
+        
+        const { data } = supabase.storage.from('os-photos').getPublicUrl(fileName);
+        newUrls.push(data.publicUrl);
+      }
+      
+      setEditData({ ...editData, photos_url: [...editData.photos_url, ...newUrls] });
+      toast.success(`${newUrls.length} foto(s) adicionada(s)!`);
+    } catch (error: any) {
+      toast.error('Erro no upload: ' + error.message);
+    } finally {
+      setUploadingEdit(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
+  }
+
+  function removeEditPhoto(photoUrl: string) {
+    setEditData({ ...editData, photos_url: editData.photos_url.filter(u => u !== photoUrl) });
   }
 
   async function loadChecklistModels() {
@@ -871,7 +916,7 @@ export default function OrderDetailsPage() {
       {/* Modal Editar OS */}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-content max-w-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content max-w-3xl" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="p-6 border-b bg-gradient-to-r from-amber-500 to-orange-600">
               <div className="flex items-center gap-4">
@@ -880,12 +925,12 @@ export default function OrderDetailsPage() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-white">Editar Ordem de Serviço</h2>
-                  <p className="text-white/70 text-sm">OS #{order.id.slice(0,6).toUpperCase()}</p>
+                  <p className="text-white/70 text-sm">OS #{order.id.slice(0,6).toUpperCase()} - Edição completa</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[65vh] overflow-y-auto">
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
               {/* Seção: Cliente e Equipamento */}
               <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
@@ -951,7 +996,7 @@ export default function OrderDetailsPage() {
                     <textarea
                       value={editData.description}
                       onChange={(e) => setEditData({ ...editData, description: e.target.value })}
-                      className="input min-h-[100px] resize-none"
+                      className="input min-h-[80px] resize-none"
                       placeholder="Descreva detalhadamente o serviço..."
                     />
                   </div>
@@ -989,7 +1034,6 @@ export default function OrderDetailsPage() {
                         className="input pl-10"
                       />
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">Permite datas retroativas</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -1033,6 +1077,74 @@ export default function OrderDetailsPage() {
                     </select>
                   </div>
                 </div>
+              </div>
+
+              {/* Seção: Relatório Técnico */}
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xs font-bold">4</span>
+                  📝 Relatório Técnico
+                </h3>
+                <textarea
+                  value={editData.execution_report}
+                  onChange={(e) => setEditData({ ...editData, execution_report: e.target.value })}
+                  className="input min-h-[150px] resize-none"
+                  placeholder="Descreva os serviços realizados, peças trocadas, observações técnicas..."
+                />
+              </div>
+
+              {/* Seção: Fotos */}
+              <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-xs font-bold">5</span>
+                  📷 Fotos ({editData.photos_url.length})
+                </h3>
+                
+                <input
+                  ref={editFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleEditPhotoUpload}
+                  className="hidden"
+                />
+                
+                {editData.photos_url.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-3 mb-4">
+                    {editData.photos_url.map((photo, index) => (
+                      <div key={index} className="relative group">
+                        <img 
+                          src={photo} 
+                          alt={`Foto ${index + 1}`} 
+                          className="rounded-lg object-cover h-24 w-full cursor-pointer hover:opacity-90"
+                          onClick={() => window.open(photo, '_blank')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeEditPhoto(photo)}
+                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-400 mb-4">
+                    <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma foto</p>
+                  </div>
+                )}
+                
+                <button 
+                  type="button"
+                  onClick={() => editFileInputRef.current?.click()}
+                  disabled={uploadingEdit}
+                  className="btn btn-secondary w-full"
+                >
+                  {uploadingEdit ? <Loader2 className="animate-spin" size={18} /> : <Upload size={18} />}
+                  Adicionar Fotos
+                </button>
               </div>
             </div>
 
