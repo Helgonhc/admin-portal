@@ -68,7 +68,12 @@ export default function OrderDetailsPage() {
   const [uploadingEdit, setUploadingEdit] = useState(false);
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  // Modal de Conclusão
+  const [showConcluirModal, setShowConcluirModal] = useState(false);
+  const [concluirData, setConcluirData] = useState({
+    completed_at: '',
+    checkout_at: '',
+  });  useEffect(() => {
     loadOrder();
   }, [params.id]);
 
@@ -326,6 +331,24 @@ export default function OrderDetailsPage() {
   }
 
   async function updateStatus(newStatus: string) {
+    // Se for concluir, abre o modal para escolher a data
+    if (newStatus === 'concluido') {
+      if (!reportText.trim()) {
+        toast.error('Preencha o relatório antes de concluir');
+        setActiveTab('report');
+        return;
+      }
+      // Preencher com data/hora atual como padrão
+      const now = new Date();
+      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      setConcluirData({
+        completed_at: localDateTime,
+        checkout_at: localDateTime,
+      });
+      setShowConcluirModal(true);
+      return;
+    }
+
     setProcessing(true);
     try {
       const updates: any = { status: newStatus };
@@ -333,17 +356,6 @@ export default function OrderDetailsPage() {
       
       if (newStatus === 'em_andamento' && order.status === 'pendente') {
         updates.checkin_at = now;
-      }
-      if (newStatus === 'concluido') {
-        if (!reportText.trim()) {
-          toast.error('Preencha o relatório antes de concluir');
-          setActiveTab('report');
-          setProcessing(false);
-          return;
-        }
-        updates.completed_at = now;
-        updates.checkout_at = now;
-        updates.execution_report = reportText;
       }
       
       const { error } = await supabase
@@ -357,6 +369,41 @@ export default function OrderDetailsPage() {
       await sendStatusChangeNotifications(newStatus);
       
       toast.success('Status atualizado!');
+      loadOrder();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function handleConcluirOS() {
+    if (!concluirData.completed_at) {
+      toast.error('Selecione a data de conclusão');
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const updates: any = {
+        status: 'concluido',
+        completed_at: concluirData.completed_at,
+        checkout_at: concluirData.checkout_at || concluirData.completed_at,
+        execution_report: reportText,
+      };
+
+      const { error } = await supabase
+        .from('service_orders')
+        .update(updates)
+        .eq('id', params.id);
+
+      if (error) throw error;
+
+      // Enviar notificações
+      await sendStatusChangeNotifications('concluido');
+
+      toast.success('OS concluída com sucesso!');
+      setShowConcluirModal(false);
       loadOrder();
     } catch (error: any) {
       toast.error(error.message);
@@ -1231,6 +1278,78 @@ export default function OrderDetailsPage() {
                   Salvar Alterações
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Concluir OS */}
+      {showConcluirModal && (
+        <div className="modal-overlay" onClick={() => setShowConcluirModal(false)}>
+          <div className="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="p-6 border-b bg-gradient-to-r from-emerald-500 to-green-600">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Concluir Ordem de Serviço</h2>
+                  <p className="text-white/70 text-sm">OS #{order.id.slice(0,6).toUpperCase()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-gray-600 text-sm">
+                Selecione a data e hora de conclusão da OS:
+              </p>
+              
+              <div>
+                <label className="label flex items-center gap-1">
+                  <span>Data/Hora de Conclusão</span>
+                  <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={concluirData.completed_at}
+                  onChange={(e) => setConcluirData({ ...concluirData, completed_at: e.target.value, checkout_at: e.target.value })}
+                  className="input"
+                />
+                <p className="text-xs text-gray-400 mt-1">Permite datas retroativas para lançamentos posteriores</p>
+              </div>
+
+              <div>
+                <label className="label">Data/Hora de Checkout (opcional)</label>
+                <input
+                  type="datetime-local"
+                  value={concluirData.checkout_at}
+                  onChange={(e) => setConcluirData({ ...concluirData, checkout_at: e.target.value })}
+                  className="input"
+                />
+                <p className="text-xs text-gray-400 mt-1">Se diferente da conclusão</p>
+              </div>
+
+              <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+                <p className="text-sm text-emerald-700">
+                  ✅ O relatório técnico será salvo automaticamente junto com a conclusão.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t bg-gray-50 flex gap-3 justify-end">
+              <button onClick={() => setShowConcluirModal(false)} className="btn btn-secondary">
+                Cancelar
+              </button>
+              <button 
+                onClick={handleConcluirOS} 
+                disabled={processing || !concluirData.completed_at} 
+                className="btn btn-success"
+              >
+                {processing ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle size={20} />}
+                Concluir OS
+              </button>
             </div>
           </div>
         </div>
