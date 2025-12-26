@@ -24,15 +24,15 @@
   animation: shimmer 1.5s infinite linear;
 }
 
-.card-hover-premium {
+.card-hover {
   @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
 }
 
-.animate-fade-in-premium {
+.animate-fadeIn {
   @apply animate-[fadeIn_0.5s_ease-out];
 }
 
-@keyframes fadeInPremium {
+@keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(10px);
