@@ -1,424 +1,415 @@
 import { supabase } from '../lib/supabase';
 
 const formatDateTime = (dateString: string) => {
-  if (!dateString) return '-';
-  try {
-    let s = String(dateString).replace('Z', '').replace(/\+\d{2}:\d{2}$/, '').replace(/\.\d+$/, '');
-    if (s.includes('T')) {
-      const parts = s.split('T');
-      const [y, m, d] = parts[0].split('-');
-      const time = parts[1] || '00:00';
-      const [h, min] = time.split(':');
-      return `${d}/${m}/${y} ${h}:${min}`;
-    }
-    const [y, m, d] = s.split('-');
-    return `${d}/${m}/${y}`;
-  } catch { return String(dateString); }
+    if (!dateString) return '-';
+    try {
+        let s = String(dateString).replace('Z', '').replace(/\+\d{2}:\d{2}$/, '').replace(/\.\d+$/, '');
+        if (s.includes('T')) {
+            const parts = s.split('T');
+            const [y, m, d] = parts[0].split('-');
+            const time = parts[1] || '00:00';
+            const [h, min] = time.split(':');
+            return `${d}/${m}/${y} ${h}:${min}`;
+        }
+        const [y, m, d] = s.split('-');
+        return `${d}/${m}/${y}`;
+    } catch { return String(dateString); }
 };
 
 const formatDate = (dateString: string) => {
-  if (!dateString) return '-';
-  try {
-    let s = String(dateString).split('T')[0];
-    const [y, m, d] = s.split('-');
-    return `${d}/${m}/${y}`;
-  } catch { return String(dateString); }
+    if (!dateString) return '-';
+    try {
+        let s = String(dateString).split('T')[0];
+        const [y, m, d] = s.split('-');
+        return `${d}/${m}/${y}`;
+    } catch { return String(dateString); }
 };
 
 const formatOrderId = (id: string, dateString: string) => {
-  if (!id) return 'OS';
-  try {
-    const s = String(dateString).split('T')[0];
-    const [y, m] = s.split('-');
-    return `${y}${m}-${id.slice(0, 4).toUpperCase()}`;
-  } catch { return id.slice(0, 6).toUpperCase(); }
+    if (!id) return 'OS';
+    try {
+        const s = String(dateString).split('T')[0];
+        const [y, m] = s.split('-');
+        return `${y}${m}-${id.slice(0, 4).toUpperCase()}`;
+    } catch { return id.slice(0, 6).toUpperCase(); }
 };
 
 async function getCompanyConfig() {
-  const { data: config } = await supabase.from('app_config').select('*').limit(1).maybeSingle();
-  return {
-    name: config?.company_name || 'CHAMEI TECNOLOGIA',
-    cnpj: config?.company_cnpj || config?.cnpj || '00.000.000/0000-00',
-    address: config?.company_address || config?.address || 'Endereço não configurado',
-    phone: config?.company_phone || config?.phone || '',
-    email: config?.company_email || config?.email || '',
-    logo: config?.company_logo || config?.logo_url || '',
-    color: config?.primary_color || '#312e81'
-  };
+    const { data: config } = await supabase.from('app_config').select('*').limit(1).maybeSingle();
+    return {
+        name: config?.company_name || 'CHAMEI TECNOLOGIA',
+        cnpj: config?.company_cnpj || config?.cnpj || '00.000.000/0000-00',
+        address: config?.company_address || config?.address || 'Endereço não configurado',
+        phone: config?.company_phone || config?.phone || '',
+        email: config?.company_email || config?.email || '',
+        logo: config?.company_logo || config?.logo_url || '',
+        color: config?.primary_color || '#4f46e5'
+    };
 }
 
 const getCommonCSS = (color: string) => `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@700;800&family=Merriweather:ital,wght@0,400;1,400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&display=swap');
 
     :root {
-        --primary-color: ${color};
-        --dark-gray: #111827;
-        --medium-gray: #d1d5db;
-        --light-gray: #f3f4f6;
+        --primary: ${color};
+        --slate-900: #0f172a;
+        --slate-700: #334155;
+        --slate-500: #64748b;
+        --slate-200: #e2e8f0;
+        --slate-50: #f8fafc;
     }
 
-    /* Reset e Base */
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
-    body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: var(--dark-gray); padding: 20px 0; }
+    
+    body { 
+        font-family: 'Inter', sans-serif; 
+        background-color: #f1f5f9; 
+        color: var(--slate-900); 
+        padding: 40px 0;
+    }
 
-    /* Estrutura de Folha A4 */
-    .report-page-container {
-        width: 100%;
-        max-width: 210mm;
-        margin: 0 auto 20px auto;
+    /* Page Setup */
+    .page-container {
+        width: 210mm;
+        margin: 0 auto;
+        padding: 0;
         page-break-after: always;
     }
-    .report-page-container:last-child { page-break-after: auto; }
+    .page-container:last-child { page-break-after: auto; }
 
-    .report-page {
+    .a4-page {
         background: white;
-        width: 100%;
         min-height: 297mm;
-        height: auto;
-        box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        padding: 15mm;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        border: 1px solid var(--slate-200);
         display: flex;
         flex-direction: column;
         position: relative;
-        border: 1px solid #e5e7eb;
-        font-size: 10pt;
     }
 
-    /* Cabeçalho Técnico */
-    .report-header {
-        padding: 8mm 12mm;
-        flex-shrink: 0;
+    /* Header */
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid var(--primary);
     }
-    .header-table {
-        width: 100%;
-        border-collapse: collapse;
-        border: 2px solid #111827;
-    }
-    .header-table td {
-        padding: 6px 10px;
-        border: 1.5px solid #111827;
-        font-size: 8pt;
-        vertical-align: middle;
-    }
-    .header-logo { width: 30%; text-align: center; }
-    .header-logo img { max-height: 60px; max-width: 180px; object-fit: contain; }
-    .header-title { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 11pt; text-align: center; text-transform: uppercase; }
-    .header-label { font-weight: 800; text-transform: uppercase; color: #374151; font-size: 7.5pt; }
+    
+    .company-brand img { max-height: 60px; margin-bottom: 10px; display: block; }
+    .company-name { font-family: 'Montserrat', sans-serif; font-size: 18px; font-weight: 800; color: var(--primary); text-transform: uppercase; }
+    .company-meta { font-size: 9px; color: var(--slate-500); line-height: 1.4; margin-top: 4px; }
 
-    /* Conteúdo */
-    .report-content {
-        flex-grow: 1;
-        padding: 5mm 12mm 10mm 12mm;
-        font-family: 'Inter', sans-serif;
-    }
-    .text-body { font-family: 'Merriweather', serif; font-size: 10pt; text-align: justify; line-height: 1.6; margin-bottom: 1.5rem; }
+    .doc-info { text-align: right; }
+    .doc-type { font-family: 'Montserrat', sans-serif; font-size: 10px; font-weight: 800; color: var(--slate-500); text-transform: uppercase; letter-spacing: 2px; }
+    .doc-id { font-size: 32px; font-weight: 900; color: var(--slate-900); line-height: 1; margin: 4px 0; }
+    .doc-date { font-size: 10px; font-weight: 600; color: var(--slate-500); }
 
-    .section-title {
-        font-family: 'Montserrat', sans-serif;
-        font-size: 12pt;
-        font-weight: 800;
-        color: var(--primary-color);
-        margin-bottom: 10px;
-        padding-bottom: 4px;
-        border-bottom: 2px solid var(--primary-color);
+    /* Sections */
+    .section { margin-bottom: 25px; }
+    .section-title { 
+        font-family: 'Montserrat', sans-serif; 
+        font-size: 11px; 
+        font-weight: 800; 
+        color: var(--primary); 
+        text-transform: uppercase; 
+        letter-spacing: 1px;
+        margin-bottom: 12px;
         display: flex;
         align-items: center;
         gap: 10px;
     }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--slate-200); }
 
-    /* Tabelas e Dados */
-    .data-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 10px 0 20px 0;
-        font-size: 9pt;
+    .info-grid { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 20px; 
     }
-    .data-table th { background: #f9fafb; font-weight: 700; text-align: left; padding: 10px; border: 1px solid #e5e7eb; color: #4b5563; text-transform: uppercase; font-size: 7.5pt; }
-    .data-table td { padding: 10px; border: 1px solid #e5e7eb; vertical-align: top; }
-    .data-table tr:nth-child(even) { background-color: #fcfcfc; }
-    .total-row { background: var(--primary-color) !important; color: white !important; font-weight: 800; }
-    .total-row td { border-color: var(--primary-color); }
+    
+    .info-card { 
+        background: var(--slate-50); 
+        border: 1px solid var(--slate-200); 
+        border-radius: 8px; 
+        padding: 12px; 
+    }
 
-    /* Assinaturas */
-    .signature-section {
-        margin-top: 30px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 40px;
+    .field { margin-bottom: 8px; }
+    .field:last-child { margin-bottom: 0; }
+    .label { font-size: 8px; font-weight: 700; color: var(--slate-500); text-transform: uppercase; display: block; margin-bottom: 2px; }
+    .value { font-size: 10px; font-weight: 600; color: var(--slate-700); }
+
+    /* Content Area */
+    .content-box {
+        background: white;
+        border: 1px solid var(--slate-200);
+        border-radius: 8px;
+        padding: 15px;
+        font-size: 10.5px;
+        line-height: 1.6;
+        color: var(--slate-700);
+        white-space: pre-wrap;
+        min-height: 80px;
+    }
+
+    /* Table */
+    .clean-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+    .clean-table th { background: var(--slate-50); padding: 10px; font-size: 8.5px; font-weight: 800; color: var(--slate-500); text-align: left; border-bottom: 2px solid var(--slate-200); text-transform: uppercase; }
+    .clean-table td { padding: 12px 10px; font-size: 10px; border-bottom: 1px solid var(--slate-50); color: var(--slate-700); }
+    .clean-table tr:nth-child(even) td { background: #fafbfc; }
+    
+    .total-bar { 
+        background: var(--slate-900); 
+        color: white; 
+        margin-top: 2px;
+        border-radius: 6px;
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .total-label { font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .total-value { font-size: 18px; font-weight: 900; }
+
+    /* Signatures */
+    .signature-row { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 40px; 
+        margin-top: auto; 
+        padding-top: 40px;
         page-break-inside: avoid;
     }
-    .signature-box { text-align: center; }
-    .signature-img-wrap { height: 70px; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid #94a3b8; margin-bottom: 8px; padding-bottom: 5px; }
-    .signature-img-wrap img { max-height: 65px; max-width: 100%; mix-blend-mode: multiply; }
-    .signature-name { font-weight: 700; color: #0f172a; font-size: 9pt; }
-    .signature-label { font-size: 8pt; color: #64748b; font-weight: 500; }
+    .sign-box { text-align: center; }
+    .sign-line { border-bottom: 1px solid var(--slate-500); height: 60px; margin-bottom: 10px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 5px; }
+    .sign-line img { max-height: 55px; max-width: 100%; mix-blend-mode: multiply; }
+    .sign-name { font-size: 11px; font-weight: 700; color: var(--slate-900); }
+    .sign-meta { font-size: 8px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; }
 
     /* Footer */
-    .report-footer {
-        padding: 6mm 12mm;
-        flex-shrink: 0;
-        border-top: 1px solid var(--medium-gray);
-        margin-top: auto;
-        text-align: center;
-        font-size: 7.5pt;
-        color: #6b7280;
+    .footer {
+        margin-top: 30px;
+        padding-top: 15px;
+        border-top: 1px solid var(--slate-200);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 8.5px;
+        color: var(--slate-500);
     }
-    .footer-line { width: 100%; height: 1px; background: #d1d5db; margin-bottom: 10px; }
-    .footer-flex { display: flex; justify-content: space-between; text-align: left; }
 
-    /* Fotos */
-    .photos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px; }
-    .photo-item { border: 1px solid #e5e7eb; border-radius: 6px; padding: 5px; background: #fff; }
-    .photo-item img { width: 100%; height: 160px; object-fit: cover; border-radius: 4px; }
-    .photo-caption { font-size: 8pt; italic; text-align: center; margin-top: 5px; color: #4b5563; }
+    /* Photos */
+    .photo-mosaic { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+    .photo-card { border: 1px solid var(--slate-200); border-radius: 8px; overflow: hidden; }
+    .photo-card img { width: 100%; height: 200px; object-fit: cover; border-bottom: 1px solid var(--slate-50); }
+    .photo-caption { padding: 8px; text-align: center; font-size: 9px; font-weight: 500; color: var(--slate-500); }
 
-    .print-btn {
+    .print-button {
         position: fixed;
         bottom: 30px;
         right: 30px;
-        background: var(--primary-color);
+        background: var(--primary);
         color: white;
         border: none;
-        padding: 15px 30px;
+        padding: 15px 35px;
         border-radius: 50px;
+        font-family: 'Montserrat', sans-serif;
         font-weight: 800;
-        text-transform: uppercase;
         cursor: pointer;
-        box-shadow: 0 10px 15px rgba(0,0,0,0.2);
-        z-index: 1000;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        z-index: 9999;
+        text-transform: uppercase;
+        letter-spacing: 1px;
     }
 
     @media print {
-        body { background-color: #fff; padding: 0; }
+        body { background: white; padding: 0; }
         .no-print { display: none !important; }
-        .report-page { box-shadow: none; border: none; width: 210mm; min-height: 297mm; }
-        .report-page-container { margin: 0; box-shadow: none; border: none; }
+        .page-container { margin: 0; width: 210mm; }
+        .a4-page { box-shadow: none; border: none; padding: 15mm; }
     }
 `;
 
-function getFooterHTML(data: any) {
-  return `
-        <div class="report-footer">
-            <div class="footer-line"></div>
-            <div class="footer-flex">
-                <div style="width: 60%;">
-                    <strong style="color: #374151;">${data.companyName}</strong><br>
-                    ${data.companyAddress}
-                </div>
-                <div style="width: 40%; text-align: right;">
-                    📞 ${data.companyPhone}<br>
-                    ✉️ ${data.companyEmail}
-                </div>
-            </div>
-            <p style="margin-top: 5px; font-size: 7pt; opacity: 0.7;">Documento gerado via Chamei Portal em ${new Date().toLocaleString('pt-BR')}</p>
-        </div>
-    `;
-}
-
-function getHeaderHTML(data: any, page: number) {
-  return `
-        <div class="report-header">
-            <table class="header-table">
-                <tbody>
-                    <tr>
-                        <td class="header-logo" rowspan="4">
-                            ${data.companyLogoUrl ? `<img src="${data.companyLogoUrl}">` : `<span style="font-weight: 900; color: #ddd; font-size: 20pt;">LOGO</span>`}
-                        </td>
-                        <td class="header-title" colspan="2">${data.reportType}</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2"><span class="header-label">Solicitante:</span> <span style="font-weight: 600;">${data.clientName}</span></td>
-                    </tr>
-                    <tr>
-                        <td colspan="2"><span class="header-label">Endereço:</span> <span style="font-size: 7.5pt;">${data.clientAddress}</span></td>
-                    </tr>
-                    <tr>
-                        <td style="width: 40%;"><span class="header-label">ID Documento:</span> <span style="font-weight: 700;">#${data.docId}</span></td>
-                        <td style="width: 30%; border-left: 2px solid #111827;"><span class="header-label">Página:</span> ${page}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    `;
-}
-
 export async function generateServiceOrderPDF(order: any) {
-  try {
-    const company = await getCompanyConfig();
-    let techName = '-', techSig = '';
+    try {
+        const company = await getCompanyConfig();
+        let techName = '-', techSig = '';
 
-    if (order.technician_id) {
-      const { data: tech } = await supabase.from('profiles').select('full_name, signature_url').eq('id', order.technician_id).maybeSingle();
-      if (tech) {
-        techName = tech.full_name || '-';
-        techSig = tech.signature_url || '';
-      }
-    }
+        if (order.technician_id) {
+            const { data: tech } = await supabase.from('profiles').select('full_name, signature_url').eq('id', order.technician_id).maybeSingle();
+            if (tech) {
+                techName = tech.full_name || '-';
+                techSig = tech.signature_url || '';
+            }
+        }
 
-    const { data: orderItems } = await supabase.from('service_order_items').select('*').eq('order_id', order.id).order('created_at');
-    const osNumber = formatOrderId(order.id, order.created_at);
-    const photos = order.photos_url || order.photos || [];
-    const color = company.color;
-    const totalItems = orderItems?.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0) || 0;
+        const { data: orderItems } = await supabase.from('service_order_items').select('*').eq('order_id', order.id).order('created_at');
+        const osNumber = formatOrderId(order.id, order.created_at);
+        const photos = order.photos_url || order.photos || [];
+        const color = company.color;
+        const totalItems = orderItems?.reduce((acc, item) => acc + (item.quantity * item.unit_price), 0) || 0;
 
-    const data = {
-      companyLogoUrl: company.logo,
-      companyName: company.name,
-      companyAddress: company.address,
-      companyPhone: company.phone,
-      companyEmail: company.email,
-      reportType: 'RELATÓRIO DE ATENDIMENTO TÉCNICO',
-      clientName: order.clients?.name || '-',
-      clientAddress: order.clients?.address || '-',
-      docId: osNumber,
-      reportDate: formatDate(order.created_at)
-    };
+        const w = window.open('', '_blank');
+        if (!w) return;
 
-    const w = window.open('', '_blank');
-    if (!w) return;
-
-    w.document.write(`<!DOCTYPE html>
+        w.document.write(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <title>OS #${osNumber} - RELATÓRIO PRESTADOR</title>
+  <title>ORDEM DE SERVIÇO - #${osNumber}</title>
   <style>${getCommonCSS(color)}</style>
 </head>
 <body>
-  <button class="print-btn no-print" onclick="window.print()">Imprimir Documento 📄</button>
+  <button class="print-button no-print" onclick="window.print()">Gerar PDF Final 📄</button>
   
-  <div class="container">
-    <div class="report-page-container">
-        <div class="report-page">
-            ${getHeaderHTML(data, 1)}
-            <div class="report-content">
-                <div class="section-title">1. OBJETO DO CHAMADO</div>
-                <div class="text-body">${order.description || 'Não especificado.'}</div>
-
-                <div class="section-title">2. DETALHAMENTO DA EXECUÇÃO</div>
-                <div class="text-body">${order.execution_report || 'Nenhum parecer técnico textual anexado.'}</div>
-
-                <div class="section-title">3. PROFISSIONAL RESPONSÁVEL</div>
-                <table class="data-table">
-                    <tr>
-                        <td style="width: 50%;"><span class="header-label">Técnico Integrador:</span><br><strong>${techName}</strong></td>
-                        <td style="width: 50%;"><span class="header-label">Horários:</span><br>Início: ${formatDateTime(order.checkin_at)}<br>Fim: ${formatDateTime(order.completed_at || order.updated_at)}</td>
-                    </tr>
-                </table>
-
-                ${orderItems && orderItems.length > 0 ? `
-                <div class="section-title">4. MATERIAIS E SERVIÇOS APLICADOS</div>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Descrição</th>
-                            <th style="text-align: center;">Qtd</th>
-                            <th style="text-align: right;">v. Unitário</th>
-                            <th style="text-align: right;">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${orderItems.map((item: any) => `
-                            <tr>
-                                <td>${item.description}</td>
-                                <td style="text-align: center;">${item.quantity}</td>
-                                <td style="text-align: right;">R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                <td style="text-align: right; font-weight: 700;">R$ ${(item.quantity * item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                            </tr>
-                        `).join('')}
-                        <tr class="total-row">
-                            <td colspan="3" style="text-align: right;">VALOR TOTAL DO ATENDIMENTO</td>
-                            <td style="text-align: right;">R$ ${totalItems.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                    </tbody>
-                </table>` : ''}
-            </div>
-            ${getFooterHTML(data)}
+  <div class="page-container">
+    <div class="a4-page">
+      <div class="header">
+        <div class="company-brand">
+          ${company.logo ? `<img src="${company.logo}">` : ''}
+          <div class="company-name">${company.name}</div>
+          <div class="company-meta">
+            CNPJ: ${company.cnpj}<br>
+            ${company.address}<br>
+            ${company.phone} ${company.email ? `• ${company.email}` : ''}
+          </div>
         </div>
-    </div>
-
-    ${photos.length > 0 ? `
-    <div class="report-page-container">
-        <div class="report-page">
-            ${getHeaderHTML(data, 2)}
-            <div class="report-content">
-                <div class="section-title">5. ANEXO FOTOGRÁFICO DE EVIDÊNCIAS</div>
-                <div class="photos-grid">
-                    ${photos.map((url: string, idx: number) => `
-                        <div class="photo-item">
-                            <img src="${url}">
-                            <div class="photo-caption">Evidência #${idx + 1}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            ${getFooterHTML(data)}
+        <div class="doc-info">
+          <div class="doc-type">ORDEM DE SERVIÇO</div>
+          <div class="doc-id">#${osNumber}</div>
+          <div class="doc-date">EMITIDO EM: ${formatDate(order.created_at)}</div>
         </div>
-    </div>` : ''}
+      </div>
 
-    <div class="report-page-container">
-        <div class="report-page">
-            ${getHeaderHTML(data, photos.length > 0 ? 3 : 2)}
-            <div class="report-content">
-                <div class="section-title">6. FORMALIZAÇÃO E CIÊNCIA</div>
-                <div class="text-body" style="font-size: 9pt;">
-                    Declaramos para os devidos fins que os serviços acima descritos foram realizados e equipamentos testados em conformidade. O aceite deste documento via assinatura digital ou física comprova a prestação do serviço.
-                </div>
-                
-                <div class="signature-section">
-                    <div class="signature-box">
-                        <div class="signature-img-wrap">${techSig ? `<img src="${techSig}">` : ''}</div>
-                        <div class="signature-name">${techName}</div>
-                        <div class="signature-label">Prestador Responsável</div>
-                    </div>
-                    <div class="signature-box">
-                        <div class="signature-img-wrap">${order.signature_url ? `<img src="${order.signature_url}">` : ''}</div>
-                        <div class="signature-name">${order.signer_name || 'Representante do Cliente'}</div>
-                        <div class="signature-label">Aceite e Recebimento</div>
-                    </div>
-                </div>
-                
-                <div style="margin-top: 40px; text-align: center;">
-                    <p style="font-size: 10pt; color: #1e293b; font-weight: 600;">
-                        ${company.address.split('-')[0]}, ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}.
-                    </p>
-                </div>
-            </div>
-            ${getFooterHTML(data)}
+      <div class="section">
+        <div class="section-title">DADOS DO ATENDIMENTO</div>
+        <div class="info-grid">
+          <div class="info-card">
+            <div class="field"><span class="label">CLIENTE</span><span class="value">${order.clients?.name || '-'}</span></div>
+            <div class="field"><span class="label">CONTATO / CNPJ</span><span class="value">${order.clients?.cnpj_cpf || '-'}</span></div>
+            <div class="field"><span class="label">ENDEREÇO</span><span class="value">${order.clients?.address || '-'}</span></div>
+          </div>
+          <div class="info-card">
+            <div class="field"><span class="label">PROFISSIONAL RESPONSÁVEL</span><span class="value">${techName}</span></div>
+            <div class="field"><span class="label">DATA/HORA INÍCIO</span><span class="value">${formatDateTime(order.checkin_at)}</span></div>
+            <div class="field"><span class="label">DATA/HORA FIM</span><span class="value">${formatDateTime(order.completed_at || order.updated_at)}</span></div>
+          </div>
         </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">EQUIPAMENTO</div>
+        <div class="info-card" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+          <div class="field"><span class="label">NOME / DESCRIÇÃO</span><span class="value">${order.equipments?.name || '-'}</span></div>
+          <div class="field"><span class="label">MARCA / MODELO</span><span class="value">${order.equipments?.model || '-'}</span></div>
+          <div class="field"><span class="label">Nº DE SÉRIE</span><span class="value">${order.equipments?.serial_number || '-'}</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">DESCRIÇÃO DOS SERVIÇOS / RELATÓRIO</div>
+        <div class="content-box">${order.execution_report || order.description || 'Nenhum relatório técnico registrado.'}</div>
+      </div>
+
+      ${orderItems && orderItems.length > 0 ? `
+      <div class="section">
+        <div class="section-title">MATERIAIS E SERVIÇOS</div>
+        <table class="clean-table">
+          <thead>
+            <tr>
+              <th style="width: 50%;">DESCRIÇÃO</th>
+              <th style="text-align: center;">QTD</th>
+              <th style="text-align: right;">VALOR UNIT.</th>
+              <th style="text-align: right;">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${orderItems.map((item: any) => `
+              <tr>
+                <td>${item.description}</td>
+                <td style="text-align: center;">${item.quantity}</td>
+                <td style="text-align: right;">R$ ${item.unit_price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                <td style="text-align: right; font-weight: 700;">R$ ${(item.quantity * item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="total-bar">
+          <span class="total-label">INVESTIMENTO TOTAL</span>
+          <span class="total-value">R$ ${totalItems.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>` : ''}
+
+      <div class="signature-row">
+        <div class="sign-box">
+          <div class="sign-line">${techSig ? `<img src="${techSig}">` : ''}</div>
+          <div class="sign-name">${techName}</div>
+          <div class="sign-meta">TÉCNICO RESPONSÁVEL</div>
+        </div>
+        <div class="sign-box">
+          <div class="sign-line">${order.signature_url ? `<img src="${order.signature_url}">` : ''}</div>
+          <div class="sign-name">${order.signer_name || 'REPRESENTANTE DO CLIENTE'}</div>
+          <div class="sign-meta">ACEITE E RECEBIMENTO</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div>CHAMEI APP • SISTEMA DE GESTÃO PARA PRESTADORES</div>
+        <div>Página 01 / ${photos.length > 0 ? '02' : '01'}</div>
+      </div>
     </div>
   </div>
+
+  ${photos.length > 0 ? `
+  <div class="page-container">
+    <div class="a4-page">
+      <div class="header">
+        <div class="company-brand">
+          <div class="company-name">${company.name}</div>
+        </div>
+        <div class="doc-info">
+          <div class="doc-type">ANEXO FOTOGRÁFICO</div>
+          <div class="doc-id">#${osNumber}</div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="photo-mosaic">
+          ${photos.map((url: string, i: number) => `
+            <div class="photo-card">
+              <img src="${url}">
+              <div class="photo-caption">REGISTRO FOTOGRÁFICO #${i + 1}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="footer" style="margin-top: auto;">
+        <div>DOCUMENTO DE EVIDÊNCIAS DE CAMPO</div>
+        <div>Página 02 / 02</div>
+      </div>
+    </div>
+  </div>` : ''}
 </body>
 </html>`);
-    w.document.close();
-  } catch (error) {
-    console.error('PDF Error:', error);
-    alert('Erro ao gerar RELATÓRIO PREMIUM');
-  }
+        w.document.close();
+    } catch (error) {
+        console.error('PDF Error:', error);
+        alert('Erro ao gerar RELATÓRIO TÉCNICO');
+    }
 }
 
 export async function generateQuotePDF(quote: any) {
-  try {
-    const company = await getCompanyConfig();
-    const quoteNumber = quote.quote_number || quote.id?.slice(0, 8).toUpperCase() || 'ORC';
-    const color = company.color;
+    try {
+        const company = await getCompanyConfig();
+        const quoteNumber = quote.quote_number || quote.id?.slice(0, 8).toUpperCase() || 'ORC';
+        const color = company.color;
+        const w = window.open('', '_blank');
+        if (!w) return;
 
-    const data = {
-      companyLogoUrl: company.logo,
-      companyName: company.name,
-      companyAddress: company.address,
-      companyPhone: company.phone,
-      companyEmail: company.email,
-      reportType: 'ORÇAMENTO / PROPOSTA COMERCIAL',
-      clientName: quote.clients?.name || '-',
-      clientAddress: quote.clients?.address || '-',
-      docId: quoteNumber,
-      reportDate: formatDate(new Date().toISOString())
-    };
-
-    const w = window.open('', '_blank');
-    if (!w) return;
-
-    w.document.write(`<!DOCTYPE html>
+        w.document.write(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
@@ -426,46 +417,67 @@ export async function generateQuotePDF(quote: any) {
   <style>${getCommonCSS(color)}</style>
 </head>
 <body>
-  <button class="print-btn no-print" onclick="window.print()">Imprimir Proposta 📄</button>
+  <button class="print-button no-print" onclick="window.print()">Gerar PDF do Orçamento 📄</button>
   
-  <div class="container">
-    <div class="report-page-container">
-        <div class="report-page">
-            ${getHeaderHTML(data, 1)}
-            <div class="report-content">
-                <div class="section-title">DESCRIÇÃO DA PROPOSTA</div>
-                <div class="text-body">${quote.description || 'Especificações detalhadas conforme conversado.'}</div>
-
-                <div style="background: var(--primary-color); color: white; border-radius: 12px; padding: 30px; margin-top: 40px; text-align: right; box-shadow: 0 10px 25px -10px ${color};">
-                    <p style="text-transform: uppercase; font-size: 8pt; font-weight: 800; letter-spacing: 2px; opacity: 0.8; margin-bottom: 5px;">Investimento Total Estimado</p>
-                    <h2 style="font-size: 36px; font-weight: 900; letter-spacing: -1.5px; font-family: 'Montserrat', sans-serif;">R$ ${(quote.total_value || quote.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
-                    <p style="font-size: 9pt; margin-top: 10px; opacity: 0.7; font-weight: 500;">Validade da proposta: 07 dias corridos.</p>
-                </div>
-
-                <div class="signature-section" style="margin-top: 60px;">
-                    <div class="signature-box">
-                        <div class="signature-img-wrap"></div>
-                        <div class="signature-name">${company.name}</div>
-                        <div class="signature-label">Representante Comercial</div>
-                    </div>
-                    <div class="signature-box">
-                        <div class="signature-img-wrap"></div>
-                        <div class="signature-name">Aceite do Cliente</div>
-                        <div class="signature-label">Data e Assinatura</div>
-                    </div>
-                </div>
-            </div>
-            ${getFooterHTML(data)}
+  <div class="page-container">
+    <div class="a4-page">
+      <div class="header">
+        <div class="company-brand">
+          ${company.logo ? `<img src="${company.logo}">` : ''}
+          <div class="company-name">${company.name}</div>
         </div>
+        <div class="doc-info">
+          <div class="doc-type">ORÇAMENTO / PROPOSTA</div>
+          <div class="doc-id">#${quoteNumber}</div>
+          <div class="doc-date">DATA: ${formatDate(new Date().toISOString())}</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">DESTINATÁRIO</div>
+        <div class="info-card">
+          <div class="field"><span class="label">CLIENTE</span><span class="value" style="font-size: 14px; color: var(--primary);">${quote.clients?.name || '-'}</span></div>
+          <div class="field"><span class="label">ENDEREÇO</span><span class="value">${quote.clients?.address || '-'}</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">ESCOPO DOS SERVIÇOS</div>
+        <div class="content-box">${quote.description || 'Especificações de serviços conforme solicitação.'}</div>
+      </div>
+
+      <div style="background: var(--slate-900); color: white; border-radius: 12px; padding: 30px; margin-top: 40px; text-align: right;">
+        <p style="text-transform: uppercase; font-size: 8px; font-weight: 800; letter-spacing: 2.5px; opacity: 0.6; margin-bottom: 5px;">Investimento Total Estimado</p>
+        <h2 style="font-size: 36px; font-weight: 900; letter-spacing: -1px;">R$ ${(quote.total_value || quote.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+        <p style="font-size: 9px; margin-top: 10px; opacity: 0.5;">PROPOSTA VÁLIDA POR 07 DIAS • CONDICIONADO À DISPONIBILIDADE.</p>
+      </div>
+
+      <div class="signature-row" style="margin-top: 80px;">
+        <div class="sign-box">
+          <div class="sign-line"></div>
+          <div class="sign-name">${company.name}</div>
+          <div class="sign-meta">DEPARTAMENTO COMERCIAL</div>
+        </div>
+        <div class="sign-box">
+          <div class="sign-line"></div>
+          <div class="sign-name">ACEITE DO CLIENTE</div>
+          <div class="sign-meta">DATA E ASSINATURA</div>
+        </div>
+      </div>
+
+      <div class="footer" style="margin-top: auto;">
+        <div>DOCUMENTO COM CARÁTER DE PROPOSTA COMERCIAL</div>
+        <div>EMITIDO EM: ${new Date().toLocaleDateString('pt-BR')}</div>
+      </div>
     </div>
   </div>
 </body>
 </html>`);
-    w.document.close();
-  } catch (error) {
-    console.error('PDF Error:', error);
-    alert('Erro ao gerar ORÇAMENTO PREMIUM');
-  }
+        w.document.close();
+    } catch (error) {
+        console.error('PDF Error:', error);
+        alert('Erro ao gerar ORÇAMENTO');
+    }
 }
 
 export async function generateOvertimePDF(overtime: any) { }
