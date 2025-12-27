@@ -864,10 +864,10 @@ export default function OrderDetailsPage() {
             navigator.clipboard.writeText(url);
             toast.success('Link de aprovação copiado!');
           }}
-          className="flex items-center gap-2 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all border border-indigo-100 shadow-sm"
+          className="btn !bg-indigo-600 !text-white hover:!bg-indigo-700 shadow-md shadow-indigo-200"
           title="Copiar link para o cliente"
         >
-          <Copy size={14} /> Link do Cliente
+          <Copy size={16} /> Link do Cliente
         </button>
         <button
           onClick={loadEditData}

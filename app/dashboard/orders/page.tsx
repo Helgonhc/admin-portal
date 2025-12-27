@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, ServiceOrder } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/authStore';
-import { Plus, Search, Filter, Eye, Loader2, ClipboardList, Calendar, LayoutGrid, List as ListIcon, User, Timer, AlertCircle, MapPin, Navigation, Map as MapIcon } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Loader2, ClipboardList, Calendar, LayoutGrid, List as ListIcon, User, Timer, AlertCircle, MapPin, Navigation, Map as MapIcon, Copy } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { usePermissions } from '../../../hooks/usePermissions';
@@ -724,13 +724,28 @@ function SortableOrderCard({ order, getPriorityColor, getPriorityLabel }: any) {
         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${getPriorityColor(order.priority)}`}>
           {getPriorityLabel(order.priority)}
         </span>
-        <Link
-          href={`/dashboard/orders/${order.id}`}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="p-1 px-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-600 hover:text-white"
-        >
-          DETAILS
-        </Link>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const url = `${window.location.origin}/portal/${order.id}`;
+              navigator.clipboard.writeText(url);
+              toast.success('Link copiado!');
+            }}
+            className="p-1 px-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-600 hover:text-white"
+            title="Copiar link do cliente"
+          >
+            <Copy size={12} />
+          </button>
+          <Link
+            href={`/dashboard/orders/${order.id}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="p-1 px-2.5 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-md text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-600 hover:text-white"
+          >
+            DETAILS
+          </Link>
+        </div>
       </div>
 
       <h4 className="font-bold text-sm text-gray-800 dark:text-gray-100 mb-1 leading-tight">{order.title}</h4>
