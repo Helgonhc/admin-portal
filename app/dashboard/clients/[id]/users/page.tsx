@@ -170,13 +170,16 @@ export default function ManageClientUsersPage() {
     if (!confirm(`Tem certeza que deseja remover permanentemente:\n\n${user.full_name}\n${user.email}\n\nEsta ação não pode ser desfeita!`)) return;
 
     try {
-      // Deletar do profiles
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', user.id);
+      // Usar função SQL que deleta completamente (profile + auth.users)
+      const { data, error } = await supabase.rpc('delete_user_completely', {
+        user_uuid: user.id
+      });
 
-      if (profileError) throw profileError;
+      if (error) throw error;
+
+      if (data && !data.success) {
+        throw new Error(data.message || 'Erro ao remover usuário');
+      }
 
       toast.success('Usuário removido!');
       loadData();
@@ -287,8 +290,8 @@ export default function ManageClientUsersPage() {
                   </p>
                 </div>
                 <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-sm font-medium flex-shrink-0 ${user.is_active
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-red-100 text-red-700'
                   }`}>
                   {user.is_active ? '✅ Ativo' : '⏸️ Inativo'}
                 </span>
@@ -298,8 +301,8 @@ export default function ManageClientUsersPage() {
                 <button
                   onClick={() => handleToggleStatus(user)}
                   className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-lg flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm ${user.is_active
-                      ? 'bg-gray-100 text-red-600 hover:bg-red-50'
-                      : 'bg-gray-100 text-green-600 hover:bg-green-50'
+                    ? 'bg-gray-100 text-red-600 hover:bg-red-50'
+                    : 'bg-gray-100 text-green-600 hover:bg-green-50'
                     }`}
                 >
                   <Power size={14} className="sm:w-[18px] sm:h-[18px]" />
@@ -328,8 +331,8 @@ export default function ManageClientUsersPage() {
           }
         }}
         className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl flex items-center justify-center gap-2 sm:gap-3 font-semibold text-sm sm:text-lg ${canAddUser
-            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
           }`}
       >
         <UserPlus size={20} className="sm:w-6 sm:h-6" />
