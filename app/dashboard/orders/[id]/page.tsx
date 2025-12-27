@@ -91,6 +91,8 @@ export default function OrderDetailsPage() {
     checkin_at: '',
     completed_at: '',
     checkout_at: '',
+    signer_name: '',
+    signer_doc: '',
   });
 
   useEffect(() => {
@@ -101,7 +103,7 @@ export default function OrderDetailsPage() {
     try {
       const { data, error } = await supabase
         .from('service_orders')
-        .select('*, clients(name, phone, email, address), technician:profiles!service_orders_technician_id_fkey(full_name), equipments(name, model, serial_number)')
+        .select('*, clients(name, phone, email, address, responsible_name), technician:profiles!service_orders_technician_id_fkey(full_name), equipments(name, model, serial_number)')
         .eq('id', params.id)
         .single();
 
@@ -524,6 +526,8 @@ export default function OrderDetailsPage() {
         checkin_at: checkinValue,
         completed_at: localDateTime,
         checkout_at: localDateTime,
+        signer_name: order.signer_name || order.clients?.responsible_name || '',
+        signer_doc: order.signer_doc || '',
       });
       setShowConcluirModal(true);
       return;
@@ -588,6 +592,8 @@ export default function OrderDetailsPage() {
         completed_at: concluirData.completed_at,
         checkout_at: concluirData.checkout_at || concluirData.completed_at,
         execution_report: reportText,
+        signer_name: concluirData.signer_name,
+        signer_doc: concluirData.signer_doc,
       };
 
       const { error } = await supabase
@@ -858,7 +864,7 @@ export default function OrderDetailsPage() {
             navigator.clipboard.writeText(url);
             toast.success('Link de aprovação copiado!');
           }}
-          className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/10"
+          className="flex items-center gap-2 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-all border border-indigo-100 shadow-sm"
           title="Copiar link para o cliente"
         >
           <Copy size={14} /> Link do Cliente
@@ -1580,6 +1586,29 @@ export default function OrderDetailsPage() {
                   onChange={(e) => setConcluirData({ ...concluirData, completed_at: e.target.value, checkout_at: e.target.value })}
                   className="input"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Responsável (Cliente)</label>
+                  <input
+                    type="text"
+                    value={concluirData.signer_name}
+                    onChange={(e) => setConcluirData({ ...concluirData, signer_name: e.target.value })}
+                    className="input"
+                    placeholder="Nome de quem recebeu..."
+                  />
+                </div>
+                <div>
+                  <label className="label">Doc / CPF do Responsável</label>
+                  <input
+                    type="text"
+                    value={concluirData.signer_doc}
+                    onChange={(e) => setConcluirData({ ...concluirData, signer_doc: e.target.value })}
+                    className="input"
+                    placeholder="Documento..."
+                  />
+                </div>
               </div>
 
               <div className="bg-emerald-50 p-4 rounded-xl text-xs text-emerald-800 border border-emerald-100 italic">

@@ -238,13 +238,14 @@ const getCommonCSS = (color: string) => `
 export async function generateServiceOrderPDF(order: any) {
   try {
     const company = await getCompanyConfig();
-    let techName = '-', techSig = '';
+    let techName = '-', techSig = '', techDoc = '';
 
     if (order.technician_id) {
-      const { data: tech } = await supabase.from('profiles').select('full_name, signature_url').eq('id', order.technician_id).maybeSingle();
+      const { data: tech } = await supabase.from('profiles').select('full_name, signature_url, cpf').eq('id', order.technician_id).maybeSingle();
       if (tech) {
         techName = tech.full_name || '-';
         techSig = tech.signature_url || '';
+        techDoc = tech.cpf || '';
       }
     }
 
@@ -296,8 +297,8 @@ export async function generateServiceOrderPDF(order: any) {
           </div>
           <div class="info-card">
             <div class="field"><span class="label">TÉCNICO OPERACIONAL</span><span class="value">${techName}</span></div>
-            <div class="field"><span class="label">CHECAGEM INICIAL</span><span class="value">${formatDateTime(order.checkin_at)}</span></div>
-            <div class="field"><span class="label">CONCLUSÃO TÉCNICA</span><span class="value">${formatDateTime(order.completed_at || order.updated_at)}</span></div>
+            <div class="field"><span class="label">HORÁRIO INÍCIO</span><span class="value">${formatDateTime(order.checkin_at)}</span></div>
+            <div class="field"><span class="label">HORÁRIO FIM</span><span class="value">${formatDateTime(order.completed_at || order.updated_at)}</span></div>
           </div>
         </div>
       </div>
@@ -350,12 +351,12 @@ export async function generateServiceOrderPDF(order: any) {
         <div class="sign-box">
           <div class="sign-line">${techSig ? `<img src="${techSig}">` : ''}</div>
           <div class="sign-name">${techName}</div>
-          <div class="sign-meta">TÉCNICO RESPONSÁVEL</div>
+          <div class="sign-meta">TÉCNICO RESPONSÁVEL ${techDoc ? `• ${techDoc}` : ''}</div>
         </div>
         <div class="sign-box">
           <div class="sign-line">${order.signature_url ? `<img src="${order.signature_url}">` : ''}</div>
           <div class="sign-name">${order.signer_name || 'REPRESENTANTE DO CLIENTE'}</div>
-          <div class="sign-meta">ACEITE E RECEBIMENTO</div>
+          <div class="sign-meta">DOC RESPONSÁVEL: ${order.signer_doc || '-'}</div>
         </div>
       </div>` : ''}
 
@@ -395,12 +396,12 @@ export async function generateServiceOrderPDF(order: any) {
         <div class="sign-box">
           <div class="sign-line">${techSig ? `<img src="${techSig}">` : ''}</div>
           <div class="sign-name">${techName}</div>
-          <div class="sign-meta">TÉCNICO RESPONSÁVEL</div>
+          <div class="sign-meta">TÉCNICO RESPONSÁVEL ${techDoc ? `• ${techDoc}` : ''}</div>
         </div>
         <div class="sign-box">
           <div class="sign-line">${order.signature_url ? `<img src="${order.signature_url}">` : ''}</div>
           <div class="sign-name">${order.signer_name || 'REPRESENTANTE DO CLIENTE'}</div>
-          <div class="sign-meta">ACEITE E RECEBIMENTO</div>
+          <div class="sign-meta">DOC RESPONSÁVEL: ${order.signer_doc || '-'}</div>
         </div>
       </div>
 
