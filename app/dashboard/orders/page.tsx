@@ -9,6 +9,27 @@ import toast from 'react-hot-toast';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { Skeleton, ListSkeleton } from '../../../components/Skeleton';
 import { getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel } from '../../../utils/statusUtils';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  defaultDropAnimationSideEffects
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 
 export default function OrdersPage() {
   const { can } = usePermissions();
@@ -32,6 +53,18 @@ export default function OrdersPage() {
     scheduled_date: '',
   });
   const [saving, setSaving] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     loadData();
@@ -94,6 +127,40 @@ export default function OrdersPage() {
       toast.error('Erro ao atualizar status: ' + error.message);
     }
   }
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const orderId = active.id as string;
+    const overId = over.id as string;
+
+    // Se soltou sobre uma coluna (o ID da coluna está no kanbanColumns)
+    const columns = ['pendente', 'em_andamento', 'aguardando_peca', 'concluido'];
+
+    if (columns.includes(overId)) {
+      const order = orders.find(o => o.id === orderId);
+      if (order && order.status !== overId) {
+        await updateOrderStatus(orderId, overId);
+      }
+      return;
+    }
+
+    // Se soltou sobre outro card, pega o status desse card
+    const overOrder = orders.find(o => o.id === overId);
+    if (overOrder) {
+      const order = orders.find(o => o.id === orderId);
+      if (order && order.status !== overOrder.status) {
+        await updateOrderStatus(orderId, overOrder.status);
+      }
+    }
+  };
 
   async function loadEquipments(clientId: string) {
     if (!clientId) {
@@ -320,70 +387,56 @@ export default function OrdersPage() {
         )}
 
         {viewMode === 'kanban' && (
-          /* KANBAN VIEW */
-          <div className="flex gap-4 overflow-x-auto pb-4 h-full scrollbar-thin">
-            {kanbanColumns.map((col) => {
-              const colOrders = filteredOrders.filter(o => o.status === col.id);
-              return (
-                <div key={col.id} className={`flex flex-col min-w-[300px] max-w-[300px] h-full rounded-2xl ${col.color} border border-transparent dark:border-gray-800/50`}>
-                  <div className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${col.id === 'pendente' ? 'bg-gray-400' : col.id === 'em_andamento' ? 'bg-blue-500' : col.id === 'aguardando_peca' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                      <h3 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase tracking-wider">{col.title}</h3>
-                    </div>
-                    <span className="bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm border dark:border-gray-700">
-                      {colOrders.length}
-                    </span>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            modifiers={[restrictToWindowEdges]}
+          >
+            <div className="flex gap-4 overflow-x-auto pb-4 h-full scrollbar-thin">
+              {kanbanColumns.map((col) => {
+                const colOrders = filteredOrders.filter(o => o.status === col.id);
+                return (
+                  <DroppableColumn key={col.id} col={col} count={colOrders.length}>
+                    <SortableContext
+                      items={colOrders.map(o => o.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {colOrders.map((order) => (
+                        <SortableOrderCard
+                          key={order.id}
+                          order={order}
+                          getPriorityColor={getPriorityColor}
+                          getPriorityLabel={getPriorityLabel}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DroppableColumn>
+                );
+              })}
+            </div>
+
+            <DragOverlay dropAnimation={{
+              sideEffects: defaultDropAnimationSideEffects({
+                styles: {
+                  active: {
+                    opacity: '0.5',
+                  },
+                },
+              }),
+            }}>
+              {activeId ? (
+                <div className="bg-white dark:bg-gray-900 p-4 rounded-xl shadow-2xl border-2 border-indigo-500 w-[280px] rotate-3 scale-105 pointer-events-none opacity-90 cursor-grabbing">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-100 text-indigo-700">DRAGGING</span>
                   </div>
-
-                  <div className="flex-1 overflow-y-auto p-2 space-y-3 custom-scrollbar">
-                    {colOrders.map((order) => (
-                      <div key={order.id} className="group relative bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-900 transition-all cursor-default">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${getPriorityColor(order.priority)}`}>
-                            {getPriorityLabel(order.priority)}
-                          </span>
-                          <Link
-                            href={`/dashboard/orders/${order.id}`}
-                            className="p-1 px-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-600 hover:text-white"
-                          >
-                            DETAILS
-                          </Link>
-                        </div>
-
-                        <h4 className="font-bold text-sm text-gray-800 dark:text-gray-100 mb-1 leading-tight">{order.title}</h4>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3 font-medium flex items-center gap-1.5">
-                          <Timer size={12} className="text-gray-300" />
-                          {order.clients?.name}
-                        </p>
-
-                        <div className="flex items-center justify-between pt-3 border-t dark:border-gray-800 mt-2">
-                          <div className="flex -space-x-1.5">
-                            <div className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-900 bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center overflow-hidden">
-                              <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-300">
-                                {(order as any).technician?.full_name?.charAt(0) || 'U'}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-gray-400 font-medium">
-                            #{order.id.slice(0, 4).toUpperCase()}
-                          </span>
-                        </div>
-
-                        {/* Quick Status Picker on hover if needed or just drag handle */}
-                      </div>
-                    ))}
-
-                    {colOrders.length === 0 && (
-                      <div className="py-8 text-center bg-white/30 dark:bg-black/10 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-                        <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Vazio</p>
-                      </div>
-                    )}
-                  </div>
+                  <h4 className="font-bold text-sm text-gray-800 dark:text-gray-100 mb-1">{orders.find(o => o.id === activeId)?.title}</h4>
+                  <p className="text-[11px] text-gray-500">{orders.find(o => o.id === activeId)?.clients?.name}</p>
                 </div>
-              );
-            })}
-          </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
 
         {viewMode === 'map' && (
@@ -601,6 +654,103 @@ export default function OrdersPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// --- Componentes Auxiliares para o DND ---
+
+function DroppableColumn({ col, children, count }: any) {
+  const { setNodeRef, isOver } = useSortable({
+    id: col.id,
+    data: {
+      type: 'Column',
+      column: col,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex flex-col min-w-[300px] max-w-[300px] h-full rounded-2xl ${col.color} border-2 ${isOver ? 'border-indigo-500 shadow-lg scale-[1.02]' : 'border-transparent dark:border-gray-800/50'} transition-all duration-200`}
+    >
+      <div className="p-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${col.id === 'pendente' ? 'bg-gray-400' : col.id === 'em_andamento' ? 'bg-blue-500' : col.id === 'aguardando_peca' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+          <h3 className="font-bold text-gray-700 dark:text-gray-300 text-sm uppercase tracking-wider">{col.title}</h3>
+        </div>
+        <span className="bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm border dark:border-gray-700">
+          {count}
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2 space-y-3 custom-scrollbar">
+        {children}
+        {count === 0 && (
+          <div className="py-8 text-center bg-white/30 dark:bg-black/10 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
+            <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Vazio</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SortableOrderCard({ order, getPriorityColor, getPriorityLabel }: any) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: order.id });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="group relative bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-900 transition-all cursor-grab active:cursor-grabbing"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${getPriorityColor(order.priority)}`}>
+          {getPriorityLabel(order.priority)}
+        </span>
+        <Link
+          href={`/dashboard/orders/${order.id}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="p-1 px-2.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-md text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-600 hover:text-white"
+        >
+          DETAILS
+        </Link>
+      </div>
+
+      <h4 className="font-bold text-sm text-gray-800 dark:text-gray-100 mb-1 leading-tight">{order.title}</h4>
+      <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3 font-medium flex items-center gap-1.5">
+        <Timer size={12} className="text-gray-300" />
+        {order.clients?.name}
+      </p>
+
+      <div className="flex items-center justify-between pt-3 border-t dark:border-gray-800 mt-2">
+        <div className="flex -space-x-1.5">
+          <div className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-900 bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center overflow-hidden">
+            <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-300">
+              {(order as any).technician?.full_name?.charAt(0) || 'U'}
+            </span>
+          </div>
+        </div>
+        <span className="text-[10px] text-gray-400 font-medium">
+          #{order.id.slice(0, 4).toUpperCase()}
+        </span>
+      </div>
     </div>
   );
 }

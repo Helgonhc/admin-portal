@@ -40,6 +40,9 @@ export default function OrderDetailsPage() {
   // Relatório
   const [reportText, setReportText] = useState('');
   const [savingReport, setSavingReport] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showSmartAssist, setShowSmartAssist] = useState(false);
 
   // Checklist
   const [tasks, setTasks] = useState<any[]>([]);
@@ -145,6 +148,48 @@ export default function OrderDetailsPage() {
       .gt('quantity', 0)
       .order('name');
     setAvailableProducts(data || []);
+  }
+
+  async function loadSmartAssist() {
+    if (!order?.description) {
+      toast.error('Adicione uma descrição à OS para gerar sugestões');
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    setShowSmartAssist(true);
+    try {
+      // Tentar encontrar palavras-chave relevantes (mínimo 4 caracteres)
+      const keywords = order.description
+        .replace(/[,.;:!?]/g, ' ')
+        .split(' ')
+        .filter((w: string) => w.length >= 4)
+        .slice(0, 5); // Limitar a 5 palavras para a query não ficar gigante
+
+      if (keywords.length === 0) {
+        setSuggestions([]);
+        return;
+      }
+
+      const orQuery = keywords.map((k: string) => `description.ilike.%${k}%`).join(',');
+
+      const { data, error } = await supabase
+        .from('service_orders')
+        .select('title, execution_report, description, status')
+        .not('execution_report', 'is', null)
+        .neq('id', order.id)
+        .or(orQuery)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) throw error;
+      setSuggestions(data || []);
+    } catch (error: any) {
+      console.error('Erro Smart Assist:', error);
+      toast.error('Erro ao buscar sugestões');
+    } finally {
+      setLoadingSuggestions(false);
+    }
   }
 
   async function addOrderItem() {
@@ -808,6 +853,17 @@ export default function OrderDetailsPage() {
           <p className="text-gray-500">{order.clients?.name}</p>
         </div>
         <button
+          onClick={() => {
+            const url = `${window.location.origin}/portal/${order.id}`;
+            navigator.clipboard.writeText(url);
+            toast.success('Link de aprovação copiado!');
+          }}
+          className="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/10"
+          title="Copiar link para o cliente"
+        >
+          <Copy size={14} /> Link do Cliente
+        </button>
+        <button
           onClick={loadEditData}
           className="btn btn-secondary"
           title="Editar OS"
@@ -1049,9 +1105,61 @@ export default function OrderDetailsPage() {
 
           {/* Relatório Técnico */}
           <div className="card">
-            <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <Edit size={18} className="text-indigo-500" /> Relatório Técnico
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <Edit size={18} className="text-indigo-500" /> Relatório Técnico
+              </h3>
+              <button
+                onClick={loadSmartAssist}
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold border border-indigo-100 hover:bg-indigo-100 transition-all shadow-sm"
+              >
+                <PenTool size={14} className="animate-pulse" /> Smart Assist
+              </button>
+            </div>
+
+            {showSmartAssist && (
+              <div className="mb-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 animate-fadeIn">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-1">
+                    <PenTool size={12} /> Sugestões Inteligentes (Baseadas no Histórico)
+                  </p>
+                  <button onClick={() => setShowSmartAssist(false)} className="text-indigo-400 hover:text-indigo-600">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {loadingSuggestions ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="animate-spin text-indigo-600" size={24} />
+                  </div>
+                ) : suggestions.length === 0 ? (
+                  <p className="text-xs text-indigo-400 italic py-2 text-center">Nenhuma solução similar encontrada no histórico.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {suggestions.map((sug, i) => (
+                      <div key={i} className="bg-white p-3 rounded-xl border border-indigo-100/50 shadow-sm hover:shadow-md transition-all group">
+                        <p className="text-xs font-bold text-gray-800 mb-1">{sug.title}</p>
+                        <p className="text-xs text-gray-600 line-clamp-2 italic mb-2">"{sug.description}"</p>
+                        <div className="p-2 bg-indigo-50 rounded-lg text-xs text-indigo-700 border border-indigo-100 flex flex-col gap-2">
+                          <p className="font-medium">{sug.execution_report}</p>
+                          <button
+                            onClick={() => {
+                              const currentText = reportText ? reportText + '\n\n' : '';
+                              setReportText(currentText + sug.execution_report);
+                              toast.success('Sugestão aplicada!');
+                            }}
+                            className="self-end px-2 py-1 bg-white text-indigo-600 rounded border border-indigo-100 font-bold hover:bg-indigo-600 hover:text-white transition-all text-[10px]"
+                          >
+                            Aplicar Sugestão
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <textarea
               value={reportText}
               onChange={(e) => setReportText(e.target.value)}
