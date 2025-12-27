@@ -75,17 +75,10 @@ export default function DashboardLayout({
 
   const LayoutWrapper = ({ content, sidebar = true }: { content: React.ReactNode, sidebar?: boolean }) => (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-      {sidebar && <Sidebar />}
+      {sidebar && <Sidebar onSearchClick={() => setIsSearchOpen(true)} />}
       <main className="flex-1 overflow-auto relative">
         {/* Top Floating Actions */}
         <div className="absolute top-4 right-4 z-40 flex items-center gap-2">
-          <button
-            onClick={() => setIsSearchOpen(true)}
-            className="p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-indigo-500 transition-all shadow-sm hidden sm:flex items-center gap-2 px-3"
-          >
-            <Search size={18} />
-            <span className="text-xs font-medium">Buscar... <span className="ml-2 opacity-50">Ctrl+K</span></span>
-          </button>
           <button
             onClick={() => setIsNotificationsOpen(true)}
             className="p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-indigo-500 transition-all shadow-sm flex items-center relative"

@@ -31,6 +31,7 @@ import {
   Download,
   FileCheck,
   TrendingUp,
+  Search,
 } from 'lucide-react';
 
 // Menu items com permissões necessárias
@@ -71,7 +72,11 @@ interface AppConfig {
   email: string;
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  onSearchClick?: () => void;
+}
+
+export default function Sidebar({ onSearchClick }: SidebarProps) {
   const pathname = usePathname();
   const { profile, logout } = useAuthStore();
   const { can, isAdmin } = usePermissions();
@@ -188,6 +193,23 @@ export default function Sidebar() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Busca Rápida - Novo Posicionamento */}
+      <div className={`px-3 pt-2 pb-1 ${collapsed ? 'flex justify-center' : ''}`}>
+        <button
+          onClick={onSearchClick}
+          className={`group flex items-center gap-3 w-full p-2.5 rounded-xl border border-indigo-100 bg-indigo-50/30 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all shadow-sm ${collapsed ? 'justify-center w-10 h-10 p-0' : ''}`}
+          title={collapsed ? 'Buscar... (Ctrl+K)' : undefined}
+        >
+          <Search size={20} className="shrink-0 group-hover:scale-110 transition-transform" />
+          {!collapsed && (
+            <div className="flex flex-1 items-center justify-between">
+              <span className="text-sm font-medium">Buscar...</span>
+              <span className="text-[10px] bg-white border border-indigo-100 px-1.5 py-0.5 rounded-md opacity-60">Ctrl+K</span>
+            </div>
+          )}
+        </button>
       </div>
 
       {/* Menu */}
