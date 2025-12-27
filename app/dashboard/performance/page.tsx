@@ -189,9 +189,9 @@ export default function PerformancePage() {
                                 <Pie
                                     data={clientDemand}
                                     cx="50%"
-                                    cy="50%"
-                                    innerRadius={70}
-                                    outerRadius={100}
+                                    cy="45%"
+                                    innerRadius={60}
+                                    outerRadius={80}
                                     paddingAngle={5}
                                     dataKey="count"
                                 >
@@ -200,7 +200,13 @@ export default function PerformancePage() {
                                     ))}
                                 </Pie>
                                 <Tooltip />
-                                <Legend layout="vertical" align="right" verticalAlign="middle" iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                                <Legend
+                                    layout="horizontal"
+                                    align="center"
+                                    verticalAlign="bottom"
+                                    iconType="circle"
+                                    wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }}
+                                />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
