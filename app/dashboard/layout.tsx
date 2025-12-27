@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../lib/supabase';
 import Sidebar from '../../components/Sidebar';
 import { Shield, Search, Bell } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
@@ -98,6 +99,37 @@ export default function DashboardLayout({
       <NotificationDrawer isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
     </div>
   );
+
+  // Bloqueio total para usuários com role 'client' no portal admin
+  if (profile?.role === 'client') {
+    return <LayoutWrapper content={
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+        <Shield className="w-20 h-20 text-red-500 mb-6 animate-pulse" />
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Acesso não Autorizado</h2>
+        <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-8 text-lg">
+          Este portal é exclusivo para técnicos e administradores.
+          Como cliente, você deve utilizar o portal dedicado às suas solicitações.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <a
+            href="https://chameiapp-portal.vercel.app"
+            className="btn btn-primary px-8 py-3 text-lg"
+          >
+            Ir para o Portal do Cliente
+          </a>
+          <button
+            onClick={() => {
+              supabase.auth.signOut();
+              router.push('/login');
+            }}
+            className="btn btn-secondary px-8 py-3 text-lg"
+          >
+            Sair e Fazer Login
+          </button>
+        </div>
+      </div>
+    } />;
+  }
 
   // Bloqueios
   const isAdminOnlyPage = adminOnlyPages.some(page => pathname?.startsWith(page));
