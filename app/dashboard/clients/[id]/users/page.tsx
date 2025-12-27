@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../../../lib/supabase';
 import { usePermissions } from '../../../../../hooks/usePermissions';
-import { 
+import {
   ArrowLeft, UserPlus, Trash2, Power, User, Mail, Loader2, Users, Shield
 } from 'lucide-react';
 import Link from 'next/link';
@@ -27,7 +27,7 @@ export default function ManageClientUsersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
-  
+
   // Form fields
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -46,7 +46,7 @@ export default function ManageClientUsersPage() {
         .select('*')
         .eq('id', params.id)
         .single();
-      
+
       setClient(clientData);
 
       // Carregar usuários do cliente
@@ -102,17 +102,18 @@ export default function ManageClientUsersPage() {
         p_phone: null,
         p_cpf: null,
         p_cargo: null,
+        p_client_id: params.id,
       });
 
       if (rpcError) {
         console.error('Erro na função SQL:', rpcError);
         throw new Error(`Erro ao criar usuário: ${rpcError.message}. Execute o SQL CRIAR_USUARIO_SEM_AFETAR_SESSAO.sql no Supabase.`);
       }
-      
+
       if (result && !result.success) {
         throw new Error(result.error || 'Erro ao criar usuário');
       }
-      
+
       if (result && result.success) {
         // Atualizar o profile com o client_id
         await supabase
@@ -139,7 +140,7 @@ export default function ManageClientUsersPage() {
 
   async function handleToggleStatus(user: ClientUser) {
     const action = user.is_active ? 'desativar' : 'ativar';
-    
+
     if (!confirm(user.is_active
       ? `Deseja desativar o acesso de ${user.full_name}?\n\nO usuário não conseguirá fazer login até ser reativado.`
       : `Deseja reativar o acesso de ${user.full_name}?\n\nO usuário poderá fazer login novamente.`
@@ -211,7 +212,7 @@ export default function ManageClientUsersPage() {
         <Shield className="w-16 h-16 text-red-300 mb-4" />
         <h2 className="text-xl font-bold text-gray-600">Acesso Restrito</h2>
         <p className="text-gray-500 mt-2">Apenas administradores podem gerenciar usuários do portal.</p>
-        <button 
+        <button
           onClick={() => router.back()}
           className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
         >
@@ -266,14 +267,13 @@ export default function ManageClientUsersPage() {
       ) : (
         <div className="space-y-3 sm:space-y-4">
           {users.map((user) => (
-            <div 
-              key={user.id} 
+            <div
+              key={user.id}
               className={`card border-l-4 ${user.is_active ? 'border-l-indigo-500' : 'border-l-gray-300 opacity-70'}`}
             >
               <div className="flex items-start gap-2 sm:gap-4">
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-sm sm:text-lg font-bold flex-shrink-0 ${
-                  user.is_active ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'
-                }`}>
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-sm sm:text-lg font-bold flex-shrink-0 ${user.is_active ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'
+                  }`}>
                   {user.full_name?.[0] || '?'}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -286,11 +286,10 @@ export default function ManageClientUsersPage() {
                     Criado em {formatDate(user.created_at)}
                   </p>
                 </div>
-                <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-sm font-medium flex-shrink-0 ${
-                  user.is_active 
-                    ? 'bg-green-100 text-green-700' 
+                <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-sm font-medium flex-shrink-0 ${user.is_active
+                    ? 'bg-green-100 text-green-700'
                     : 'bg-red-100 text-red-700'
-                }`}>
+                  }`}>
                   {user.is_active ? '✅ Ativo' : '⏸️ Inativo'}
                 </span>
               </div>
@@ -298,11 +297,10 @@ export default function ManageClientUsersPage() {
               <div className="flex gap-2 sm:gap-3 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
                 <button
                   onClick={() => handleToggleStatus(user)}
-                  className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-lg flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm ${
-                    user.is_active 
-                      ? 'bg-gray-100 text-red-600 hover:bg-red-50' 
+                  className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-lg flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm ${user.is_active
+                      ? 'bg-gray-100 text-red-600 hover:bg-red-50'
                       : 'bg-gray-100 text-green-600 hover:bg-green-50'
-                  }`}
+                    }`}
                 >
                   <Power size={14} className="sm:w-[18px] sm:h-[18px]" />
                   {user.is_active ? 'Desativar' : 'Ativar'}
@@ -329,11 +327,10 @@ export default function ManageClientUsersPage() {
             toast.error('Esta empresa já possui 2 usuários ativos.\n\nRemova ou desative um usuário para adicionar outro.');
           }
         }}
-        className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl flex items-center justify-center gap-2 sm:gap-3 font-semibold text-sm sm:text-lg ${
-          canAddUser 
-            ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+        className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl flex items-center justify-center gap-2 sm:gap-3 font-semibold text-sm sm:text-lg ${canAddUser
+            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
             : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-        }`}
+          }`}
       >
         <UserPlus size={20} className="sm:w-6 sm:h-6" />
         Adicionar Usuário
@@ -384,13 +381,13 @@ export default function ManageClientUsersPage() {
               </div>
             </div>
             <div className="p-3 sm:p-6 border-t bg-gray-50 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
-              <button 
+              <button
                 onClick={() => {
                   setShowModal(false);
                   setNewUserName('');
                   setNewUserEmail('');
                   setNewUserPassword('Portal@123');
-                }} 
+                }}
                 className="btn btn-secondary order-2 sm:order-1"
                 disabled={creating}
               >

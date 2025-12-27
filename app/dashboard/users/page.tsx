@@ -33,7 +33,7 @@ export default function UsersPage() {
     cargo: '',
   });
   const [saving, setSaving] = useState(false);
-  
+
   // Modal de credenciais após criar usuário
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{
@@ -155,13 +155,14 @@ export default function UsersPage() {
           p_phone: formData.phone?.trim() || null,
           p_cpf: formData.cpf?.trim() || null,
           p_cargo: formData.cargo?.trim() || null,
+          p_client_id: formData.client_id?.trim() || null,
         });
 
         if (rpcError) {
           console.error('Erro na função SQL:', rpcError);
           throw new Error(`Erro ao criar usuário: ${rpcError.message}. Execute o SQL CRIAR_USUARIO_SEM_AFETAR_SESSAO.sql no Supabase.`);
         }
-        
+
         if (result && !result.success) {
           throw new Error(result.error || 'Erro ao criar usuário');
         }
@@ -248,7 +249,7 @@ export default function UsersPage() {
     };
     return labels[role] || role;
   };
-  
+
   // Função para copiar texto
   async function copyToClipboard(text: string, field: string) {
     try {
@@ -533,14 +534,14 @@ export default function UsersPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-6 space-y-4">
               {/* Credenciais */}
               <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                 <h3 className="font-semibold text-gray-700 flex items-center gap-2">
                   🔐 Credenciais de Acesso
                 </h3>
-                
+
                 {/* Email */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-white border rounded-lg px-3 py-2">
@@ -554,7 +555,7 @@ export default function UsersPage() {
                     {copiedField === 'email' ? <Check size={18} /> : <Copy size={18} />}
                   </button>
                 </div>
-                
+
                 {/* Senha */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-white border rounded-lg px-3 py-2">
@@ -568,7 +569,7 @@ export default function UsersPage() {
                     {copiedField === 'password' ? <Check size={18} /> : <Copy size={18} />}
                   </button>
                 </div>
-                
+
                 {/* Copiar Tudo */}
                 <button
                   onClick={() => copyToClipboard(
@@ -585,7 +586,7 @@ export default function UsersPage() {
               {/* Onde Acessar */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-gray-700">📍 Onde Acessar</h3>
-                
+
                 {createdCredentials.role === 'client' ? (
                   // Cliente - Portal do Cliente
                   <a
@@ -619,7 +620,7 @@ export default function UsersPage() {
                         <p className="text-xs text-gray-500">{ADMIN_PORTAL_URL}</p>
                       </div>
                     </a>
-                    
+
                     <a
                       href={APK_DOWNLOAD_URL}
                       target="_blank"
@@ -641,12 +642,12 @@ export default function UsersPage() {
               {/* Aviso */}
               <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-xs text-yellow-800">
-                  ⚠️ <strong>Importante:</strong> Envie estas credenciais para o usuário de forma segura. 
+                  ⚠️ <strong>Importante:</strong> Envie estas credenciais para o usuário de forma segura.
                   {createdCredentials.role !== 'client' && ' O técnico pode usar tanto o portal web quanto o aplicativo Android.'}
                 </p>
               </div>
             </div>
-            
+
             <div className="p-4 border-t bg-gray-50">
               <button
                 onClick={() => setShowCredentialsModal(false)}

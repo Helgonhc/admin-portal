@@ -21,12 +21,18 @@ CREATE OR REPLACE FUNCTION create_user_admin(
   p_role TEXT DEFAULT 'technician',
   p_phone TEXT DEFAULT NULL,
   p_cpf TEXT DEFAULT NULL,
-  p_cargo TEXT DEFAULT NULL
+  p_cargo TEXT DEFAULT NULL,
+  p_client_id UUID DEFAULT NULL
 )
 RETURNS JSONB AS $$
 DECLARE
   v_user_id UUID;
 BEGIN
+  -- Validação: Se o role for 'client', o client_id é obrigatório
+  IF p_role = 'client' AND p_client_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Erro: Usuário do tipo Cliente deve ter uma empresa vinculada.');
+  END IF;
+
   -- Verificar se o email já existe no auth.users
   IF EXISTS (SELECT 1 FROM auth.users WHERE email = p_email) THEN
     RETURN jsonb_build_object('success', false, 'error', 'Este email já está cadastrado no sistema.');
@@ -65,19 +71,18 @@ BEGIN
   ) RETURNING id INTO v_user_id;
 
   -- O trigger handle_new_user() deve criar o profile automaticamente
-  -- Mas vamos garantir que os dados extras (phone, cpf, cargo) sejam salvos
-  -- Aguardamos um pequeno momento para o trigger processar ou fazemos o update direto
+  -- Mas vamos garantir que os dados extras sejam salvos, incluindo o client_id
   
   -- Sincronizar dados no profiles
-  -- Caso o trigger handle_new_user tenha falhado em capturar tudo
-  INSERT INTO public.profiles (id, email, full_name, role, phone, cpf, cargo, is_active)
-  VALUES (v_user_id, p_email, p_full_name, p_role, p_phone, p_cpf, p_cargo, true)
+  INSERT INTO public.profiles (id, email, full_name, role, phone, cpf, cargo, client_id, is_active)
+  VALUES (v_user_id, p_email, p_full_name, p_role, p_phone, p_cpf, p_cargo, p_client_id, true)
   ON CONFLICT (id) DO UPDATE SET
     full_name = EXCLUDED.full_name,
     role = EXCLUDED.role,
     phone = EXCLUDED.phone,
     cpf = EXCLUDED.cpf,
     cargo = EXCLUDED.cargo,
+    client_id = EXCLUDED.client_id,
     is_active = true;
 
   RETURN jsonb_build_object(
