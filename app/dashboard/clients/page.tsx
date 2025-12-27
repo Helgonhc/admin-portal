@@ -6,7 +6,7 @@ import {
   Plus, Search, Edit, Trash2, Eye, Loader2, Building2,
   Globe, Lock, Users, MessageCircle, Phone, Mail, MapPin,
   Navigation, Unlock, UserPlus, Upload, Image, X, Shield,
-  AlertTriangle, Calendar
+  AlertTriangle, Calendar, User
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -570,33 +570,47 @@ export default function ClientsPage() {
           </div>
         ) : (
           filteredClients.map((client) => (
-            <div key={client.id} className={`card hover:shadow-lg transition-shadow ${maintenanceStatus[client.id]?.vencidas > 0
-                ? 'border-l-4 border-l-red-500 bg-red-50/30'
-                : maintenanceStatus[client.id]?.urgentes > 0
-                  ? 'border-l-4 border-l-amber-500 bg-amber-50/30'
-                  : ''
-              }`}>
+            <div key={client.id} className={`card card-interactive group border-l-4 ${maintenanceStatus[client.id]?.vencidas > 0
+              ? 'border-l-red-500 bg-red-50/20'
+              : maintenanceStatus[client.id]?.urgentes > 0
+                ? 'border-l-amber-400 bg-amber-50/20'
+                : 'border-l-indigo-500 bg-white'
+              } hover:border-l-indigo-600 transition-all duration-300`}>
               {/* Header do Card */}
-              <div className="flex items-start gap-2 sm:gap-3 mb-3 sm:mb-4">
-                {client.client_logo_url ? (
-                  <img
-                    src={client.client_logo_url}
-                    alt={client.name}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-indigo-100 flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm sm:text-lg flex-shrink-0">
-                    {client.name[0]}
+              <div className="flex items-start gap-4 mb-4">
+                <div className="relative">
+                  {client.client_logo_url ? (
+                    <img
+                      src={client.client_logo_url}
+                      alt={client.name}
+                      className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover border-2 border-white shadow-sm ring-1 ring-gray-100 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 rounded-2xl flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-md flex-shrink-0">
+                      {client.name[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center shadow-sm ${client.type === 'PJ' ? 'bg-indigo-600' : 'bg-emerald-500'}`} title={client.type}>
+                    {client.type === 'PJ' ? <Building2 size={10} className="text-white" /> : <User size={10} className="text-white" />}
                   </div>
-                )}
+                </div>
+
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-800 truncate text-sm sm:text-base">{client.name}</h3>
-                  {client.responsible_name && (
-                    <p className="text-xs sm:text-sm text-gray-500 truncate">Resp: {client.responsible_name}</p>
-                  )}
-                  {client.cnpj_cpf && (
-                    <p className="text-[10px] sm:text-xs text-gray-400 truncate">{client.cnpj_cpf}</p>
-                  )}
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <h3 className="font-black text-gray-900 truncate text-base sm:text-lg leading-tight group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
+                      {client.name}
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    {client.responsible_name && (
+                      <p className="text-xs text-indigo-500 font-bold flex items-center gap-1">
+                        <User size={10} /> {client.responsible_name}
+                      </p>
+                    )}
+                    {client.cnpj_cpf && (
+                      <p className="text-[10px] font-medium text-gray-400 font-mono bg-gray-50 px-1.5 rounded">{client.cnpj_cpf}</p>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-0.5 sm:gap-1 flex-shrink-0">
                   {can('can_edit_clients') && (
@@ -639,37 +653,35 @@ export default function ClientsPage() {
               </div>
 
               {/* Botões de Ação Rápida */}
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+              <div className="grid grid-cols-3 gap-2 mb-3">
                 <div className="relative group">
                   <button
                     onClick={() => handleWhatsApp(client, 'vazio')}
-                    className="w-full py-1.5 sm:py-2 px-1 sm:px-3 bg-green-500 hover:bg-green-600 text-white rounded-lg flex items-center justify-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm font-medium"
+                    className="w-full py-2 px-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl flex items-center justify-center gap-1 text-[10px] sm:text-xs font-bold shadow-sm shadow-emerald-100 transition-all hover:-translate-y-0.5"
                   >
-                    <MessageCircle size={12} className="sm:w-4 sm:h-4" />
+                    <MessageCircle size={14} />
                     <span className="hidden xs:inline">WhatsApp</span>
-                    <span className="xs:hidden">Zap</span>
                   </button>
                   {/* Dropdown de mensagens */}
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg shadow-lg border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 min-w-[140px]">
-                    <button onClick={() => handleWhatsApp(client, 'caminho')} className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-left text-xs sm:text-sm hover:bg-gray-50 rounded-t-lg">🚗 A caminho</button>
-                    <button onClick={() => handleWhatsApp(client, 'cheguei')} className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-left text-xs sm:text-sm hover:bg-gray-50">📍 Cheguei</button>
-                    <button onClick={() => handleWhatsApp(client, 'concluido')} className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-left text-xs sm:text-sm hover:bg-gray-50">✅ Concluído</button>
-                    <button onClick={() => handleWhatsApp(client, 'vazio')} className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-left text-xs sm:text-sm hover:bg-gray-50 rounded-b-lg">💬 Em branco</button>
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 min-w-[140px] overflow-hidden">
+                    <button onClick={() => handleWhatsApp(client, 'caminho')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 flex items-center gap-2">🚗 A caminho</button>
+                    <button onClick={() => handleWhatsApp(client, 'cheguei')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 flex items-center gap-2">📍 Cheguei</button>
+                    <button onClick={() => handleWhatsApp(client, 'concluido')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 flex items-center gap-2">✅ Concluído</button>
+                    <button onClick={() => handleWhatsApp(client, 'vazio')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 border-t">💬 Em branco</button>
                   </div>
                 </div>
                 <a
                   href={`mailto:${client.email}`}
-                  className="py-1.5 sm:py-2 px-1 sm:px-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg flex items-center justify-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm font-medium"
+                  className="py-2 px-1 bg-slate-600 hover:bg-slate-700 text-white rounded-xl flex items-center justify-center gap-1 text-[10px] sm:text-xs font-bold shadow-sm shadow-gray-100 transition-all hover:-translate-y-0.5"
                 >
-                  <Mail size={12} className="sm:w-4 sm:h-4" />
+                  <Mail size={14} />
                   <span className="hidden xs:inline">E-mail</span>
-                  <span className="xs:hidden">Mail</span>
                 </a>
                 <Link
                   href={`/dashboard/equipments?client=${client.id}`}
-                  className="py-1.5 sm:py-2 px-1 sm:px-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-0.5 sm:gap-1 text-[10px] sm:text-sm font-medium"
+                  className="py-2 px-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center gap-1 text-[10px] sm:text-xs font-bold shadow-sm shadow-indigo-100 transition-all hover:-translate-y-0.5"
                 >
-                  <Building2 size={12} className="sm:w-4 sm:h-4" />
+                  <Building2 size={14} />
                   Equip.
                 </Link>
               </div>
@@ -700,8 +712,8 @@ export default function ClientsPage() {
                   <button
                     onClick={() => handleTogglePortalBlock(client)}
                     className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium ${client.portal_blocked
-                        ? 'bg-red-600 text-white hover:bg-red-700'
-                        : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
                       }`}
                   >
                     {client.portal_blocked ? <Unlock size={12} className="sm:w-4 sm:h-4" /> : <Lock size={12} className="sm:w-4 sm:h-4" />}
@@ -723,8 +735,8 @@ export default function ClientsPage() {
                 <Link
                   href="/dashboard/maintenance"
                   className={`mt-1.5 sm:mt-2 p-1.5 sm:p-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold border-2 ${maintenanceStatus[client.id]?.vencidas > 0
-                      ? 'bg-red-50 border-red-400 text-red-700'
-                      : 'bg-amber-50 border-amber-400 text-amber-700'
+                    ? 'bg-red-50 border-red-400 text-red-700'
+                    : 'bg-amber-50 border-amber-400 text-amber-700'
                     }`}
                 >
                   <AlertTriangle size={12} className="sm:w-3.5 sm:h-3.5 flex-shrink-0" />
