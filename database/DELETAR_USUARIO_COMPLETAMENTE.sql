@@ -1,10 +1,9 @@
 -- =====================================================
 -- FUNÇÃO: DELETAR USUÁRIO COMPLETAMENTE (AUTH + PROFILES)
 -- =====================================================
--- Esta função permite que um administrador exclua um usuário
--- do sistema de autenticação (auth.users) e da tabela de perfis
--- de forma atômica e definitiva.
--- =====================================================
+
+-- Remover função antiga para evitar erro de tipo de retorno
+DROP FUNCTION IF EXISTS delete_user_completely(uuid);
 
 CREATE OR REPLACE FUNCTION delete_user_completely(user_uuid UUID)
 RETURNS JSONB AS $$
