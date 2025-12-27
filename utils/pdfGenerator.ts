@@ -193,19 +193,19 @@ const getCommonCSS = (color: string) => `
         margin-top: 40px;
         padding-top: 20px;
         border-top: 1px solid var(--slate-200);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 9px;
-        color: var(--slate-500);
+        text-align: center;
+        font-size: 8px;
+        color: var(--slate-400);
         font-weight: 500;
+        line-height: 1.6;
+        text-transform: uppercase;
     }
 
     /* Photos */
-    .photo-mosaic { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-    .photo-card { border: 1px solid var(--slate-200); border-radius: 10px; overflow: hidden; background: #fff; }
-    .photo-card img { width: 100%; height: 220px; object-fit: cover; border-bottom: 1px solid var(--slate-50); }
-    .photo-caption { padding: 12px; text-align: center; font-size: 10px; font-weight: 600; color: var(--slate-500); text-transform: uppercase; }
+    .photo-mosaic { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .photo-card { border: 1px solid var(--slate-200); border-radius: 6px; overflow: hidden; background: #fff; }
+    .photo-card img { width: 100%; height: 110px; object-fit: cover; }
+    .photo-caption { padding: 6px; text-align: center; font-size: 8px; font-weight: 700; color: var(--slate-400); text-transform: uppercase; }
 
     .print-button {
         position: fixed;
@@ -266,7 +266,7 @@ export async function generateServiceOrderPDF(order: any) {
   <style>${getCommonCSS(color)}</style>
 </head>
 <body>
-  <button class="print-button no-print" onclick="window.print()">Imprimir Proposta Final 📄</button>
+  <button class="print-button no-print" onclick="window.print()">Imprimir Ordem de Serviço 📄</button>
   
   <div class="page-container">
     <div class="a4-page">
@@ -361,8 +361,8 @@ export async function generateServiceOrderPDF(order: any) {
       </div>` : ''}
 
       <div class="footer">
-        <div>CHAMEI APP • GESTÃO TÉCNICA INTELIGENTE</div>
-        <div>PÁGINA 01 / ${photos.length > 0 ? '02' : '01'}</div>
+        <div>${company.name} • ${company.address}</div>
+        <div style="opacity: 0.7; font-size: 7px; margin-top: 2px;">PÁGINA 01 / ${photos.length > 0 ? '02' : '01'}</div>
       </div>
     </div>
   </div>
@@ -406,8 +406,8 @@ export async function generateServiceOrderPDF(order: any) {
       </div>
 
       <div class="footer">
-        <div>LAUDO DE EVIDÊNCIAS TÉCNICAS</div>
-        <div>PÁGINA 02 / 02</div>
+        <div>${company.name} • ${company.address}</div>
+        <div style="opacity: 0.7; font-size: 7px; margin-top: 2px;">PÁGINA 02 / 02</div>
       </div>
     </div>
   </div>` : ''}
