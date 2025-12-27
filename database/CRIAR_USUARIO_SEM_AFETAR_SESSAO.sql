@@ -9,9 +9,11 @@
 -- O Supabase geralmente coloca extensões no schema 'extensions'
 CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions;
 
--- 2️⃣ REMOVER VERSÃO ANTIGA (Se existir)
--- Isso é necessário porque mudamos o tipo de retorno para JSONB
+-- 2️⃣ REMOVER VERSÕES ANTIGAS (Se existirem)
+-- Removemos as versões com 7 e 8 argumentos para garantir a atualização
 DROP FUNCTION IF EXISTS create_user_admin(text,text,text,text,text,text,text);
+DROP FUNCTION IF EXISTS create_user_admin(text,text,text,text,text,text,text,uuid);
+DROP FUNCTION IF EXISTS create_user_admin(text,text,text,text,text,text,text,text);
 
 -- 3️⃣ CRIAR OU ATUALIZAR A FUNÇÃO RPC
 CREATE OR REPLACE FUNCTION create_user_admin(
@@ -22,14 +24,20 @@ CREATE OR REPLACE FUNCTION create_user_admin(
   p_phone TEXT DEFAULT NULL,
   p_cpf TEXT DEFAULT NULL,
   p_cargo TEXT DEFAULT NULL,
-  p_client_id UUID DEFAULT NULL
+  p_client_id TEXT DEFAULT NULL
 )
 RETURNS JSONB AS $$
 DECLARE
   v_user_id UUID;
+  v_client_uuid UUID;
 BEGIN
+  -- Converter client_id texto para UUID se não for nulo
+  IF p_client_id IS NOT NULL AND p_client_id <> '' THEN
+    v_client_uuid := p_client_id::UUID;
+  END IF;
+
   -- Validação: Se o role for 'client', o client_id é obrigatório
-  IF p_role = 'client' AND p_client_id IS NULL THEN
+  IF p_role = 'client' AND v_client_uuid IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'Erro: Usuário do tipo Cliente deve ter uma empresa vinculada.');
   END IF;
 
@@ -75,7 +83,7 @@ BEGIN
   
   -- Sincronizar dados no profiles
   INSERT INTO public.profiles (id, email, full_name, role, phone, cpf, cargo, client_id, is_active)
-  VALUES (v_user_id, p_email, p_full_name, p_role, p_phone, p_cpf, p_cargo, p_client_id, true)
+  VALUES (v_user_id, p_email, p_full_name, p_role, p_phone, p_cpf, p_cargo, v_client_uuid, true)
   ON CONFLICT (id) DO UPDATE SET
     full_name = EXCLUDED.full_name,
     role = EXCLUDED.role,
