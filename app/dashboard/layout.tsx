@@ -76,7 +76,7 @@ export default function DashboardLayout({
 
   const LayoutWrapper = ({ content, sidebar = true }: { content: React.ReactNode, sidebar?: boolean }) => (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-      {sidebar && <Sidebar onSearchClick={() => setIsSearchOpen(true)} />}
+      {sidebar && <Sidebar onSearchClick={() => setIsSearchOpen(true)} unreadCount={unreadCount} />}
       <main className="flex-1 overflow-auto relative">
         {/* Top Floating Actions */}
         <div className="absolute top-4 right-4 z-40 flex items-center gap-2">

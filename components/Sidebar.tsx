@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 import { usePermissions } from '../hooks/usePermissions';
-import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import {
   LayoutDashboard,
   Users,
@@ -74,13 +73,13 @@ interface AppConfig {
 
 interface SidebarProps {
   onSearchClick?: () => void;
+  unreadCount?: number;
 }
 
-export default function Sidebar({ onSearchClick }: SidebarProps) {
+export default function Sidebar({ onSearchClick, unreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const { profile, logout } = useAuthStore();
   const { can, isAdmin } = usePermissions();
-  const { unreadCount } = useRealtimeNotifications();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
