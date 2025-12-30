@@ -100,43 +100,9 @@ export default function TicketsPage() {
 
       const selectedClient = clients.find(c => c.id === formData.client_id);
 
-      const { data: clientUsers } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('client_id', formData.client_id)
-        .eq('role', 'client')
-        .eq('is_active', true);
+      // Notificações para clientes são criadas pelo trigger do banco
 
-      if (clientUsers && clientUsers.length > 0) {
-        const notifications = clientUsers.map(u => ({
-          user_id: u.id,
-          title: '🎫 Novo Chamado Criado',
-          message: `Chamado: ${formData.title}`,
-          type: 'ticket',
-          reference_id: newTicket?.id,
-          is_read: false
-        }));
-        await supabase.from('notifications').insert(notifications);
-      }
-
-      const { data: allUsers } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('role', ['admin', 'super_admin', 'technician'])
-        .eq('is_active', true)
-        .neq('id', profile?.id);
-
-      if (allUsers && allUsers.length > 0) {
-        const notifications = allUsers.map(u => ({
-          user_id: u.id,
-          title: '🎫 Novo Chamado Criado',
-          message: `Cliente: ${selectedClient?.name || 'N/A'} - ${formData.title}`,
-          type: 'ticket',
-          reference_id: newTicket?.id,
-          is_read: false
-        }));
-        await supabase.from('notifications').insert(notifications);
-      }
+      // Notificações para admins são criadas pelo trigger do banco
 
       toast.success('Chamado criado!');
       setShowModal(false);
