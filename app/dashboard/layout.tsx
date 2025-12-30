@@ -31,7 +31,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isLoading, checkAuth, profile } = useAuthStore();
-  const { unreadCount } = useRealtimeNotifications();
+  const { unreadCount, notifications, refresh } = useRealtimeNotifications();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -96,7 +96,7 @@ export default function DashboardLayout({
         {content}
       </main>
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-      <NotificationDrawer isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
+      <NotificationDrawer isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} notifications={notifications} unreadCount={unreadCount} refresh={refresh} />
     </div>
   );
 

@@ -1,13 +1,29 @@
 'use client';
 
 import { X, Bell, Check, Loader2, Info, AlertTriangle, AlertCircle } from 'lucide-react';
-import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-export function NotificationDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-    const { notifications, unreadCount, refresh } = useRealtimeNotifications();
+interface Notification {
+    id: string;
+    type: string;
+    title: string;
+    body: string;
+    message: string;
+    is_read: boolean;
+    created_at: string;
+}
+
+interface NotificationDrawerProps {
+    isOpen: boolean;
+    onClose: () => void;
+    notifications: Notification[];
+    unreadCount: number;
+    refresh: () => void;
+}
+
+export function NotificationDrawer({ isOpen, onClose, notifications, unreadCount, refresh }: NotificationDrawerProps) {
 
     const markAsRead = async (id: string) => {
         const { error } = await supabase
@@ -70,8 +86,8 @@ export function NotificationDrawer({ isOpen, onClose }: { isOpen: boolean, onClo
                                     )}
                                     <div className="flex gap-3">
                                         <div className={`mt-1 p-2 rounded-lg shrink-0 ${n.type === 'alert' ? 'bg-red-100 dark:bg-red-900/30 text-red-600' :
-                                                n.type === 'warning' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' :
-                                                    'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
+                                            n.type === 'warning' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' :
+                                                'bg-blue-100 dark:bg-blue-900/30 text-blue-600'
                                             }`}>
                                             {n.type === 'alert' ? <AlertCircle size={16} /> :
                                                 n.type === 'warning' ? <AlertTriangle size={16} /> :
