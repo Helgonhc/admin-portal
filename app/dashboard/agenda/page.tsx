@@ -12,10 +12,11 @@ import Link from 'next/link';
 interface Appointment {
   id: string;
   client_id: string;
+  service_type: string;
   title: string;
   description?: string;
-  scheduled_date: string;
-  scheduled_time?: string;
+  requested_date: string;
+  requested_time_start?: string;
   status: string;
   clients?: { name: string };
 }
@@ -67,18 +68,18 @@ export default function AgendaPage() {
 
       const [appointmentsRes, ordersRes, maintenancesRes, clientsRes] = await Promise.all([
         supabase
-          .from('appointments')
+          .from('appointment_requests')
           .select('*, clients(name)')
-          .gte('scheduled_date', format(start, 'yyyy-MM-dd'))
-          .lte('scheduled_date', format(end, 'yyyy-MM-dd'))
-          .order('scheduled_date'),
+          .gte('requested_date', format(start, 'yyyy-MM-dd'))
+          .lte('requested_date', format(end, 'yyyy-MM-dd'))
+          .order('requested_date'),
         supabase
           .from('service_orders')
           .select('*, clients(name)')
-          .gte('scheduled_date', format(start, 'yyyy-MM-dd'))
-          .lte('scheduled_date', format(end, 'yyyy-MM-dd'))
-          .not('scheduled_date', 'is', null)
-          .order('scheduled_date'),
+          .gte('scheduled_at', format(start, 'yyyy-MM-dd'))
+          .lte('scheduled_at', format(end, 'yyyy-MM-dd'))
+          .not('scheduled_at', 'is', null)
+          .order('scheduled_at'),
         supabase
           .from('active_maintenance_contracts')
           .select('id, title, next_maintenance_date, last_maintenance_date, frequency, urgency_status, maintenance_type_name, maintenance_color, client_name, days_until_maintenance')
@@ -106,24 +107,24 @@ export default function AgendaPage() {
 
   const getEventsForDay = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const dayAppointments = filters.type === 'all' || filters.type === 'appointments' 
-      ? appointments.filter(a => a.scheduled_date === dateStr) 
+    const dayAppointments = filters.type === 'all' || filters.type === 'appointments'
+      ? appointments.filter(a => a.requested_date === dateStr)
       : [];
-    const dayOrders = filters.type === 'all' || filters.type === 'orders' 
-      ? orders.filter(o => o.scheduled_date === dateStr) 
+    const dayOrders = filters.type === 'all' || filters.type === 'orders'
+      ? orders.filter(o => o.scheduled_at?.split('T')[0] === dateStr)
       : [];
     const dayMaintenances = filters.type === 'all' || filters.type === 'maintenance'
       ? maintenances.filter(m => m.next_maintenance_date === dateStr)
       : [];
     return [
-      ...dayAppointments.map(a => ({ ...a, type: 'appointment' })), 
+      ...dayAppointments.map(a => ({ ...a, type: 'appointment' })),
       ...dayOrders.map(o => ({ ...o, type: 'order' })),
       ...dayMaintenances.map(m => ({ ...m, type: 'maintenance' }))
     ];
   };
 
   const selectedDateEvents = selectedDate ? getEventsForDay(selectedDate) : [];
-  
+
   // Estatísticas do mês
   const monthMaintenances = maintenances.length;
   const urgentMaintenances = maintenances.filter(m => m.urgency_status === 'vencido' || m.urgency_status === 'urgente').length;
@@ -147,10 +148,15 @@ export default function AgendaPage() {
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('appointments').insert([{
-        ...formData,
-        status: 'scheduled',
-        created_by: profile?.id,
+      const { error } = await supabase.from('appointment_requests').insert([{
+        client_id: formData.client_id,
+        title: formData.title,
+        service_type: formData.title,
+        description: formData.description,
+        requested_date: formData.scheduled_date,
+        requested_time_start: formData.scheduled_time,
+        status: 'pending',
+        technician_id: profile?.id,
       }]);
       if (error) throw error;
       toast.success('Agendamento criado!');
@@ -304,7 +310,7 @@ export default function AgendaPage() {
             {Array.from({ length: startOfMonth(currentMonth).getDay() }).map((_, i) => (
               <div key={`empty-${i}`} className="aspect-square" />
             ))}
-            
+
             {days.map((day) => {
               const events = getEventsForDay(day);
               const isToday = isSameDay(day, new Date());
@@ -317,13 +323,12 @@ export default function AgendaPage() {
                 <button
                   key={day.toISOString()}
                   onClick={() => setSelectedDate(day)}
-                  className={`aspect-square p-1 rounded-lg text-sm transition-all relative ${
-                    isSelected
+                  className={`aspect-square p-1 rounded-lg text-sm transition-all relative ${isSelected
                       ? 'bg-indigo-600 text-white'
                       : isToday
-                      ? 'bg-indigo-100 text-indigo-700 font-bold'
-                      : 'hover:bg-gray-100'
-                  }`}
+                        ? 'bg-indigo-100 text-indigo-700 font-bold'
+                        : 'hover:bg-gray-100'
+                    }`}
                 >
                   <span className="block">{format(day, 'd')}</span>
                   {events.length > 0 && (
@@ -367,13 +372,12 @@ export default function AgendaPage() {
                 <Link
                   key={event.id}
                   href={event.type === 'maintenance' ? '/dashboard/maintenance' : event.type === 'order' ? `/dashboard/orders/${event.id}` : '#'}
-                  className={`block p-3 rounded-lg border-l-4 hover:shadow-md transition-shadow cursor-pointer ${
-                    event.type === 'order'
+                  className={`block p-3 rounded-lg border-l-4 hover:shadow-md transition-shadow cursor-pointer ${event.type === 'order'
                       ? 'bg-amber-50 border-amber-500'
                       : event.type === 'maintenance'
-                      ? 'bg-purple-50 border-purple-500'
-                      : 'bg-indigo-50 border-indigo-500'
-                  }`}
+                        ? 'bg-purple-50 border-purple-500'
+                        : 'bg-indigo-50 border-indigo-500'
+                    }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     {event.type === 'order' ? (
@@ -383,24 +387,23 @@ export default function AgendaPage() {
                     ) : (
                       <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">📅 Agendamento</span>
                     )}
-                    {event.scheduled_time && (
+                    {(event.requested_time_start || event.scheduled_time) && (
                       <span className="text-xs text-gray-500 flex items-center gap-1">
                         <Clock size={12} />
-                        {event.scheduled_time}
+                        {event.requested_time_start || event.scheduled_time}
                       </span>
                     )}
                     {event.type === 'maintenance' && event.urgency_status && (
-                      <span className={`text-xs px-2 py-0.5 rounded text-white ${
-                        event.urgency_status === 'vencido' ? 'bg-red-500' :
-                        event.urgency_status === 'urgente' ? 'bg-amber-500' : 'bg-emerald-500'
-                      }`}>
-                        {event.urgency_status === 'vencido' ? 'Vencida' : 
-                         event.urgency_status === 'urgente' ? 'Urgente' : 'OK'}
+                      <span className={`text-xs px-2 py-0.5 rounded text-white ${event.urgency_status === 'vencido' ? 'bg-red-500' :
+                          event.urgency_status === 'urgente' ? 'bg-amber-500' : 'bg-emerald-500'
+                        }`}>
+                        {event.urgency_status === 'vencido' ? 'Vencida' :
+                          event.urgency_status === 'urgente' ? 'Urgente' : 'OK'}
                       </span>
                     )}
                   </div>
                   <p className="font-medium text-gray-800 text-sm">
-                    {event.type === 'maintenance' ? (event.maintenance_type_name || event.title) : event.title}
+                    {event.type === 'maintenance' ? (event.maintenance_type_name || event.title) : (event.title || event.service_type)}
                   </p>
                   <p className="text-xs text-gray-500">
                     {event.type === 'maintenance' ? event.client_name : event.clients?.name}

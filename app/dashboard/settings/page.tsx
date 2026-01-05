@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/authStore';
-import { 
-  Save, Loader2, User, Building2, Bell, Shield, Palette, 
-  Mail, Phone, MapPin, Camera, Key, Check, Plus, Trash2, List, Upload, Image, Search
+import {
+  Save, Loader2, User, Building2, Bell, Shield, Palette,
+  Mail, Phone, MapPin, Camera, Key, Check, Plus, Trash2, List, Upload, Image, Search, RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -13,7 +13,7 @@ import toast from 'react-hot-toast';
 async function fetchCNPJ(cnpj: string) {
   const cleanCNPJ = cnpj.replace(/\D/g, '');
   if (cleanCNPJ.length !== 14) return null;
-  
+
   try {
     const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCNPJ}`);
     if (!response.ok) return null;
@@ -27,7 +27,7 @@ async function fetchCNPJ(cnpj: string) {
 async function fetchCEP(cep: string) {
   const cleanCEP = cep.replace(/\D/g, '');
   if (cleanCEP.length !== 8) return null;
-  
+
   try {
     const response = await fetch(`https://viacep.com.br/ws/${cleanCEP}/json/`);
     if (!response.ok) return null;
@@ -41,7 +41,7 @@ async function fetchCEP(cep: string) {
 
 export default function SettingsPage() {
   const { profile, setProfile } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'notifications' | 'checklists'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'notifications' | 'checklists' | 'whatsapp'>('profile');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -76,6 +76,11 @@ export default function SettingsPage() {
     neighborhood: '',
     city: '',
     state: '',
+    // Evolution API Settings
+    evolution_api_url: 'http://localhost:8080',
+    evolution_api_key: '123456',
+    evolution_instance_name: 'ChameiApp',
+    evolution_webhook_url: '',
   });
   const [configId, setConfigId] = useState<string | null>(null);
   const [searchingCEP, setSearchingCEP] = useState(false);
@@ -98,6 +103,117 @@ export default function SettingsPage() {
     description: '',
     items: [''],
   });
+
+  // WhatsApp / Evolution API
+  const [waStatus, setWaStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading');
+  const [waQrCode, setWaQrCode] = useState<string | null>(null);
+
+  async function checkWAStatus() {
+    if (!companyData.evolution_api_url || !companyData.evolution_api_key || !companyData.evolution_instance_name) return;
+
+    setWaStatus('loading');
+    try {
+      const response = await fetch(`${companyData.evolution_api_url}/instance/connectionState/${companyData.evolution_instance_name}`, {
+        headers: {
+          'apikey': companyData.evolution_api_key
+        }
+      });
+      const data = await response.json();
+      if (data.instance?.state === 'open') {
+        setWaStatus('connected');
+        setWaQrCode(null);
+      } else {
+        setWaStatus('disconnected');
+        fetchWAQrCode();
+      }
+    } catch (error) {
+      setWaStatus('disconnected');
+    }
+  }
+
+  async function fetchWAQrCode() {
+    try {
+      const response = await fetch(`${companyData.evolution_api_url}/instance/connect/${companyData.evolution_instance_name}`, {
+        headers: {
+          'apikey': companyData.evolution_api_key
+        }
+      });
+      const data = await response.json();
+      if (data.base64) {
+        setWaQrCode(data.base64);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar QR Code:', error);
+    }
+  }
+
+  async function updateWebhook() {
+    if (!companyData.evolution_webhook_url) {
+      toast.error('Informe a URL do Webhook do n8n');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch(`${companyData.evolution_api_url}/webhook/set/${companyData.evolution_instance_name}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': companyData.evolution_api_key
+        },
+        body: JSON.stringify({
+          url: companyData.evolution_webhook_url,
+          enabled: true,
+          events: [
+            "MESSAGES_UPSERT",
+            "MESSAGES_UPDATE",
+            "MESSAGES_DELETE",
+            "SEND_MESSAGE",
+            "CONTACTS_UPSERT",
+            "CONTACTS_UPDATE",
+            "PRESENCE_UPDATE",
+            "CHATS_UPSERT",
+            "CHATS_UPDATE",
+            "CHATS_DELETE",
+            "GROUPS_UPSERT",
+            "GROUPS_UPDATE",
+            "GROUP_PARTICIPANTS_UPDATE",
+            "CONNECTION_UPDATE",
+            "CALL"
+          ]
+        })
+      });
+
+      if (!response.ok) throw new Error('Erro ao configurar webhook na API');
+
+      toast.success('Webhook configurado na Evolution API!');
+      saveCompany();
+    } catch (error: any) {
+      toast.error('Erro ao configurar webhook: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function logoutWA() {
+    if (!confirm('Deseja realmente desconectar o WhatsApp?')) return;
+    try {
+      await fetch(`${companyData.evolution_api_url}/instance/logout/${companyData.evolution_instance_name}`, {
+        method: 'DELETE',
+        headers: { 'apikey': companyData.evolution_api_key }
+      });
+      toast.success('WhatsApp desconectado!');
+      checkWAStatus();
+    } catch (error) {
+      toast.error('Erro ao desconectar');
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'whatsapp' && isAdmin) {
+      checkWAStatus();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (profile) {
@@ -122,7 +238,7 @@ export default function SettingsPage() {
       .from('app_config')
       .select('*')
       .single();
-    
+
     if (data) {
       setConfigId(data.id);
       setCompanyData({
@@ -139,6 +255,10 @@ export default function SettingsPage() {
         neighborhood: data.neighborhood || '',
         city: data.city || '',
         state: data.state || '',
+        evolution_api_url: data.evolution_api_url || 'http://localhost:8080',
+        evolution_api_key: data.evolution_api_key || '123456',
+        evolution_instance_name: data.evolution_instance_name || 'ChameiApp',
+        evolution_webhook_url: data.evolution_webhook_url || '',
       });
     }
   }
@@ -154,7 +274,7 @@ export default function SettingsPage() {
     try {
       const img = new window.Image();
       img.crossOrigin = 'Anonymous';
-      
+
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
           try {
@@ -172,37 +292,37 @@ export default function SettingsPage() {
 
             const imageData = ctx.getImageData(0, 0, size, size).data;
             const colorCounts: { [key: string]: number } = {};
-            
+
             for (let i = 0; i < imageData.length; i += 4) {
               const r = imageData[i];
               const g = imageData[i + 1];
               const b = imageData[i + 2];
               const a = imageData[i + 3];
-              
+
               if (a < 128) continue;
               const brightness = (r + g + b) / 3;
               if (brightness > 240 || brightness < 15) continue;
               const saturation = Math.max(r, g, b) - Math.min(r, g, b);
               if (saturation < 30) continue;
-              
+
               const qr = Math.round(r / 32) * 32;
               const qg = Math.round(g / 32) * 32;
               const qb = Math.round(b / 32) * 32;
-              
+
               const key = `${qr},${qg},${qb}`;
               colorCounts[key] = (colorCounts[key] || 0) + 1;
             }
-            
+
             let maxCount = 0;
             let dominantColor = null;
-            
+
             for (const [color, count] of Object.entries(colorCounts)) {
               if (count > maxCount) {
                 maxCount = count;
                 dominantColor = color;
               }
             }
-            
+
             if (dominantColor) {
               const [r, g, b] = dominantColor.split(',').map(Number);
               const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
@@ -358,7 +478,7 @@ export default function SettingsPage() {
         .eq('id', profile?.id);
 
       if (error) throw error;
-      
+
       setProfile({ ...profile!, ...profileData });
       toast.success('Perfil atualizado!');
     } catch (error: any) {
@@ -377,19 +497,19 @@ export default function SettingsPage() {
           .from('app_config')
           .update(companyData)
           .eq('id', configId);
-        
+
         if (error) throw error;
       } else {
         // Criar novo registro
         const { error } = await supabase
           .from('app_config')
           .insert(companyData);
-        
+
         if (error) throw error;
       }
 
       toast.success('Configurações da empresa salvas!');
-      
+
       // Recarregar a página para atualizar o sidebar
       window.location.reload();
     } catch (error: any) {
@@ -568,13 +688,13 @@ export default function SettingsPage() {
           { id: 'profile', icon: User, label: 'Meu Perfil' },
           { id: 'company', icon: Building2, label: 'Empresa', adminOnly: true },
           { id: 'checklists', icon: List, label: 'Checklists', adminOnly: true },
+          { id: 'whatsapp', icon: Phone, label: 'WhatsApp', adminOnly: true },
         ].filter(tab => !tab.adminOnly || isAdmin).map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${
-              activeTab === tab.id ? 'bg-white shadow text-indigo-600' : 'text-gray-600 hover:text-gray-800'
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md transition-all ${activeTab === tab.id ? 'bg-white shadow text-indigo-600' : 'text-gray-600 hover:text-gray-800'
+              }`}
           >
             <tab.icon size={18} />
             <span className="font-medium">{tab.label}</span>
@@ -592,9 +712,9 @@ export default function SettingsPage() {
               <div className="relative">
                 <div className="w-20 h-20 rounded-full border-2 border-gray-200 overflow-hidden bg-gray-100 flex items-center justify-center">
                   {profileData.avatar_url ? (
-                    <img 
-                      src={profileData.avatar_url} 
-                      alt="Avatar" 
+                    <img
+                      src={profileData.avatar_url}
+                      alt="Avatar"
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -705,9 +825,9 @@ export default function SettingsPage() {
               <div className="flex items-start gap-4">
                 <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50">
                   {companyData.logo_url ? (
-                    <img 
-                      src={companyData.logo_url} 
-                      alt="Logo" 
+                    <img
+                      src={companyData.logo_url}
+                      alt="Logo"
                       className="w-full h-full object-contain"
                     />
                   ) : (
@@ -735,7 +855,7 @@ export default function SettingsPage() {
                     {uploading ? 'Enviando...' : 'Fazer Upload'}
                   </button>
                   <p className="text-xs text-gray-500">
-                    PNG, JPG ou GIF. Máximo 2MB.<br/>
+                    PNG, JPG ou GIF. Máximo 2MB.<br />
                     A logo aparecerá no menu lateral do portal.
                   </p>
                   {companyData.logo_url && (
@@ -768,7 +888,7 @@ export default function SettingsPage() {
                 Cor Principal
               </h4>
               <p className="text-xs text-gray-500 mb-3">
-                A cor principal será usada em botões, menus e destaques do portal. 
+                A cor principal será usada em botões, menus e destaques do portal.
                 Você pode extrair automaticamente da logo ou escolher manualmente.
               </p>
               <div className="flex items-center gap-4">
@@ -806,17 +926,17 @@ export default function SettingsPage() {
               {/* Preview da cor */}
               <div className="mt-3 flex items-center gap-2">
                 <span className="text-xs text-gray-500">Preview:</span>
-                <div 
+                <div
                   className="px-4 py-2 rounded-lg text-white text-sm font-medium"
                   style={{ backgroundColor: companyData.primary_color }}
                 >
                   Botão Exemplo
                 </div>
-                <div 
+                <div
                   className="px-3 py-1 rounded-full text-xs font-semibold"
-                  style={{ 
+                  style={{
                     backgroundColor: `${companyData.primary_color}20`,
-                    color: companyData.primary_color 
+                    color: companyData.primary_color
                   }}
                 >
                   Badge Exemplo
@@ -888,7 +1008,7 @@ export default function SettingsPage() {
                 <MapPin size={18} />
                 Endereço
               </h4>
-              
+
               <div className="grid md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label className="label">CEP</label>
@@ -1089,6 +1209,151 @@ export default function SettingsPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* WhatsApp Tab */}
+      {activeTab === 'whatsapp' && isAdmin && (
+        <div className="card space-y-6">
+          <div className="flex justify-between items-center border-b pb-4">
+            <div>
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <Phone size={18} className="text-emerald-500" />
+                Integração WhatsApp
+              </h3>
+              <p className="text-sm text-gray-500">Conecte sua conta para abrir chamados automaticamente</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {waStatus === 'connected' ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  CONECTADO
+                </span>
+              ) : waStatus === 'loading' ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold">
+                  <Loader2 size={12} className="animate-spin" />
+                  VERIFICANDO...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold">
+                  DESCONECTADO
+                </span>
+              )}
+              <button
+                onClick={checkWAStatus}
+                className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+                title="Atualizar Status"
+              >
+                <RefreshCw size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Configurações da API */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Configurações da Evolution API</h4>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="label text-xs uppercase text-gray-500 font-bold">URL da API</label>
+                  <input
+                    type="text"
+                    value={companyData.evolution_api_url}
+                    onChange={(e) => setCompanyData({ ...companyData, evolution_api_url: e.target.value })}
+                    className="input font-mono text-sm"
+                    placeholder="http://localhost:8080"
+                  />
+                </div>
+                <div>
+                  <label className="label text-xs uppercase text-gray-500 font-bold">API KEY</label>
+                  <input
+                    type="password"
+                    value={companyData.evolution_api_key}
+                    onChange={(e) => setCompanyData({ ...companyData, evolution_api_key: e.target.value })}
+                    className="input font-mono text-sm"
+                    placeholder="Sua chave secreta"
+                  />
+                </div>
+                <div>
+                  <label className="label text-xs uppercase text-gray-500 font-bold">Nome da Instância</label>
+                  <input
+                    type="text"
+                    value={companyData.evolution_instance_name}
+                    onChange={(e) => setCompanyData({ ...companyData, evolution_instance_name: e.target.value })}
+                    className="input font-mono text-sm"
+                    placeholder="Ex: ChameiApp"
+                  />
+                </div>
+                <div>
+                  <label className="label text-xs uppercase text-gray-500 font-bold">Webhook URL (n8n)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={companyData.evolution_webhook_url}
+                      onChange={(e) => setCompanyData({ ...companyData, evolution_webhook_url: e.target.value })}
+                      className="input font-mono text-sm flex-1"
+                      placeholder="http://n8n:5678/webhook/..."
+                    />
+                    <button
+                      onClick={updateWebhook}
+                      disabled={saving}
+                      className="btn btn-secondary px-3"
+                      title="Sincronizar Webhook"
+                    >
+                      {saving ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button onClick={saveCompany} disabled={saving} className="btn btn-primary w-full">
+                {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                Salvar Configurações API
+              </button>
+            </div>
+
+            {/* Status de Conexão / QR Code */}
+            <div className="flex flex-col items-center justify-center bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-200">
+              {waStatus === 'connected' ? (
+                <div className="text-center space-y-4">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <Check size={40} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800">WhatsApp Conectado!</h4>
+                    <p className="text-sm text-gray-500">O sistema está pronto para receber e responder mensagens.</p>
+                  </div>
+                  <button
+                    onClick={logoutWA}
+                    className="text-sm text-red-600 font-bold hover:underline py-2"
+                  >
+                    Desconectar conta atual
+                  </button>
+                </div>
+              ) : waQrCode ? (
+                <div className="text-center space-y-4">
+                  <div className="bg-white p-4 rounded-xl shadow-lg inline-block border-4 border-indigo-600">
+                    <img src={waQrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-800">Escaneie o QR Code</h4>
+                    <p className="text-sm text-gray-500">Abra o WhatsApp no seu celular {'>'} Aparelhos Conectados</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center space-y-4">
+                  <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mx-auto opacity-50">
+                    <Phone size={40} className="text-gray-400" />
+                  </div>
+                  <p className="text-sm text-gray-500">Não foi possível carregar o status ou QR Code.</p>
+                  <button onClick={checkWAStatus} className="btn btn-secondary btn-sm">
+                    Tentar Novamente
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
