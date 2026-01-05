@@ -56,6 +56,7 @@ export default function AgendaPage() {
     scheduled_time: '09:00',
   });
   const [saving, setSaving] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
 
   useEffect(() => {
     loadData();
@@ -161,6 +162,25 @@ export default function AgendaPage() {
       if (error) throw error;
       toast.success('Agendamento criado!');
       setShowModal(false);
+      loadData();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateAppointmentStatus(id: string, newStatus: string) {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('appointment_requests')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success(`Status atualizado para ${newStatus}`);
+      setSelectedEvent((prev: any) => prev ? { ...prev, status: newStatus } : null);
       loadData();
     } catch (error: any) {
       toast.error(error.message);
@@ -324,10 +344,10 @@ export default function AgendaPage() {
                   key={day.toISOString()}
                   onClick={() => setSelectedDate(day)}
                   className={`aspect-square p-1 rounded-lg text-sm transition-all relative ${isSelected
-                      ? 'bg-indigo-600 text-white'
-                      : isToday
-                        ? 'bg-indigo-100 text-indigo-700 font-bold'
-                        : 'hover:bg-gray-100'
+                    ? 'bg-indigo-600 text-white'
+                    : isToday
+                      ? 'bg-indigo-100 text-indigo-700 font-bold'
+                      : 'hover:bg-gray-100'
                     }`}
                 >
                   <span className="block">{format(day, 'd')}</span>
@@ -344,74 +364,175 @@ export default function AgendaPage() {
           </div>
         </div>
 
-        {/* Selected Day Events */}
-        <div className="card">
-          <h3 className="font-semibold text-gray-800 mb-4">
-            {selectedDate
-              ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
-              : 'Selecione um dia'}
-          </h3>
+        {/* Selected Day Events / Event Details */}
+        <div className="card h-fit sticky top-6">
+          {!selectedEvent ? (
+            <>
+              <h3 className="font-semibold text-gray-800 mb-4">
+                {selectedDate
+                  ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
+                  : 'Selecione um dia'}
+              </h3>
 
-          {selectedDate && (
-            <button
-              onClick={() => openModal(selectedDate)}
-              className="w-full btn btn-secondary mb-4"
-            >
-              <Plus size={18} />
-              Agendar neste dia
-            </button>
-          )}
-
-          <div className="space-y-3">
-            {selectedDateEvents.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-4">
-                {selectedDate ? 'Nenhum evento neste dia' : 'Selecione um dia no calendário'}
-              </p>
-            ) : (
-              selectedDateEvents.map((event: any) => (
-                <Link
-                  key={event.id}
-                  href={event.type === 'maintenance' ? '/dashboard/maintenance' : event.type === 'order' ? `/dashboard/orders/${event.id}` : '#'}
-                  className={`block p-3 rounded-lg border-l-4 hover:shadow-md transition-shadow cursor-pointer ${event.type === 'order'
-                      ? 'bg-amber-50 border-amber-500'
-                      : event.type === 'maintenance'
-                        ? 'bg-purple-50 border-purple-500'
-                        : 'bg-indigo-50 border-indigo-500'
-                    }`}
+              {selectedDate && (
+                <button
+                  onClick={() => openModal(selectedDate)}
+                  className="w-full btn btn-secondary mb-4"
                 >
-                  <div className="flex items-center gap-2 mb-1">
-                    {event.type === 'order' ? (
-                      <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded">📋 OS</span>
-                    ) : event.type === 'maintenance' ? (
-                      <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded">🔧 Manutenção</span>
-                    ) : (
-                      <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">📅 Agendamento</span>
-                    )}
-                    {(event.requested_time_start || event.scheduled_time) && (
-                      <span className="text-xs text-gray-500 flex items-center gap-1">
-                        <Clock size={12} />
-                        {event.requested_time_start || event.scheduled_time}
-                      </span>
-                    )}
-                    {event.type === 'maintenance' && event.urgency_status && (
-                      <span className={`text-xs px-2 py-0.5 rounded text-white ${event.urgency_status === 'vencido' ? 'bg-red-500' :
-                          event.urgency_status === 'urgente' ? 'bg-amber-500' : 'bg-emerald-500'
-                        }`}>
-                        {event.urgency_status === 'vencido' ? 'Vencida' :
-                          event.urgency_status === 'urgente' ? 'Urgente' : 'OK'}
-                      </span>
-                    )}
+                  <Plus size={18} />
+                  Agendar neste dia
+                </button>
+              )}
+
+              <div className="space-y-3">
+                {selectedDateEvents.length === 0 ? (
+                  <p className="text-gray-500 text-sm text-center py-4">
+                    {selectedDate ? 'Nenhum evento neste dia' : 'Selecione um dia no calendário'}
+                  </p>
+                ) : (
+                  selectedDateEvents.map((event: any) => (
+                    <div
+                      key={event.id}
+                      onClick={() => setSelectedEvent(event)}
+                      className={`block p-3 rounded-lg border-l-4 hover:shadow-md transition-shadow cursor-pointer ${event.type === 'order'
+                        ? 'bg-amber-50 border-amber-500'
+                        : event.type === 'maintenance'
+                          ? 'bg-purple-50 border-purple-500'
+                          : 'bg-indigo-50 border-indigo-500'
+                        }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        {event.type === 'order' ? (
+                          <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded">📋 OS</span>
+                        ) : event.type === 'maintenance' ? (
+                          <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded">🔧 Manutenção</span>
+                        ) : (
+                          <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">📅 Agendamento</span>
+                        )}
+                        {(event.requested_time_start || event.scheduled_time) && (
+                          <span className="text-xs text-gray-500 flex items-center gap-1">
+                            <Clock size={12} />
+                            {event.requested_time_start || event.scheduled_time}
+                          </span>
+                        )}
+                        {event.type === 'maintenance' && event.urgency_status && (
+                          <span className={`text-xs px-2 py-0.5 rounded text-white ${event.urgency_status === 'vencido' ? 'bg-red-500' :
+                            event.urgency_status === 'urgente' ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}>
+                            {event.urgency_status === 'vencido' ? 'Vencida' :
+                              event.urgency_status === 'urgente' ? 'Urgente' : 'OK'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-medium text-gray-800 text-sm">
+                        {event.type === 'maintenance' ? (event.maintenance_type_name || event.title) : (event.title || event.service_type)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {event.type === 'maintenance' ? event.client_name : event.clients?.name}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="animate-fadeIn">
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="text-sm text-gray-500 hover:text-indigo-600 flex items-center gap-1"
+                >
+                  <ChevronLeft size={16} /> Voltar
+                </button>
+                <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${selectedEvent.status === 'confirmed' || selectedEvent.status === 'confirmado' ? 'bg-green-100 text-green-700' :
+                  selectedEvent.status === 'pending' || selectedEvent.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
+                    selectedEvent.status === 'cancelled' || selectedEvent.status === 'cancelado' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
+                  }`}>
+                  {selectedEvent.status}
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 leading-tight">
+                    {selectedEvent.type === 'maintenance' ? (selectedEvent.maintenance_type_name || selectedEvent.title) : (selectedEvent.title || selectedEvent.service_type)}
+                  </h3>
+                  <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                    <Calendar size={14} />
+                    {selectedEvent.requested_date || selectedEvent.scheduled_at?.split('T')[0] || selectedEvent.next_maintenance_date}
+                  </p>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-lg space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Cliente:</span>
+                    <span className="font-medium text-gray-800">{selectedEvent.type === 'maintenance' ? selectedEvent.client_name : selectedEvent.clients?.name}</span>
                   </div>
-                  <p className="font-medium text-gray-800 text-sm">
-                    {event.type === 'maintenance' ? (event.maintenance_type_name || event.title) : (event.title || event.service_type)}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {event.type === 'maintenance' ? event.client_name : event.clients?.name}
-                  </p>
-                </Link>
-              ))
-            )}
-          </div>
+                  {(selectedEvent.requested_time_start || selectedEvent.scheduled_time) && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Horário:</span>
+                      <span className="font-medium text-gray-800">{selectedEvent.requested_time_start || selectedEvent.scheduled_time}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Tipo:</span>
+                    <span className="font-medium text-gray-800 uppercase">{selectedEvent.type}</span>
+                  </div>
+                </div>
+
+                {selectedEvent.description && (
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Descrição</h4>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      {selectedEvent.description}
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t space-y-2">
+                  {selectedEvent.type === 'appointment' && (
+                    <>
+                      {(selectedEvent.status === 'pending' || selectedEvent.status === 'pendente') && (
+                        <button
+                          onClick={() => updateAppointmentStatus(selectedEvent.id, 'confirmed')}
+                          className="w-full btn btn-primary flex items-center justify-center gap-2"
+                        >
+                          Confirmar Agendamento
+                        </button>
+                      )}
+                      {selectedEvent.status !== 'cancelled' && selectedEvent.status !== 'cancelado' && (
+                        <button
+                          onClick={() => updateAppointmentStatus(selectedEvent.id, 'cancelled')}
+                          className="w-full btn btn-secondary text-red-600 hover:bg-red-50 border-red-200 flex items-center justify-center gap-2"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {selectedEvent.type === 'order' && (
+                    <Link
+                      href={`/dashboard/orders/${selectedEvent.id}`}
+                      className="w-full btn btn-primary flex items-center justify-center gap-2"
+                    >
+                      Ver Ordem de Serviço
+                    </Link>
+                  )}
+
+                  {selectedEvent.type === 'maintenance' && (
+                    <Link
+                      href="/dashboard/maintenance"
+                      className="w-full btn btn-primary flex items-center justify-center gap-2"
+                    >
+                      Ver Detalhes do Contrato
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
