@@ -481,7 +481,7 @@ export async function generateQuotePDF(quote: any) {
           <div class="company-meta">
             CNPJ: ${company.cnpj}<br>
             ${company.address}<br>
-            📱 ${company.company_phone || company.phone} ${company.email ? `• ✉️ ${company.email}` : ''}
+            📱 ${company.phone} ${company.email ? `• ✉️ ${company.email}` : ''}
           </div>
         </div>
         <div class="doc-info">
