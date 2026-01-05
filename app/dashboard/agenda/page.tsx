@@ -64,28 +64,28 @@ export default function AgendaPage() {
 
   async function loadData() {
     try {
-      const start = startOfMonth(currentMonth);
-      const end = endOfMonth(currentMonth);
+      // Para os agendamentos "Próximos", buscamos uma janela maior (ex: 6 meses)
+      const futureLimit = addMonths(start, 6);
 
       const [appointmentsRes, ordersRes, maintenancesRes, clientsRes] = await Promise.all([
         supabase
           .from('appointment_requests')
           .select('*, clients(name)')
           .gte('requested_date', format(start, 'yyyy-MM-dd'))
-          .lte('requested_date', format(end, 'yyyy-MM-dd'))
+          .lte('requested_date', format(futureLimit, 'yyyy-MM-dd'))
           .order('requested_date'),
         supabase
           .from('service_orders')
           .select('*, clients(name)')
           .gte('scheduled_at', format(start, 'yyyy-MM-dd'))
-          .lte('scheduled_at', format(end, 'yyyy-MM-dd'))
+          .lte('scheduled_at', format(futureLimit, 'yyyy-MM-dd'))
           .not('scheduled_at', 'is', null)
           .order('scheduled_at'),
         supabase
           .from('active_maintenance_contracts')
           .select('id, title, next_maintenance_date, last_maintenance_date, frequency, urgency_status, maintenance_type_name, maintenance_color, client_name, days_until_maintenance')
           .gte('next_maintenance_date', format(start, 'yyyy-MM-dd'))
-          .lte('next_maintenance_date', format(end, 'yyyy-MM-dd')),
+          .lte('next_maintenance_date', format(futureLimit, 'yyyy-MM-dd')),
         supabase.from('clients').select('id, name').eq('is_active', true).order('name'),
       ]);
 
@@ -439,8 +439,8 @@ export default function AgendaPage() {
                           )}
                         </div>
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${event.status === 'confirmed' || event.status === 'confirmado' ? 'bg-green-100 text-green-700' :
-                            event.status === 'pending' || event.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
-                              'bg-gray-100 text-gray-700'
+                          event.status === 'pending' || event.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
+                            'bg-gray-100 text-gray-700'
                           }`}>
                           {event.status === 'pending' || event.status === 'pendente' ? 'Pendente' :
                             event.status === 'confirmed' || event.status === 'confirmado' ? 'Confirmado' : event.status}
