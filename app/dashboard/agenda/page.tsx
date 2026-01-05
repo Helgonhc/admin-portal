@@ -84,7 +84,7 @@ export default function AgendaPage() {
           .order('scheduled_at'),
         supabase
           .from('active_maintenance_contracts')
-          .select('id, title, next_maintenance_date, last_maintenance_date, frequency, urgency_status, maintenance_type_name, maintenance_color, client_name, days_until_maintenance')
+          .select('id, title, client_id, next_maintenance_date, last_maintenance_date, frequency, urgency_status, maintenance_type_name, maintenance_color, client_name, days_until_maintenance')
           .gte('next_maintenance_date', format(start, 'yyyy-MM-dd'))
           .lte('next_maintenance_date', format(futureLimit, 'yyyy-MM-dd')),
         supabase.from('clients').select('id, name').eq('is_active', true).order('name'),
@@ -92,8 +92,29 @@ export default function AgendaPage() {
 
       setAppointments(appointmentsRes.data || []);
       setOrders(ordersRes.data || []);
-      setMaintenances(maintenancesRes.data || []);
       setClients(clientsRes.data || []);
+
+      // Deduplicar manutenções: se já existe uma OS ou Agendamento para aquele contrato/data, removemos a "sugestão"
+      const filteredMaintenances = (maintenancesRes.data || []).filter(m => {
+        // Verifica se já existe uma OS para este contrato nesta data
+        const hasOrder = (ordersRes.data || []).some(o =>
+          o.maintenance_contract_id === m.id &&
+          o.scheduled_at?.split('T')[0] === m.next_maintenance_date
+        );
+
+        // Verifica se já existe um agendamento manual para este cliente nesta data
+        const hasApp = (appointmentsRes.data || []).some(a =>
+          a.client_id === m.client_id &&
+          a.requested_date === m.next_maintenance_date
+        );
+
+        return !hasOrder && !hasApp;
+      }).map(m => ({
+        ...m,
+        status: 'pending' // As manutenções sugeridas entram como pendentes de confirmação
+      }));
+
+      setMaintenances(filteredMaintenances);
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao carregar agenda');
