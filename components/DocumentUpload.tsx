@@ -1,0 +1,200 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
+import { FileUp, File, Download, Trash2, X, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface DocumentUploadProps {
+    clientId: string;
+}
+
+export default function DocumentUpload({ clientId }: DocumentUploadProps) {
+    const [documents, setDocuments] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        loadDocuments();
+    }, [clientId]);
+
+    async function loadDocuments() {
+        try {
+            const { data, error } = await supabase
+                .from('client_documents')
+                .select('*')
+                .eq('client_id', clientId)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setDocuments(data || []);
+        } catch (error) {
+            console.error('Erro ao carregar documentos:', error);
+            toast.error('Erro ao carregar lista de documentos');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        // Validate file size (e.g., max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('O arquivo deve ter no máximo 10MB');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${clientId}/${Date.now()}.${fileExt}`;
+
+            // 1. Upload to Storage
+            const { error: uploadError } = await supabase.storage
+                .from('documents')
+                .upload(fileName, file);
+
+            if (uploadError) throw uploadError;
+
+            // 2. Get Public URL (or keep it private and use downloadUrl logic)
+            // For private buckets, we usually don't get a public URL directly unless we sign it.
+            // We will store the path.
+
+            // 3. Insert into Database
+            const { error: dbError } = await supabase.from('client_documents').insert({
+                client_id: clientId,
+                title: file.name,
+                file_url: fileName, // Store the path
+                file_type: fileExt,
+                file_size: file.size,
+            });
+
+            if (dbError) throw dbError;
+
+            toast.success('Documento enviado com sucesso!');
+            loadDocuments();
+        } catch (error: any) {
+            console.error('Erro no upload:', error);
+            toast.error(`Erro ao enviar: ${error.message}`);
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    }
+
+    async function handleDownload(doc: any) {
+        try {
+            const { data, error } = await supabase.storage
+                .from('documents')
+                .createSignedUrl(doc.file_url, 60); // Valid for 60 seconds
+
+            if (error) throw error;
+            window.open(data.signedUrl, '_blank');
+        } catch (error) {
+            toast.error('Erro ao gerar link de download');
+        }
+    }
+
+    async function handleDelete(id: string, filePath: string) {
+        if (!confirm('Tem certeza que deseja excluir este documento?')) return;
+
+        try {
+            // 1. Delete from Storage
+            const { error: storageError } = await supabase.storage
+                .from('documents')
+                .remove([filePath]);
+
+            if (storageError) console.warn('Erro ao deletar arquivo do storage (pode já não existir):', storageError);
+
+            // 2. Delete from Database
+            const { error: dbError } = await supabase
+                .from('client_documents')
+                .delete()
+                .eq('id', id);
+
+            if (dbError) throw dbError;
+
+            toast.success('Documento excluído');
+            setDocuments(documents.filter(d => d.id !== id));
+        } catch (error) {
+            toast.error('Erro ao excluir documento');
+        }
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Upload Area */}
+            <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-100 transition-colors">
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="file-upload"
+                />
+                <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                    <div className="p-4 bg-white rounded-full shadow-sm">
+                        {uploading ? <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /> : <FileUp className="w-8 h-8 text-indigo-600" />}
+                    </div>
+                    <div>
+                        <span className="text-indigo-600 font-bold hover:underline">Clique para enviar</span>
+                        <span className="text-gray-500"> ou arraste e solte</span>
+                    </div>
+                    <p className="text-xs text-gray-400">PDF, DOC, Imagens (Máx 10MB)</p>
+                </label>
+            </div>
+
+            {/* Documents List */}
+            <div>
+                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <File className="w-5 h-5 text-gray-500" />
+                    Documentos Compartilhados ({documents.length})
+                </h3>
+
+                {loading ? (
+                    <div className="text-center py-4"><Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" /></div>
+                ) : documents.length === 0 ? (
+                    <p className="text-center text-gray-400 py-8 bg-gray-50 rounded-lg">Nenhum documento compartilhado ainda.</p>
+                ) : (
+                    <div className="grid gap-3">
+                        {documents.map((doc) => (
+                            <div key={doc.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-all group">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                        <File size={20} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-800 text-sm">{doc.title}</h4>
+                                        <p className="text-xs text-gray-500">
+                                            Enviado em {new Date(doc.created_at).toLocaleDateString('pt-BR')} • {(doc.file_size / 1024).toFixed(1)} KB
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleDownload(doc)}
+                                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                        title="Baixar"
+                                    >
+                                        <Download size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(doc.id, doc.file_url)}
+                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Excluir"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
