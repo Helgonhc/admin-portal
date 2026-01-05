@@ -472,7 +472,10 @@ export default function AgendaPage() {
                     selectedEvent.status === 'cancelled' || selectedEvent.status === 'cancelado' ? 'bg-red-100 text-red-700' :
                       'bg-gray-100 text-gray-700'
                   }`}>
-                  {selectedEvent.status}
+                  {selectedEvent.status === 'pending' || selectedEvent.status === 'pendente' ? 'Pendente' :
+                    selectedEvent.status === 'confirmed' || selectedEvent.status === 'confirmado' ? 'Confirmado' :
+                      selectedEvent.status === 'cancelled' || selectedEvent.status === 'cancelado' ? 'Cancelado' :
+                        selectedEvent.status}
                 </span>
               </div>
 
@@ -500,7 +503,12 @@ export default function AgendaPage() {
                   )}
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Tipo:</span>
-                    <span className="font-medium text-gray-800 uppercase">{selectedEvent.type}</span>
+                    <span className="font-medium text-gray-800">
+                      {selectedEvent.type === 'appointment' ? 'Agendamento' :
+                        selectedEvent.type === 'order' ? 'Ordem de Serviço' :
+                          selectedEvent.type === 'maintenance' ? 'Manutenção' :
+                            selectedEvent.type}
+                    </span>
                   </div>
                 </div>
 
