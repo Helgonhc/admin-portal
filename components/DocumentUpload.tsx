@@ -72,7 +72,15 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
         setUploading(true);
         try {
             const fileExt = file.name.split('.').pop();
-            const fileName = `${clientId}/${category}/${Date.now()}.${fileExt}`; // Path organization in storage too
+
+            // Sanitize category for the storage path (no accents or special chars)
+            const sanitizedCategory = category
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/\s+/g, '-')
+                .replace(/[^a-zA-Z0-9-]/g, '');
+
+            const fileName = `${clientId}/${sanitizedCategory}/${Date.now()}.${fileExt}`;
 
             // 1. Upload to Storage
             const { error: uploadError } = await supabase.storage
