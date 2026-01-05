@@ -5,10 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '../../../../lib/supabase';
 import { useAuthStore } from '../../../../store/authStore';
 import { usePermissions } from '../../../../hooks/usePermissions';
-import { 
-  ArrowLeft, Trash2, Loader2, Building2, Phone, Mail, MapPin, 
+import {
+  ArrowLeft, Trash2, Loader2, Building2, Phone, Mail, MapPin,
   FileText, Wrench, Ticket, Edit, Save, User, Hash, Users,
-  Globe, Lock, Unlock, MessageCircle, Navigation, Search
+  Globe, Lock, Unlock, MessageCircle, Navigation, Search,
+  Clock, Calendar, AlertCircle, CheckCircle, Plus
 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
@@ -23,11 +24,13 @@ export default function ClientDetailsPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [recentTickets, setRecentTickets] = useState<any[]>([]);
   const [equipments, setEquipments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [maintenances, setMaintenances] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   // Form data completo
   const [formData, setFormData] = useState({
     type: 'PJ' as 'PF' | 'PJ',
@@ -46,11 +49,11 @@ export default function ClientDetailsPage() {
     state: '',
     client_logo_url: '',
   });
-  
+
   // Loading states para busca automática
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
-  
+
   // Modal de Portal
   const [portalModalVisible, setPortalModalVisible] = useState(false);
   const [portalEmail, setPortalEmail] = useState('');
@@ -63,16 +66,30 @@ export default function ClientDetailsPage() {
 
   async function loadClient() {
     try {
-      const [clientRes, ordersCountRes, ticketsCountRes, equipmentsCountRes, usersCountRes, ordersRes, ticketsRes, equipmentsRes, usersRes] = await Promise.all([
+      const [
+        clientRes,
+        ordersCountRes,
+        ticketsCountRes,
+        equipmentsCountRes,
+        usersCountRes,
+        ordersRes,
+        ticketsRes,
+        equipmentsRes,
+        usersRes,
+        appsRes,
+        maintsRes
+      ] = await Promise.all([
         supabase.from('clients').select('*').eq('id', params.id).single(),
         supabase.from('service_orders').select('id', { count: 'exact' }).eq('client_id', params.id),
         supabase.from('tickets').select('id', { count: 'exact' }).eq('client_id', params.id),
         supabase.from('equipments').select('id', { count: 'exact' }).eq('client_id', params.id),
         supabase.from('profiles').select('id', { count: 'exact' }).eq('client_id', params.id),
-        supabase.from('service_orders').select('id, title, status, created_at').eq('client_id', params.id).order('created_at', { ascending: false }).limit(5),
+        supabase.from('service_orders').select('id, title, status, created_at, maintenance_contract_id, scheduled_at').eq('client_id', params.id).order('created_at', { ascending: false }).limit(20),
         supabase.from('tickets').select('id, title, status, created_at').eq('client_id', params.id).order('created_at', { ascending: false }).limit(5),
         supabase.from('equipments').select('id, name, model, status').eq('client_id', params.id).order('name').limit(10),
         supabase.from('profiles').select('id, full_name, email, role, is_active').eq('client_id', params.id).order('full_name'),
+        supabase.from('appointment_requests').select('*').eq('client_id', params.id).order('requested_date', { ascending: true }).limit(20),
+        supabase.from('active_maintenance_contracts').select('*').eq('client_id', params.id).order('next_maintenance_date', { ascending: true }),
       ]);
 
       if (clientRes.error) throw clientRes.error;
@@ -104,6 +121,25 @@ export default function ClientDetailsPage() {
       setRecentTickets(ticketsRes.data || []);
       setEquipments(equipmentsRes.data || []);
       setUsers(usersRes.data || []);
+
+      const apps = appsRes.data || [];
+      const maints = maintsRes.data || [];
+
+      setAppointments(apps);
+
+      // Deduplicar manutenções do cliente igual na agenda
+      const filteredMaints = maints.filter((m: any) => {
+        const hasOrder = (ordersRes.data || []).some(o =>
+          o.maintenance_contract_id === m.id &&
+          o.scheduled_at?.split('T')[0] === m.next_maintenance_date
+        );
+        const hasApp = apps.some((a: any) =>
+          a.requested_date === m.next_maintenance_date
+        );
+        return !hasOrder && !hasApp;
+      });
+
+      setMaintenances(filteredMaints);
     } catch (error) {
       console.error('Erro:', error);
       toast.error('Erro ao carregar dados');
@@ -139,7 +175,7 @@ export default function ClientDetailsPage() {
         }));
         toast.success('Dados carregados!');
       }
-    } catch (e) {} finally { setCnpjLoading(false); }
+    } catch (e) { } finally { setCnpjLoading(false); }
   }
 
   // Busca automática de CEP
@@ -161,7 +197,7 @@ export default function ClientDetailsPage() {
         }));
         toast.success('Endereço carregado!');
       }
-    } catch (e) {} finally { setCepLoading(false); }
+    } catch (e) { } finally { setCepLoading(false); }
   }
 
   async function handleSave() {
@@ -239,7 +275,7 @@ export default function ClientDetailsPage() {
       if (profileError) throw new Error('Erro ao criar perfil: ' + profileError.message);
 
       // Atualizar cliente com portal liberado
-      await supabase.from('clients').update({ 
+      await supabase.from('clients').update({
         email: portalEmail,
         portal_enabled: true,
         portal_blocked: false
@@ -258,7 +294,7 @@ export default function ClientDetailsPage() {
   // Bloquear/Desbloquear portal
   async function handleTogglePortalBlock() {
     const isBlocked = client?.portal_blocked || false;
-    if (!confirm(isBlocked 
+    if (!confirm(isBlocked
       ? `Deseja DESBLOQUEAR o acesso ao portal para ${client?.name}?`
       : `Deseja BLOQUEAR o acesso ao portal para ${client?.name}?`
     )) return;
@@ -286,7 +322,7 @@ export default function ClientDetailsPage() {
     if (messageType === 'caminho') message = `Olá ${nomeContato}, estou a caminho aí da ${client.name} para realizar o atendimento.`;
     else if (messageType === 'cheguei') message = `Olá ${nomeContato}, já cheguei no local e estou aguardando.`;
     else if (messageType === 'concluido') message = `Olá ${nomeContato}. O serviço técnico foi concluído com sucesso!`;
-    
+
     let cleanNumber = client.phone.replace(/\D/g, '');
     if (cleanNumber.length <= 11) cleanNumber = '55' + cleanNumber;
     window.open(`https://wa.me/${cleanNumber}${message ? `?text=${encodeURIComponent(message)}` : ''}`, '_blank');
@@ -396,9 +432,8 @@ export default function ClientDetailsPage() {
           <Link href={`/dashboard/clients/${params.id}/users`} className="py-2 sm:py-3 px-2 sm:px-4 border-2 border-purple-400 text-purple-600 hover:bg-purple-50 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm">
             <Users size={16} className="sm:w-5 sm:h-5" /> 👥 Usuários ({stats.users})
           </Link>
-          <button onClick={handleTogglePortalBlock} className={`py-2 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm ${
-            client.portal_blocked ? 'bg-red-600 text-white hover:bg-red-700' : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
-          }`}>
+          <button onClick={handleTogglePortalBlock} className={`py-2 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-2 font-medium text-xs sm:text-sm ${client.portal_blocked ? 'bg-red-600 text-white hover:bg-red-700' : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
+            }`}>
             {client.portal_blocked ? <Unlock size={16} className="sm:w-5 sm:h-5" /> : <Lock size={16} className="sm:w-5 sm:h-5" />}
             {client.portal_blocked ? '🔓 Desbloquear' : '🔒 Bloquear'}
           </button>
@@ -440,7 +475,7 @@ export default function ClientDetailsPage() {
       {/* Formulário de Edição ou Visualização */}
       <div className="card">
         <h3 className="font-semibold text-gray-800 mb-3 sm:mb-4 text-sm sm:text-base">📋 Informações do Cliente</h3>
-        
+
         {isEditing ? (
           <div className="space-y-3 sm:space-y-4">
             {/* Tipo PF/PJ */}
@@ -568,6 +603,68 @@ export default function ClientDetailsPage() {
           </div>
         )}
       </div>
+
+      {/* Agenda e Atividades Próximas */}
+      {(maintenances.length > 0 || appointments.length > 0) && (
+        <div className="card border-l-4 border-indigo-500">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+              <Calendar size={20} className="text-indigo-600" />
+              Agenda do Cliente (Próximas Atividades)
+            </h3>
+            <Link href="/dashboard/agenda" className="text-xs text-indigo-600 hover:underline">Ver Agenda Geral</Link>
+          </div>
+
+          <div className="space-y-3">
+            {/* Agendamentos e Manutenções Combinados */}
+            {[
+              ...appointments.map(a => ({ ...a, type: 'appointment' })),
+              ...maintenances.map(m => ({ ...m, type: 'maintenance' }))
+            ].sort((a, b) => {
+              const dateA = a.requested_date || a.next_maintenance_date;
+              const dateB = b.requested_date || b.next_maintenance_date;
+              return dateA.localeCompare(dateB);
+            }).map((event: any, idx) => (
+              <div key={idx} className={`p-3 rounded-lg border border-gray-100 flex items-center justify-between bg-white hover:bg-gray-50 transition-colors`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${event.type === 'maintenance' ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                    {event.type === 'maintenance' ? <Wrench size={18} /> : <Calendar size={18} />}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800">
+                      {event.type === 'maintenance' ? (event.maintenance_type_name || event.title) : (event.title || event.service_type)}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-gray-500 font-medium">
+                        {new Date((event.requested_date || event.next_maintenance_date) + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${event.type === 'maintenance' ? 'bg-purple-50 text-purple-700' : 'bg-indigo-50 text-indigo-700'
+                        }`}>
+                        {event.type === 'maintenance' ? 'Manutenção Preventiva' : 'Agendamento'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${event.status === 'confirmed' || event.status === 'confirmado' ? 'bg-green-100 text-green-700' :
+                    event.status === 'pending' || event.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                    {event.status === 'pending' || event.status === 'pendente' ? 'Pendente' :
+                      event.status === 'confirmed' || event.status === 'confirmado' ? 'Confirmado' : event.status}
+                  </span>
+                  <Link
+                    href={event.type === 'maintenance' ? '/dashboard/maintenance' : '/dashboard/agenda'}
+                    className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600"
+                  >
+                    <ArrowLeft className="rotate-180" size={16} />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Equipamentos */}
       {equipments.length > 0 && (
