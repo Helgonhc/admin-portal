@@ -16,6 +16,7 @@ import {
   Loader2,
   Calendar,
   Bell,
+  ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton, DashboardSkeleton } from '../../components/Skeleton';
@@ -46,6 +47,7 @@ export default function DashboardPage() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [statusChartData, setStatusChartData] = useState<any[]>([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
+  const [maintenanceAlerts, setMaintenanceAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const COLORS = ['#4f46e5', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6'];
@@ -75,12 +77,30 @@ export default function DashboardPage() {
         supabase.from('service_orders').select('*', { count: 'exact', head: true })
           .in('status', ['completed', 'concluido'])
           .gte('completed_at', new Date().toISOString().split('T')[0]),
-        supabase.from('active_maintenance_contracts').select('urgency_status'),
+        supabase.from('active_maintenance_contracts').select('id, title, client_name, urgency_status, next_maintenance_date'),
       ]);
 
       const maintenanceVencidas = maintenanceData?.filter(m => m.urgency_status === 'vencido').length || 0;
       const maintenanceUrgentes = maintenanceData?.filter(m => m.urgency_status === 'urgente').length || 0;
       const maintenanceProximas = maintenanceData?.filter(m => m.urgency_status === 'proximo').length || 0;
+
+      // Pegar os alertas críticos (vencidos e urgentes)
+      const alerts = maintenanceData?.filter(m => m.urgency_status === 'vencido' || m.urgency_status === 'urgente')
+        .sort((a, b) => {
+          if (a.urgency_status === 'vencido' && b.urgency_status !== 'vencido') return -1;
+          if (a.urgency_status !== 'vencido' && b.urgency_status === 'vencido') return 1;
+          return 0;
+        })
+        .slice(0, 3) || [];
+
+      setMaintenanceAlerts(alerts);
+
+      if (alerts.length > 0) {
+        toast.error(`Atenção: Você tem ${maintenanceVencidas + maintenanceUrgentes} manutenções críticas!`, {
+          icon: '⚠️',
+          duration: 5000
+        });
+      }
 
       setStats({
         totalClients: totalClients || 0,
@@ -214,6 +234,44 @@ export default function DashboardPage() {
                 <Link href="/dashboard/agenda" className="text-[10px] text-gray-400 hover:text-indigo-600 hover:underline">
                   Ver na agenda
                 </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Alertas de Manutenções Críticas */}
+      {maintenanceAlerts.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {maintenanceAlerts.map((alert) => (
+            <div key={alert.id} className={`card ${alert.urgency_status === 'vencido' ? 'border-l-4 border-l-red-500 bg-red-50/50' : 'border-l-4 border-l-amber-500 bg-amber-50/50'
+              } relative overflow-hidden group`}>
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${alert.urgency_status === 'vencido' ? 'text-red-600' : 'text-amber-600'
+                    }`}>
+                    {alert.urgency_status === 'vencido' ? <AlertCircle size={10} /> : <Clock size={10} />}
+                    {alert.urgency_status === 'vencido' ? 'Manutenção Vencida' : 'Urgente (Próximos 7 dias)'}
+                  </p>
+                  <h4 className="font-bold text-gray-800 text-sm truncate max-w-[200px]">{alert.title}</h4>
+                  <p className="text-xs text-gray-500">{alert.client_name}</p>
+                </div>
+                <Link
+                  href={`/dashboard/maintenance`}
+                  className={`p-1.5 rounded-lg shadow-sm border transition-colors ${alert.urgency_status === 'vencido' ? 'bg-white text-red-600 border-red-100 hover:bg-red-50' : 'bg-white text-amber-600 border-amber-100 hover:bg-amber-50'
+                    }`}
+                >
+                  <ChevronRight size={18} />
+                </Link>
+              </div>
+              <div className="mt-3 flex justify-between items-center">
+                <span className="text-[10px] text-gray-500 font-bold">
+                  Data: {new Date(alert.next_maintenance_date).toLocaleDateString('pt-BR')}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${alert.urgency_status === 'vencido' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                  {alert.urgency_status === 'vencido' ? 'Vencida' : 'Urgente'}
+                </span>
               </div>
             </div>
           ))}
