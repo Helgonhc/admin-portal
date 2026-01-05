@@ -21,7 +21,7 @@ type DocFile = {
 type Client = {
     id: string;
     name: string;
-    logo_url?: string | null;
+    client_logo_url?: string | null;
     doc_count?: number;
 };
 
@@ -64,7 +64,7 @@ export default function GlobalDocumentsPage() {
         try {
             const { data, error } = await supabase
                 .from('clients')
-                .select('id, name, logo_url')
+                .select('id, name, client_logo_url')
                 .order('name');
 
             if (error) throw error;
@@ -324,9 +324,9 @@ export default function GlobalDocumentsPage() {
                                     className="cursor-pointer p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition-all flex flex-col items-center justify-center text-center gap-3 bg-white"
                                 >
                                     <div className="w-16 h-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden border border-gray-100">
-                                        {item.logo_url ? (
+                                        {item.client_logo_url ? (
                                             <img
-                                                src={item.logo_url.startsWith('http') ? item.logo_url : supabase.storage.from('logos').getPublicUrl(item.logo_url).data.publicUrl}
+                                                src={item.client_logo_url.startsWith('http') ? item.client_logo_url : supabase.storage.from('os-photos').getPublicUrl(item.client_logo_url).data.publicUrl}
                                                 alt={item.name}
                                                 className="w-full h-full object-cover"
                                                 onError={(e) => {
