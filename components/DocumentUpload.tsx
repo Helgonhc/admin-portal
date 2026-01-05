@@ -10,6 +10,11 @@ interface DocumentUploadProps {
 }
 
 export default function DocumentUpload({ clientId }: DocumentUploadProps) {
+    const [documents, setDocuments] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const [category, setCategory] = useState('Outros');
     const [subcategory, setSubcategory] = useState('');
     const [referenceDate, setReferenceDate] = useState(new Date().toISOString().split('T')[0]);
