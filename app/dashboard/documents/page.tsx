@@ -21,6 +21,7 @@ type DocFile = {
 type Client = {
     id: string;
     name: string;
+    logo_url?: string | null;
     doc_count?: number;
 };
 
@@ -63,7 +64,7 @@ export default function GlobalDocumentsPage() {
         try {
             const { data, error } = await supabase
                 .from('clients')
-                .select('id, name')
+                .select('id, name, logo_url')
                 .order('name');
 
             if (error) throw error;
@@ -309,8 +310,12 @@ export default function GlobalDocumentsPage() {
                                     onClick={() => navigateTo(item)}
                                     className="cursor-pointer p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition-all flex flex-col items-center justify-center text-center gap-3 bg-white"
                                 >
-                                    <div className="p-3 rounded-full bg-indigo-50 text-indigo-600">
-                                        <Building2 size={32} />
+                                    <div className="w-16 h-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden border border-gray-100">
+                                        {item.logo_url ? (
+                                            <img src={item.logo_url} alt={item.name} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Building2 size={32} className="text-indigo-600" />
+                                        )}
                                     </div>
                                     <h3 className="font-bold text-gray-800 text-sm line-clamp-2">{item.name}</h3>
                                 </div>
