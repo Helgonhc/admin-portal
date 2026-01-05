@@ -43,11 +43,11 @@ export const useAuthStore = create<AuthState>()(
 
             // Verificar se é super_admin, admin ou técnico
             if (profile && (profile.role === 'super_admin' || profile.role === 'admin' || profile.role === 'technician')) {
-              set({ 
-                user: data.user, 
-                profile, 
+              set({
+                user: data.user,
+                profile,
                 isAuthenticated: true,
-                isLoading: false 
+                isLoading: false
               });
               return {};
             } else {
@@ -65,15 +65,15 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         // 1. Fazer signOut no Supabase PRIMEIRO (isso limpa a sessão do Supabase)
         await supabase.auth.signOut({ scope: 'global' });
-        
+
         // 2. Limpar estado do Zustand
         set({ user: null, profile: null, isAuthenticated: false, isLoading: false });
-        
+
         // 3. Limpar TODOS os storages relacionados
         if (typeof window !== 'undefined') {
           // Limpar nosso storage
           localStorage.removeItem('admin-auth-storage');
-          
+
           // Limpar storage do Supabase (pode ter vários nomes)
           const keysToRemove: string[] = [];
           for (let i = 0; i < localStorage.length; i++) {
@@ -83,7 +83,7 @@ export const useAuthStore = create<AuthState>()(
             }
           }
           keysToRemove.forEach(key => localStorage.removeItem(key));
-          
+
           // Limpar sessionStorage também
           sessionStorage.clear();
         }
@@ -100,16 +100,18 @@ export const useAuthStore = create<AuthState>()(
           .single();
 
         if (profile) {
-          set({ profile });
+          // Garantir que o email do perfil esteja sincronizado com o do usuário de auth
+          const updatedProfile = { ...profile, email: user.email || profile.email };
+          set({ profile: updatedProfile });
         }
       },
 
       checkAuth: async () => {
         set({ isLoading: true });
-        
+
         // Verificar se existe sessão válida no Supabase
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (session?.user) {
           const { data: profile } = await supabase
             .from('profiles')
@@ -118,11 +120,13 @@ export const useAuthStore = create<AuthState>()(
             .single();
 
           if (profile && (profile.role === 'super_admin' || profile.role === 'admin' || profile.role === 'technician')) {
-            set({ 
-              user: session.user, 
-              profile, 
+            // Sincronizar email do perfil com email da sessão
+            const updatedProfile = { ...profile, email: session.user.email || profile.email };
+            set({
+              user: session.user,
+              profile: updatedProfile,
               isAuthenticated: true,
-              isLoading: false 
+              isLoading: false
             });
             return;
           }
@@ -138,10 +142,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'admin-auth-storage',
-      partialize: (state) => ({ 
+      partialize: (state) => ({
         user: state.user,
         profile: state.profile,
-        isAuthenticated: state.isAuthenticated 
+        isAuthenticated: state.isAuthenticated
       }),
     }
   )

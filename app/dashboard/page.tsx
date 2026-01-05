@@ -20,6 +20,7 @@ import {
 import Link from 'next/link';
 import { Skeleton, DashboardSkeleton } from '../../components/Skeleton';
 import { getStatusColor, getStatusLabel } from '../../utils/statusUtils';
+import toast from 'react-hot-toast';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -44,6 +45,7 @@ export default function DashboardPage() {
   const [recentTickets, setRecentTickets] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [statusChartData, setStatusChartData] = useState<any[]>([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const COLORS = ['#4f46e5', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6'];
@@ -135,10 +137,34 @@ export default function DashboardPage() {
 
       setRecentTickets(tickets || []);
 
-    } catch (error) {
+      const { data: upcoming } = await supabase
+        .from('appointment_requests')
+        .select('*, clients(name)')
+        .gte('requested_date', new Date().toISOString().split('T')[0])
+        .order('requested_date', { ascending: true })
+        .order('requested_time_start', { ascending: true })
+        .limit(3);
+
+      setUpcomingAppointments(upcoming || []);
+    } catch (error: any) {
       console.error('💥 Erro ao carregar dashboard:', error);
     } finally {
       setTimeout(() => setLoading(false), 500);
+    }
+  }
+
+  async function updateAppointmentStatus(id: string, newStatus: string) {
+    try {
+      const { error } = await supabase
+        .from('appointment_requests')
+        .update({ status: newStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success(`Agendamento ${newStatus === 'confirmed' ? 'confirmado' : 'atualizado'}!`);
+      loadDashboard();
+    } catch (error: any) {
+      toast.error(error.message);
     }
   }
 
@@ -153,6 +179,46 @@ export default function DashboardPage() {
         </h1>
         <p className="text-gray-500">Aqui está o resumo operacional de hoje</p>
       </div>
+
+      {/* Lembretes / Próximos Agendamentos */}
+      {upcomingAppointments.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {upcomingAppointments.map((app) => (
+            <div key={app.id} className="card border-l-4 border-l-indigo-500 bg-indigo-50/50 relative overflow-hidden group">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                    <Calendar size={10} /> {app.requested_date} às {app.requested_time_start}
+                  </p>
+                  <h4 className="font-bold text-gray-800 text-sm">{app.title || app.service_type}</h4>
+                  <p className="text-xs text-gray-500">{app.clients?.name}</p>
+                </div>
+                {(app.status === 'pending' || app.status === 'pendente') && (
+                  <button
+                    onClick={() => updateAppointmentStatus(app.id, 'confirmed')}
+                    className="p-1.5 bg-white text-emerald-600 rounded-lg shadow-sm border border-emerald-100 hover:bg-emerald-50 transition-colors"
+                    title="Confirmar Agendamento"
+                  >
+                    <CheckCircle size={18} />
+                  </button>
+                )}
+              </div>
+              <div className="mt-3 flex justify-between items-center">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${app.status === 'confirmed' || app.status === 'confirmado' ? 'bg-green-100 text-green-700' :
+                  app.status === 'pending' || app.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                  {app.status === 'pending' || app.status === 'pendente' ? 'Pendente' :
+                    app.status === 'confirmed' || app.status === 'confirmado' ? 'Confirmado' : app.status}
+                </span>
+                <Link href="/dashboard/agenda" className="text-[10px] text-gray-400 hover:text-indigo-600 hover:underline">
+                  Ver na agenda
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

@@ -371,7 +371,7 @@ export default function AgendaPage() {
               <h3 className="font-semibold text-gray-800 mb-4">
                 {selectedDate
                   ? format(selectedDate, "d 'de' MMMM", { locale: ptBR })
-                  : 'Selecione um dia'}
+                  : 'Próximos Agendamentos'}
               </h3>
 
               {selectedDate && (
@@ -385,12 +385,34 @@ export default function AgendaPage() {
               )}
 
               <div className="space-y-3">
-                {selectedDateEvents.length === 0 ? (
+                {(!selectedDate ? [
+                  ...appointments.map(a => ({ ...a, type: 'appointment' })),
+                  ...orders.map(o => ({ ...o, type: 'order' })),
+                  ...maintenances.map(m => ({ ...m, type: 'maintenance' }))
+                ].filter(e => {
+                  const date = e.requested_date || e.scheduled_at?.split('T')[0] || e.next_maintenance_date;
+                  return date >= format(new Date(), 'yyyy-MM-dd');
+                }).sort((a, b) => {
+                  const dateA = a.requested_date || a.scheduled_at?.split('T')[0] || a.next_maintenance_date;
+                  const dateB = b.requested_date || b.scheduled_at?.split('T')[0] || b.next_maintenance_date;
+                  return dateA.localeCompare(dateB);
+                }).slice(0, 10) : selectedDateEvents).length === 0 ? (
                   <p className="text-gray-500 text-sm text-center py-4">
-                    {selectedDate ? 'Nenhum evento neste dia' : 'Selecione um dia no calendário'}
+                    {selectedDate ? 'Nenhum evento neste dia' : 'Nenhum agendamento futuro'}
                   </p>
                 ) : (
-                  selectedDateEvents.map((event: any) => (
+                  (!selectedDate ? [
+                    ...appointments.map(a => ({ ...a, type: 'appointment' })),
+                    ...orders.map(o => ({ ...o, type: 'order' })),
+                    ...maintenances.map(m => ({ ...m, type: 'maintenance' }))
+                  ].filter(e => {
+                    const date = e.requested_date || e.scheduled_at?.split('T')[0] || e.next_maintenance_date;
+                    return date >= format(new Date(), 'yyyy-MM-dd');
+                  }).sort((a, b) => {
+                    const dateA = a.requested_date || a.scheduled_at?.split('T')[0] || a.next_maintenance_date;
+                    const dateB = b.requested_date || b.scheduled_at?.split('T')[0] || b.next_maintenance_date;
+                    return dateA.localeCompare(dateB);
+                  }).slice(0, 10) : selectedDateEvents).map((event: any) => (
                     <div
                       key={event.id}
                       onClick={() => setSelectedEvent(event)}
@@ -401,33 +423,33 @@ export default function AgendaPage() {
                           : 'bg-indigo-50 border-indigo-500'
                         }`}
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        {event.type === 'order' ? (
-                          <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded">📋 OS</span>
-                        ) : event.type === 'maintenance' ? (
-                          <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded">🔧 Manutenção</span>
-                        ) : (
-                          <span className="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">📅 Agendamento</span>
-                        )}
-                        {(event.requested_time_start || event.scheduled_time) && (
-                          <span className="text-xs text-gray-500 flex items-center gap-1">
-                            <Clock size={12} />
-                            {event.requested_time_start || event.scheduled_time}
-                          </span>
-                        )}
-                        {event.type === 'maintenance' && event.urgency_status && (
-                          <span className={`text-xs px-2 py-0.5 rounded text-white ${event.urgency_status === 'vencido' ? 'bg-red-500' :
-                            event.urgency_status === 'urgente' ? 'bg-amber-500' : 'bg-emerald-500'
-                            }`}>
-                            {event.urgency_status === 'vencido' ? 'Vencida' :
-                              event.urgency_status === 'urgente' ? 'Urgente' : 'OK'}
-                          </span>
-                        )}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          {event.type === 'order' ? (
+                            <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-bold">📋 OS</span>
+                          ) : event.type === 'maintenance' ? (
+                            <span className="text-[10px] bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded font-bold">🔧 MANUT</span>
+                          ) : (
+                            <span className="text-[10px] bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded font-bold">📅 AGEND</span>
+                          )}
+                          {!selectedDate && (
+                            <span className="text-[10px] text-gray-500 font-medium">
+                              {event.requested_date || event.scheduled_at?.split('T')[0] || event.next_maintenance_date}
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase ${event.status === 'confirmed' || event.status === 'confirmado' ? 'bg-green-100 text-green-700' :
+                            event.status === 'pending' || event.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-700'
+                          }`}>
+                          {event.status === 'pending' || event.status === 'pendente' ? 'Pendente' :
+                            event.status === 'confirmed' || event.status === 'confirmado' ? 'Confirmado' : event.status}
+                        </span>
                       </div>
-                      <p className="font-medium text-gray-800 text-sm">
+                      <p className="font-semibold text-gray-800 text-sm truncate">
                         {event.type === 'maintenance' ? (event.maintenance_type_name || event.title) : (event.title || event.service_type)}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 mt-0.5 italic">
                         {event.type === 'maintenance' ? event.client_name : event.clients?.name}
                       </p>
                     </div>
