@@ -31,6 +31,7 @@ import {
   FileCheck,
   TrendingUp,
   Search,
+  FolderOpen
 } from 'lucide-react';
 
 // Menu items com permissões necessárias
@@ -42,6 +43,7 @@ const menuItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, permission: null },
   { name: 'Insights & BI', href: '/dashboard/performance', icon: TrendingUp, permission: 'can_view_reports' },
   { name: 'Clientes', href: '/dashboard/clients', icon: Building2, permission: 'can_view_all_clients' },
+  { name: 'Documentos', href: '/dashboard/documents', icon: FolderOpen, permission: null },
   { name: 'Equipamentos', href: '/dashboard/equipments', icon: Wrench, permission: 'can_create_equipments' },
   { name: 'Ordens de Serviço', href: '/dashboard/orders', icon: ClipboardList, permission: null },
   { name: 'Chamados', href: '/dashboard/tickets', icon: Ticket, permission: null },
