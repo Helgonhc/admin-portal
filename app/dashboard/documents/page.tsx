@@ -30,6 +30,7 @@ const CATEGORY_COLORS: any = {
     'Laudo': 'text-orange-600 bg-orange-50',
     'Ordem de Serviço': 'text-gray-600 bg-gray-50',
     'Nota Fiscal': 'text-green-600 bg-green-50',
+    'Orçamento': 'text-emerald-600 bg-emerald-50',
     'Outros': 'text-purple-600 bg-purple-50',
 };
 
