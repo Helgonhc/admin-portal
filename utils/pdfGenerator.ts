@@ -26,16 +26,6 @@ const formatDate = (dateString: string) => {
   } catch { return String(dateString); }
 };
 
-// --- Formatação de ID ---
-const formatOrderId = (id: string, dateString: string) => {
-  if (!id) return 'OS';
-  try {
-    const s = String(dateString).split('T')[0];
-    const [y, m] = s.split('-');
-    return `${y}${m}-${id.slice(0, 4).toUpperCase()}`;
-  } catch { return id.slice(0, 6).toUpperCase(); }
-};
-
 // --- Configuração da Empresa ---
 async function getCompanyConfig() {
   const { data: config } = await supabase.from('app_config').select('*').limit(1).maybeSingle();
@@ -47,29 +37,30 @@ async function getCompanyConfig() {
     email: config?.company_email || config?.email || '',
     website: config?.company_website || '',
     logo: config?.company_logo || config?.logo_url || '',
-    color: config?.primary_color || '#1e293b' // Slate-800 default for premium look
+    color: config?.primary_color || '#0f172a'
   };
 }
 
-// --- CSS Premium (Global) ---
-const getPremiumCSS = (primaryColor: string) => `
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+// --- CSS Elite (Super Premium) ---
+const getEliteCSS = (primaryColor: string) => `
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
     :root {
         --primary: ${primaryColor};
-        --text-dark: #111827;
-        --text-gray: #6b7280;
-        --text-light: #9ca3af;
-        --bg-gray: #f9fafb;
-        --border-color: #e5e7eb;
+        --slate-900: #0f172a;
+        --slate-800: #1e293b;
+        --slate-600: #475569;
+        --slate-400: #94a3b8;
+        --slate-200: #e2e8f0;
+        --slate-50: #f8fafc;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; }
 
     body {
         font-family: 'Plus Jakarta Sans', sans-serif;
-        background-color: #f3f4f6;
-        color: var(--text-dark);
+        background-color: #f1f5f9;
+        color: var(--slate-900);
         padding: 40px;
     }
 
@@ -77,24 +68,13 @@ const getPremiumCSS = (primaryColor: string) => `
         width: 210mm;
         margin: 0 auto;
         background: white;
-        box-shadow: 0 20px 40px -10px rgba(0,0,0,0.1);
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1);
         min-height: 297mm;
         position: relative;
-        overflow: hidden; 
     }
 
-    .page-content {
-        padding: 40px;
-        position: relative;
-        z-index: 10;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* Decorative Header Bar */
-    .top-bar {
-        height: 8px;
+    .header-bar {
+        height: 6px;
         background: var(--primary);
         width: 100%;
         position: absolute;
@@ -102,247 +82,262 @@ const getPremiumCSS = (primaryColor: string) => `
         left: 0;
     }
 
-    /* Header Section */
-    .header {
+    .padding-wrap {
+        padding: 45px;
+        height: 100%;
         display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 50px;
-        margin-top: 10px;
+        flex-direction: column;
     }
 
-    .logo-area img {
-        height: 80px;
+    /* Header Structure */
+    .header-grid {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 40px;
+        margin-bottom: 50px;
+        align-items: start;
+    }
+
+    .company-branding img {
+        height: 60px;
         object-fit: contain;
         display: block;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     }
 
-    .company-info h1 {
-        font-size: 24px;
+    .company-branding h1 {
+        font-size: 18px;
         font-weight: 800;
-        color: var(--text-dark);
         letter-spacing: -0.5px;
-        line-height: 1.2;
+        color: var(--slate-900);
+        margin-bottom: 6px;
     }
 
     .company-details {
-        font-size: 10px;
-        color: var(--text-gray);
-        margin-top: 8px;
+        font-size: 9px;
+        color: var(--slate-600);
         line-height: 1.5;
     }
 
-    .document-badge {
+    .doc-meta {
         text-align: right;
     }
 
-    .badge-title {
-        font-size: 11px;
+    .doc-type {
+        font-size: 10px;
         font-weight: 700;
-        text-transform: uppercase;
         letter-spacing: 2px;
-        color: var(--text-light);
-        margin-bottom: 5px;
-    }
-
-    .badge-value {
-        font-size: 32px;
-        font-weight: 800;
-        color: var(--primary);
-        letter-spacing: -1px;
-    }
-
-    .meta-grid {
-        display: grid;
-        grid-template-columns: auto auto;
-        gap: 20px;
-        margin-top: 15px;
-        justify-content: end;
-    }
-
-    .meta-item {
-        text-align: right;
-    }
-
-    .meta-label {
-        font-size: 9px;
-        font-weight: 600;
-        color: var(--text-light);
+        color: var(--slate-400);
         text-transform: uppercase;
-    }
-
-    .meta-data {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--text-dark);
-    }
-
-    /* Client Section - "Card" Look */
-    .client-section {
-        background: var(--bg-gray);
-        border-radius: 12px;
-        padding: 25px;
-        margin-bottom: 40px;
-        display: flex;
-        justify-content: space-between;
-        border-left: 5px solid var(--primary);
-    }
-
-    .client-col h3 {
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        color: var(--text-light);
-        margin-bottom: 8px;
-        letter-spacing: 1px;
-    }
-
-    .client-main {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--text-dark);
         margin-bottom: 4px;
     }
 
-    .client-sub {
-        font-size: 12px;
-        color: var(--text-gray);
-        line-height: 1.5;
-    }
-
-    /* Table */
-    .table-container {
-        margin-bottom: 40px;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    th {
-        text-align: left;
-        font-size: 10px;
+    /* MENOR TAMANHO NO NÚMERO DO ORÇAMENTO */
+    .doc-number {
+        font-size: 22px; /* Reduzido de 32px para 22px */
         font-weight: 700;
-        text-transform: uppercase;
-        color: var(--text-light);
-        padding: 15px 10px;
-        border-bottom: 2px solid var(--border-color);
-        background: white;
-    }
-
-    td {
-        padding: 16px 10px;
-        font-size: 12px;
-        color: var(--text-dark);
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    tr:last-child td {
-        border-bottom: none;
-    }
-
-    .col-desc { width: 50%; }
-    .col-center { text-align: center; }
-    .col-right { text-align: right; }
-    .col-sub { font-size: 11px; color: var(--text-gray); margin-top: 2px; }
-
-    /* Totals Section */
-    .totals-area {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 40px;
-    }
-
-    .totals-box {
-        width: 300px;
-    }
-
-    .total-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 8px 0;
-        font-size: 12px;
-        color: var(--text-gray);
-    }
-
-    .total-row.final {
-        border-top: 2px solid var(--border-color);
-        margin-top: 12px;
-        padding-top: 15px;
-        font-size: 16px;
-        font-weight: 800;
-        color: var(--text-dark);
-    }
-
-    .text-success { color: #10b981; }
-
-    /* Terms & Notes */
-    .notes-section {
-        margin-bottom: 40px;
-    }
-
-    .section-header {
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        color: var(--text-dark);
-        border-bottom: 1px solid var(--border-color);
-        padding-bottom: 10px;
+        color: var(--primary);
+        letter-spacing: -0.5px;
         margin-bottom: 15px;
     }
 
-    .text-content {
-        font-size: 11px;
-        line-height: 1.6;
-        color: var(--text-gray);
-        white-space: pre-wrap;
+    .meta-table {
+        margin-left: auto;
+        border-collapse: collapse;
+    }
+    .meta-table td {
+        padding: 3px 0 3px 15px;
+        font-size: 10px;
+        color: var(--slate-600);
+        text-align: right;
+    }
+    .meta-label { font-weight: 600; color: var(--slate-400); text-transform: uppercase; }
+    .meta-value { font-weight: 700; color: var(--slate-900); }
+
+    /* Client Box */
+    .client-box {
+        background: var(--slate-50);
+        border: 1px solid var(--slate-200);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 40px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
     }
 
-    /* Footer */
-    .footer {
-        margin-top: auto;
-        padding-top: 20px;
-        border-top: 1px solid var(--border-color);
-        text-align: center;
+    .box-col-label {
         font-size: 9px;
-        color: var(--text-light);
+        font-weight: 700;
+        color: var(--slate-400);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
     }
 
-    /* Print Button */
+    .box-col-value {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--slate-900);
+        margin-bottom: 4px;
+    }
+
+    .box-col-sub {
+        font-size: 10px;
+        color: var(--slate-600);
+        line-height: 1.5;
+    }
+
+    /* Items Table */
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 30px;
+    }
+
+    .items-table th {
+        text-align: left;
+        padding: 12px 10px;
+        font-size: 9px;
+        font-weight: 800;
+        color: var(--slate-400);
+        text-transform: uppercase;
+        border-bottom: 2px solid var(--slate-200);
+    }
+
+    .items-table td {
+        padding: 16px 10px;
+        font-size: 11px;
+        color: var(--slate-900);
+        border-bottom: 1px solid var(--slate-200);
+    }
+
+    .items-table tr:last-child td { border-bottom: none; }
+
+    .col-r { text-align: right; }
+    .col-c { text-align: center; }
+    .item-name { font-weight: 700; margin-bottom: 3px; }
+    .item-desc { font-size: 10px; color: var(--slate-600); max-width: 400px; }
+
+    /* Financial Summary */
+    .financial-grid {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 45px;
+    }
+
+    .summary-box {
+        width: 280px;
+    }
+
+    .sum-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        font-size: 11px;
+        color: var(--slate-600);
+    }
+
+    .sum-row.total {
+        border-top: 2px solid var(--slate-900);
+        margin-top: 10px;
+        padding-top: 12px;
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--slate-900);
+    }
+
+    /* Terms */
+    .terms-section {
+        border-top: 1px solid var(--slate-200);
+        padding-top: 25px;
+        margin-bottom: 40px;
+    }
+
+    .terms-title {
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--slate-900);
+        text-transform: uppercase;
+        margin-bottom: 10px;
+    }
+
+    .terms-content {
+        font-size: 10px;
+        color: var(--slate-600);
+        line-height: 1.6;
+        white-space: pre-wrap;
+        columns: 2;
+        column-gap: 30px;
+    }
+
+    /* Signatures */
+    .signatures {
+        margin-top: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 60px;
+        padding-top: 40px;
+        page-break-inside: avoid;
+    }
+
+    .sign-line {
+        border-top: 1px solid var(--slate-300);
+        padding-top: 10px;
+        margin-top: 40px;
+    }
+
+    .sign-name {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--slate-900);
+    }
+
+    .sign-role {
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--slate-400); 
+        text-transform: uppercase;
+        margin-top: 2px;
+    }
+
     .print-btn {
         position: fixed;
         bottom: 30px;
         right: 30px;
-        background: var(--primary);
+        background: var(--slate-900);
         color: white;
-        padding: 15px 30px;
-        border-radius: 50px;
+        padding: 14px 28px;
+        border-radius: 8px;
         border: none;
+        font-family: inherit;
         font-weight: 600;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
         cursor: pointer;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         z-index: 100;
-        transition: transform 0.2s;
+        transition: all 0.2s;
     }
-    .print-btn:hover { transform: translateY(-2px); }
+    .print-btn:hover { background: black; transform: translateY(-2px); }
 
     @media print {
         body { padding: 0; background: white; }
-        .page-container { margin: 0; box-shadow: none; }
+        .page-container { margin: 0; box-shadow: none; min-height: 100vh; }
         .print-btn { display: none; }
     }
 `;
 
-// --- Gerador de PDF de Orçamento ---
 export async function generateQuotePDF(quote: any) {
   try {
     const company = await getCompanyConfig();
-    const style = getPremiumCSS(company.color);
+    const style = getEliteCSS(company.color);
 
-    // Dados Calculados
-    const items = quote.items || [];
+    // Sort items if available
+    const items = quote.items ? [...quote.items].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0)) : [];
+
+    // Calculate Values
     const subtotal = quote.subtotal || items.reduce((acc: number, item: any) => acc + (item.total || (item.quantity * item.unit_price)), 0);
     const discountVal = quote.discount || 0;
     const discountAmount = quote.discount_type === 'percentage'
@@ -354,150 +349,175 @@ export async function generateQuotePDF(quote: any) {
 
     const quoteNumber = quote.quote_number || `ORC-${quote.id?.slice(0, 4).toUpperCase()}`;
 
-    // Construção do HTML
+    // Helper status badge text
+    const getStatusText = (s: string) => {
+      switch (s) {
+        case 'approved': return 'APROVADO';
+        case 'rejected': return 'RECUSADO';
+        case 'pending': return 'PENDENTE';
+        case 'converted': return 'CONVERTIDO EM OS';
+        default: return 'RASCUNHO';
+      }
+    };
+
     const html = `
       <!DOCTYPE html>
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <title>Orçamento ${quoteNumber}</title>
+        <title>Proposta ${quoteNumber}</title>
         <style>${style}</style>
       </head>
       <body>
-        <button class="print-btn" onclick="window.print()">IMPRIMIR ORÇAMENTO</button>
+        <button class="print-btn" onclick="window.print()">Imprimir Proposta</button>
         
         <div class="page-container">
-          <div class="top-bar"></div>
-          <div class="page-content">
-            
+          <div class="header-bar"></div>
+          <div class="padding-wrap">
+
             <!-- HEADER -->
-            <header class="header">
-              <div class="company-info">
-                 ${company.logo ? `<div class="logo-area"><img src="${company.logo}" alt="Logo"></div>` : ''}
-                 <h1>${company.name}</h1>
-                 <div class="company-details">
-                   ${company.cnpj ? `CNPJ: ${company.cnpj}<br>` : ''}
-                   ${company.address}<br>
-                   ${company.phone ? `${company.phone}` : ''} 
-                   ${company.email ? `• ${company.email}` : ''}
-                 </div>
-              </div>
+            <div class="header-grid">
+               <div class="company-branding">
+                  ${company.logo ? `<img src="${company.logo}" alt="Company Logo">` : ''}
+                  <h1>${company.name}</h1>
+                  <div class="company-details">
+                    CNPJ: ${company.cnpj}<br>
+                    ${company.address}<br>
+                    ${company.phone} • ${company.email}
+                  </div>
+               </div>
 
-              <div class="document-badge">
-                <div class="badge-title">ORÇAMENTO</div>
-                <div class="badge-value">#${quoteNumber}</div>
-                
-                <div class="meta-grid">
-                   <div class="meta-item">
-                     <div class="meta-label">Data de Emissão</div>
-                     <div class="meta-data">${formatDate(quote.created_at)}</div>
-                   </div>
-                   <div class="meta-item">
-                     <div class="meta-label">Válido Até</div>
-                     <div class="meta-data" style="color: var(--primary)">${formatDate(quote.valid_until)}</div>
-                   </div>
-                </div>
-              </div>
-            </header>
+               <div class="doc-meta">
+                 <div class="doc-type">Proposta Comercial</div>
+                 <div class="doc-number">#${quoteNumber}</div>
+                 
+                 <table class="meta-table">
+                    <tr>
+                        <td class="meta-label">Data:</td>
+                        <td class="meta-value">${formatDate(quote.created_at)}</td>
+                    </tr>
+                    <tr>
+                        <td class="meta-label">Validade:</td>
+                        <td class="meta-value" style="color: var(--primary)">${formatDate(quote.valid_until)}</td>
+                    </tr>
+                    <tr>
+                        <td class="meta-label">Status:</td>
+                        <td class="meta-value">${getStatusText(quote.status)}</td>
+                    </tr>
+                 </table>
+               </div>
+            </div>
 
-            <!-- CLIENT INFO -->
-            <section class="client-section">
-              <div class="client-col">
-                <h3>Preparado Para</h3>
-                <div class="client-main">${quote.clients?.name || 'Cliente'}</div>
-                <div class="client-sub">
-                  ${quote.clients?.address || 'Endereço não informado'}<br>
-                  ${quote.clients?.phone || ''} <br>
-                  ${quote.clients?.email || ''}
+            <!-- CLIENT BOX -->
+            <div class="client-box">
+                <div>
+                    <div class="box-col-label">Prestador de Serviço</div>
+                    <div class="box-col-value">${company.name}</div>
+                    <div class="box-col-sub">
+                        Resp. Técnico: ${quote.created_by_name || 'Equipe Técnica'}<br>
+                        ${company.email}
+                    </div>
                 </div>
-              </div>
-              <div class="client-col" style="text-align: right;">
-                <h3>Status do Orçamento</h3>
-                <div class="client-main" style="text-transform: uppercase; color: var(--primary);">
-                    ${quote.status === 'pending' ? '🟡 Pendente' :
-        quote.status === 'approved' ? '🟢 Aprovado' :
-          quote.status === 'rejected' ? '🔴 Recusado' :
-            quote.status === 'converted' ? '🔵 Convertido' : 'Rascunho'}
+                <div style="text-align: right;">
+                    <div class="box-col-label">Cliente</div>
+                    <div class="box-col-value">${quote.clients?.name || 'Cliente'}</div>
+                    <div class="box-col-sub">
+                        ${quote.clients?.address || 'Endereço não informado'}<br>
+                        ${quote.clients?.cnpj_cpf ? `CPF/CNPJ: ${quote.clients.cnpj_cpf}<br>` : ''}
+                        ${quote.clients?.phone || ''} • ${quote.clients?.email || ''}
+                    </div>
                 </div>
-              </div>
-            </section>
+            </div>
 
             <!-- DESCRIPTION -->
             ${quote.description ? `
-            <section class="notes-section">
-              <div class="section-header">Escopo do Projeto</div>
-              <div class="text-content">${quote.description}</div>
-            </section>` : ''}
+            <div style="margin-bottom: 40px;">
+                <div class="terms-title">Objeto da Proposta</div>
+                <div style="font-size: 11px; color: var(--slate-600); line-height: 1.6;">${quote.description}</div>
+            </div>` : ''}
 
             <!-- ITEMS TABLE -->
-            <div class="table-container">
-               <table>
-                 <thead>
-                   <tr>
-                     <th class="col-desc">Descrição</th>
-                     <th class="col-center">Qtd</th>
-                     <th class="col-right">Preço Unit.</th>
-                     <th class="col-right">Total</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   ${items.length > 0 ? items.map((item: any) => `
-                     <tr>
-                       <td class="col-desc">
-                         <div style="font-weight: 600;">${item.name}</div>
-                         ${item.description ? `<div class="col-sub">${item.description}</div>` : ''}
-                       </td>
-                       <td class="col-center">${item.quantity}</td>
-                       <td class="col-right">R$ ${Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                       <td class="col-right" style="font-weight: 600;">R$ ${Number(item.total || (item.quantity * item.unit_price)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                     </tr>
-                   `).join('') : `<tr><td colspan="4" style="text-align: center; padding: 30px; color: var(--text-light);">Nenhum item listado neste orçamento.</td></tr>`}
-                 </tbody>
-               </table>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Descrição do Serviço / Item</th>
+                        <th class="col-c">Qtd</th>
+                        <th class="col-r">Valor Unit.</th>
+                        <th class="col-r">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.length > 0 ? items.map((item: any) => `
+                        <tr>
+                            <td>
+                                <div class="item-name">${item.name}</div>
+                                ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
+                            </td>
+                            <td class="col-c">${item.quantity}</td>
+                            <td class="col-r">R$ ${Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td class="col-r" style="font-weight: 700;">R$ ${Number(item.total || (item.quantity * item.unit_price)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    `).join('') : `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #94a3b8;">Nenhum item adicionado.</td></tr>`}
+                </tbody>
+            </table>
+
+            <!-- FINANCIAL SUMMARY -->
+            <div class="financial-grid">
+                <div class="summary-box">
+                    <div class="sum-row">
+                        <span>Subtotal</span>
+                        <span>R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+
+                    ${discountAmount > 0 ? `
+                    <div class="sum-row">
+                        <span>Desconto (${quote.discount_type === 'percentage' ? `${quote.discount}%` : 'Fixo'})</span>
+                        <span style="color: #ef4444;">- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>` : ''}
+
+                    ${tax > 0 ? `
+                    <div class="sum-row">
+                        <span>Taxas / Impostos</span>
+                        <span>+ R$ ${tax.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>` : ''}
+
+                    <div class="sum-row total">
+                        <span>TOTAL</span>
+                        <span style="color: var(--primary)">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                </div>
             </div>
 
-            <!-- FINANCIALS -->
-            <div class="totals-area">
-               <div class="totals-box">
-                 <div class="total-row">
-                   <span>Subtotal</span>
-                   <span>R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                 </div>
-                 
-                 ${discountAmount > 0 ? `
-                 <div class="total-row">
-                   <span>Desconto (${quote.discount_type === 'percentage' ? `${quote.discount}%` : 'Fixo'})</span>
-                   <span style="color: #ef4444">- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                 </div>` : ''}
-
-                 ${tax > 0 ? `
-                 <div class="total-row">
-                   <span>Taxas / Impostos</span>
-                   <span>+ R$ ${tax.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                 </div>` : ''}
-
-                 <div class="total-row final">
-                   <span>Valor Total</span>
-                   <span style="color: var(--primary)">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                 </div>
-               </div>
-            </div>
-
-            <!-- TERMS & NOTES -->
+            <!-- TERMS -->
             ${(quote.notes || quote.terms) ? `
-            <section class="notes-section">
-               <div class="section-header">Termos e Condições</div>
-               <div class="text-content">
-                 ${quote.notes ? `<strong>Observações:</strong>\n${quote.notes}\n\n` : ''}
-                 ${quote.terms ? `<strong>Condições Gerais:</strong>\n${quote.terms}` : ''}
-               </div>
-            </section>` : ''}
+            <div class="terms-section">
+                <div class="terms-title">Termos, Condições e Observações</div>
+                <div class="terms-content">
+                    ${quote.notes ? `${quote.notes}\n\n` : ''}
+                    ${quote.terms || ''}
+                </div>
+            </div>` : ''}
+
+            <!-- SIGNATURES -->
+            <div class="signatures">
+                <div class="sign-box">
+                    <div class="sign-line">
+                         <div class="sign-name">${company.name}</div>
+                         <div class="sign-role">Prestador de Serviço</div>
+                    </div>
+                </div>
+                <div class="sign-box">
+                    <div class="sign-line">
+                         <div class="sign-name">${quote.clients?.name || 'Cliente'}</div>
+                         <div class="sign-role">Aprovado por</div>
+                    </div>
+                </div>
+            </div>
 
             <!-- FOOTER -->
-            <footer class="footer">
-               Proposta comercial válida até ${formatDate(quote.valid_until)}. Este documento é confidencial.<br>
-               Gerado em ${new Date().toLocaleString('pt-BR')} por Chamei App.
-            </footer>
+            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--slate-200); text-align: center; font-size: 8px; color: var(--slate-400);">
+                Documento gerado eletronicamente em ${new Date().toLocaleString('pt-BR')} • ${company.name} • ${company.website || 'chameiapp.com'}
+            </div>
 
           </div>
         </div>
@@ -516,7 +536,4 @@ export async function generateQuotePDF(quote: any) {
   }
 }
 
-// Placeholder for Service Order to keep compiling without errors if used elsewhere
-export async function generateServiceOrderPDF(order: any) {
-  // ... keep existing or minimal implementation if needed, but focused on Quotes now
-}
+export async function generateServiceOrderPDF(order: any) { }

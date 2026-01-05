@@ -25,7 +25,11 @@ export default function QuoteDetailsPage() {
     try {
       const { data, error } = await supabase
         .from('quotes')
-        .select('*, clients(name, phone, email, address)')
+        .select(`
+            *,
+            clients (name, phone, email, address, cnpj_cpf),
+            items:quote_items(*)
+        `)
         .eq('id', params.id)
         .single();
 
@@ -116,8 +120,8 @@ export default function QuoteDetailsPage() {
           <h1 className="text-2xl font-bold text-gray-800">{quote.title}</h1>
           <p className="text-gray-500">{quote.clients?.name}</p>
         </div>
-        <button 
-          onClick={() => generateQuotePDF(quote)} 
+        <button
+          onClick={() => generateQuotePDF(quote)}
           className="btn btn-secondary"
           title="Gerar PDF"
         >
