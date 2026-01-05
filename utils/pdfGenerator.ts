@@ -1,21 +1,22 @@
 import { supabase } from '../lib/supabase';
 
-// --- Formatação de Data e Hora ---
-const formatDateTime = (dateString: string) => {
-  if (!dateString) return '-';
-  try {
-    let s = String(dateString).replace('Z', '').replace(/\+\d{2}:\d{2}$/, '').replace(/\.\d+$/, '');
-    if (s.includes('T')) {
-      const parts = s.split('T');
-      const [y, m, d] = parts[0].split('-');
-      const time = parts[1] || '00:00';
-      const [h, min] = time.split(':');
-      return `${d}/${m}/${y} ${h}:${min}`;
-    }
-    const [y, m, d] = s.split('-');
-    return `${d}/${m}/${y}`;
-  } catch { return String(dateString); }
-};
+// --- Configuração da Empresa ---
+async function getCompanyConfig() {
+  const { data: config } = await supabase.from('app_config').select('*').limit(1).maybeSingle();
+  return {
+    name: config?.company_name || 'CHAMEI TECNOLOGIA',
+    subtitle: config?.company_subtitle || 'Soluções Integradas',
+    cnpj: config?.company_cnpj || config?.cnpj || '00.000.000/0000-00',
+    address: config?.company_address || config?.address || 'Endereço não configurado',
+    city: config?.company_city || 'Cidade - UF',
+    cep: config?.company_cep || '00000-000',
+    phone: config?.company_phone || config?.phone || '',
+    email: config?.company_email || config?.email || '',
+    website: config?.company_website || '',
+    logo: config?.company_logo || config?.logo_url || '',
+    color: config?.primary_color || '#1e3a8a'
+  };
+}
 
 const formatDate = (dateString: string) => {
   if (!dateString) return '-';
@@ -26,503 +27,256 @@ const formatDate = (dateString: string) => {
   } catch { return String(dateString); }
 };
 
-// --- Configuração da Empresa ---
-async function getCompanyConfig() {
-  const { data: config } = await supabase.from('app_config').select('*').limit(1).maybeSingle();
-  return {
-    name: config?.company_name || 'CHAMEI TECNOLOGIA',
-    cnpj: config?.company_cnpj || config?.cnpj || '00.000.000/0000-00',
-    address: config?.company_address || config?.address || 'Endereço não configurado',
-    phone: config?.company_phone || config?.phone || '',
-    email: config?.company_email || config?.email || '',
-    website: config?.company_website || '',
-    logo: config?.company_logo || config?.logo_url || '',
-    color: config?.primary_color || '#0f172a'
-  };
-}
-
-// --- CSS Elite (Super Premium) ---
-const getEliteCSS = (primaryColor: string) => `
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-
-    :root {
-        --primary: ${primaryColor};
-        --slate-900: #0f172a;
-        --slate-800: #1e293b;
-        --slate-600: #475569;
-        --slate-400: #94a3b8;
-        --slate-200: #e2e8f0;
-        --slate-50: #f8fafc;
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; }
-
-    body {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        background-color: #f1f5f9;
-        color: var(--slate-900);
-        padding: 40px;
-    }
-
-    .page-container {
-        width: 210mm;
-        margin: 0 auto;
-        background: white;
-        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1);
-        min-height: 297mm;
-        position: relative;
-    }
-
-    .header-bar {
-        height: 6px;
-        background: var(--primary);
-        width: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-    }
-
-    .padding-wrap {
-        padding: 45px;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* Header Structure */
-    .header-grid {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 40px;
-        margin-bottom: 50px;
-        align-items: start;
-    }
-
-    .company-branding img {
-        height: 60px;
-        object-fit: contain;
-        display: block;
-        margin-bottom: 12px;
-    }
-
-    .company-branding h1 {
-        font-size: 18px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        color: var(--slate-900);
-        margin-bottom: 6px;
-    }
-
-    .company-details {
-        font-size: 9px;
-        color: var(--slate-600);
-        line-height: 1.5;
-    }
-
-    .doc-meta {
-        text-align: right;
-    }
-
-    .doc-type {
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 2px;
-        color: var(--slate-400);
-        text-transform: uppercase;
-        margin-bottom: 4px;
-    }
-
-    /* MENOR TAMANHO NO NÚMERO DO ORÇAMENTO */
-    .doc-number {
-        font-size: 22px; /* Reduzido de 32px para 22px */
-        font-weight: 700;
-        color: var(--primary);
-        letter-spacing: -0.5px;
-        margin-bottom: 15px;
-    }
-
-    .meta-table {
-        margin-left: auto;
-        border-collapse: collapse;
-    }
-    .meta-table td {
-        padding: 3px 0 3px 15px;
-        font-size: 10px;
-        color: var(--slate-600);
-        text-align: right;
-    }
-    .meta-label { font-weight: 600; color: var(--slate-400); text-transform: uppercase; }
-    .meta-value { font-weight: 700; color: var(--slate-900); }
-
-    /* Client Box */
-    .client-box {
-        background: var(--slate-50);
-        border: 1px solid var(--slate-200);
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 40px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
-    }
-
-    .box-col-label {
-        font-size: 9px;
-        font-weight: 700;
-        color: var(--slate-400);
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 8px;
-    }
-
-    .box-col-value {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--slate-900);
-        margin-bottom: 4px;
-    }
-
-    .box-col-sub {
-        font-size: 10px;
-        color: var(--slate-600);
-        line-height: 1.5;
-    }
-
-    /* Items Table */
-    .items-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 30px;
-    }
-
-    .items-table th {
-        text-align: left;
-        padding: 12px 10px;
-        font-size: 9px;
-        font-weight: 800;
-        color: var(--slate-400);
-        text-transform: uppercase;
-        border-bottom: 2px solid var(--slate-200);
-    }
-
-    .items-table td {
-        padding: 16px 10px;
-        font-size: 11px;
-        color: var(--slate-900);
-        border-bottom: 1px solid var(--slate-200);
-    }
-
-    .items-table tr:last-child td { border-bottom: none; }
-
-    .col-r { text-align: right; }
-    .col-c { text-align: center; }
-    .item-name { font-weight: 700; margin-bottom: 3px; }
-    .item-desc { font-size: 10px; color: var(--slate-600); max-width: 400px; }
-
-    /* Financial Summary */
-    .financial-grid {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 45px;
-    }
-
-    .summary-box {
-        width: 280px;
-    }
-
-    .sum-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 6px 0;
-        font-size: 11px;
-        color: var(--slate-600);
-    }
-
-    .sum-row.total {
-        border-top: 2px solid var(--slate-900);
-        margin-top: 10px;
-        padding-top: 12px;
-        font-size: 14px;
-        font-weight: 800;
-        color: var(--slate-900);
-    }
-
-    /* Terms */
-    .terms-section {
-        border-top: 1px solid var(--slate-200);
-        padding-top: 25px;
-        margin-bottom: 40px;
-    }
-
-    .terms-title {
-        font-size: 10px;
-        font-weight: 800;
-        color: var(--slate-900);
-        text-transform: uppercase;
-        margin-bottom: 10px;
-    }
-
-    .terms-content {
-        font-size: 10px;
-        color: var(--slate-600);
-        line-height: 1.6;
-        white-space: pre-wrap;
-        columns: 2;
-        column-gap: 30px;
-    }
-
-    /* Signatures */
-    .signatures {
-        margin-top: auto;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 60px;
-        padding-top: 40px;
-        page-break-inside: avoid;
-    }
-
-    .sign-line {
-        border-top: 1px solid var(--slate-300);
-        padding-top: 10px;
-        margin-top: 40px;
-    }
-
-    .sign-name {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--slate-900);
-    }
-
-    .sign-role {
-        font-size: 9px;
-        font-weight: 600;
-        color: var(--slate-400); 
-        text-transform: uppercase;
-        margin-top: 2px;
-    }
-
-    .print-btn {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        background: var(--slate-900);
-        color: white;
-        padding: 14px 28px;
-        border-radius: 8px;
-        border: none;
-        font-family: inherit;
-        font-weight: 600;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        cursor: pointer;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        z-index: 100;
-        transition: all 0.2s;
-    }
-    .print-btn:hover { background: black; transform: translateY(-2px); }
-
-    @media print {
-        body { padding: 0; background: white; }
-        .page-container { margin: 0; box-shadow: none; min-height: 100vh; }
-        .print-btn { display: none; }
-    }
-`;
-
 export async function generateQuotePDF(quote: any) {
   try {
     const company = await getCompanyConfig();
-    const style = getEliteCSS(company.color);
 
-    // Sort items if available
+    // Preparar Dados
     const items = quote.items ? [...quote.items].sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0)) : [];
 
-    // Calculate Values
+    // Totals
     const subtotal = quote.subtotal || items.reduce((acc: number, item: any) => acc + (item.total || (item.quantity * item.unit_price)), 0);
     const discountVal = quote.discount || 0;
-    const discountAmount = quote.discount_type === 'percentage'
-      ? subtotal * (discountVal / 100)
-      : discountVal;
-
+    const discountAmount = quote.discount_type === 'percentage' ? subtotal * (discountVal / 100) : discountVal;
     const tax = quote.tax || 0;
     const total = quote.total || (subtotal - discountAmount + tax);
 
     const quoteNumber = quote.quote_number || `ORC-${quote.id?.slice(0, 4).toUpperCase()}`;
 
-    // Helper status badge text
-    const getStatusText = (s: string) => {
-      switch (s) {
-        case 'approved': return 'APROVADO';
-        case 'rejected': return 'RECUSADO';
-        case 'pending': return 'PENDENTE';
-        case 'converted': return 'CONVERTIDO EM OS';
-        default: return 'RASCUNHO';
-      }
-    };
+    // Valor por extenso (simples ou placeholder se não tiver lib)
+    const amountExtenso = 'Reais'; // Idealmente usaria uma lib, mas manteremos simples por enquanto
 
     const html = `
-      <!DOCTYPE html>
-      <html lang="pt-BR">
-      <head>
-        <meta charset="UTF-8">
-        <title>Proposta ${quoteNumber}</title>
-        <style>${style}</style>
-      </head>
-      <body>
-        <button class="print-btn" onclick="window.print()">Imprimir Proposta</button>
-        
-        <div class="page-container">
-          <div class="header-bar"></div>
-          <div class="padding-wrap">
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposta ${quoteNumber}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Bibliotecas de Geração de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Fonte 'Lato' -->
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+      .font-sans { font-family: 'Lato', sans-serif; }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      .animate-spin { animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-100 font-sans text-slate-800 pb-32">
 
-            <!-- HEADER -->
-            <div class="header-grid">
-               <div class="company-branding">
-                  ${company.logo ? `<img src="${company.logo}" alt="Company Logo">` : ''}
-                  <h1>${company.name}</h1>
-                  <div class="company-details">
-                    CNPJ: ${company.cnpj}<br>
-                    ${company.address}<br>
-                    ${company.phone} • ${company.email}
-                  </div>
-               </div>
+    <!-- LOADER -->
+    <div id="pdf-loader" class="fixed top-0 left-0 w-full h-full bg-black bg-opacity-70 z-[10000] justify-center items-center text-white font-sans flex-col" style="display: none;">
+        <div class="border-4 border-t-4 border-t-blue-500 border-gray-200 rounded-full w-10 h-10 animate-spin mb-4"></div>
+        <p>Gerando PDF, por favor aguarde...</p>
+    </div>
 
-               <div class="doc-meta">
-                 <div class="doc-type">Proposta Comercial</div>
-                 <div class="doc-number">#${quoteNumber}</div>
+    <main class="max-w-5xl mx-auto p-4 flex justify-center">
+        <!-- DOCUMENTO VISUAL (A4) -->
+        <div 
+             id="document-to-print" 
+             class="bg-white shadow-2xl relative text-black box-border mx-auto"
+             style="
+               width: 794px; 
+               min-height: 1123px; /* Altura mínima A4 */
+               height: auto; 
+               padding: 45px 45px 100px 45px;
+               overflow: visible;
+             "
+           >
+              <!-- Cabeçalho -->
+              <div class="flex flex-row justify-between items-start border-b-2 border-blue-900 pb-4 mb-6 w-full">
+                <div class="w-[60%] pr-4">
+                   <div class="mb-4 h-24 flex items-start"> 
+                     ${company.logo ? `<img src="${company.logo}" class="h-full w-auto object-contain" crossorigin="anonymous" alt="Logo">` : ''}
+                   </div>
+                   <h1 class="text-xl font-black text-blue-900 uppercase leading-none mb-1">${company.name}</h1>
+                   <p class="text-xs font-bold tracking-widest text-gray-500 uppercase mb-3">${company.subtitle}</p>
+                   <div class="pl-2 border-l-4 border-blue-600">
+                      <p class="text-[10px] font-bold uppercase text-gray-800">MATRIZ ${company.city}</p>
+                      <p class="text-[10px] uppercase text-gray-600">${company.address}</p>
+                   </div>
+                </div>
+                <div class="w-[40%] flex flex-col items-end text-right">
+                   <div class="bg-gray-100 border-l-4 border-blue-900 p-3 w-full text-left mb-3">
+                    <h2 class="font-bold text-blue-900 text-xs uppercase mb-2">Proposta Comercial</h2>
+                    <div class="text-[10px] space-y-1">
+                       <div class="flex justify-between border-b border-gray-300 pb-0.5"><span class="font-bold text-gray-600">Nº:</span> <span>${quoteNumber}</span></div>
+                       <div class="flex justify-between border-b border-gray-300 pb-0.5"><span class="font-bold text-gray-600">DATA:</span> <span>${formatDate(quote.created_at)}</span></div>
+                       <div class="flex justify-between"><span class="font-bold text-gray-600">STATUS:</span> 
+                          <span class="${quote.status === 'approved' ? 'text-green-600' : 'text-gray-800'} font-bold uppercase">${quote.status === 'pending' ? 'Pendente' : quote.status}</span>
+                       </div>
+                      </div>
+                   </div>
+                   <div class="text-[9px] text-gray-500 leading-tight">
+                      <p>${company.email}</p>
+                      <p>${company.website || ''}</p>
+                      <p>${company.phone}</p>
+                   </div>
+                </div>
+              </div>
+              
+              <!-- Cliente -->
+              <section class="mb-8">
+                 <h2 class="text-xl font-bold text-gray-900 leading-tight">${quote.clients?.name || 'Cliente'}</h2>
+                 <p class="text-sm text-gray-600 mb-2">
+                    ${quote.clients?.address || ''}<br>
+                    ${quote.clients?.phone || ''} ${quote.clients?.email ? `• ${quote.clients.email}` : ''}
+                 </p>
+                 <div class="bg-blue-50 border border-blue-100 px-3 py-2 rounded-sm w-full">
+                    <p class="text-xs text-blue-900"><strong class="font-bold uppercase mr-1">Objeto:</strong> <span>${quote.title || 'Prestação de Serviços'}</span></p>
+                 </div>
+              </section>
+
+              <!-- Descrição / Notes -->
+               ${quote.description ? `
+               <section class="mb-6">
+                  <h3 class="font-bold text-blue-900 text-sm uppercase mb-2">Descrição / Escopo</h3>
+                  <div class="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">${quote.description}</div>
+               </section>` : ''}
+              
+              <!-- Itens -->
+              <section class="mb-8">
+                 ${items.map((item: any, idx: number) => `
+                 <div class="break-inside-avoid bg-gray-50 border border-gray-200 rounded-r-lg p-4 mb-4 border-l-4 border-blue-800 shadow-sm">
+                    <div class="flex justify-between items-baseline mb-2">
+                       <div class="flex items-baseline gap-3">
+                          <span class="font-black text-lg text-blue-800">ITEM ${idx + 1}</span>
+                          <h3 class="font-bold text-blue-900 text-base py-1">${item.name}</h3>
+                       </div>
+                       <div class="text-right">
+                          <div class="text-xs text-gray-500 uppercase font-bold">Total Item</div>
+                          <div class="font-bold text-gray-900">R$ ${Number(item.total || (item.quantity * item.unit_price)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                       </div>
+                    </div>
+                    <p class="text-xs text-gray-700 whitespace-pre-wrap text-left leading-relaxed">${item.description || ''}</p>
+                    <div class="mt-2 text-[10px] text-gray-500 font-mono">Qtd: ${item.quantity} x Unit: R$ ${Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                 </div>
+                 `).join('')}
+              </section>
+
+              <!-- Fechamento (Investimento, Validade) -->
+              <div class="break-inside-avoid mt-auto">
+                 <div class="mb-6">
+                    <h3 class="font-black text-gray-600 text-sm uppercase tracking-wider mb-2">Investimento Total</h3>
+                    <div class="bg-gray-50 p-4 border-l-4 border-green-600 flex items-center justify-between">
+                      <div class="flex flex-col">
+                         <div class="flex items-baseline gap-3">
+                             <span class="text-sm text-gray-500 font-bold">TOTAL:</span>
+                             <p class="text-xl font-black text-gray-900">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                         </div>
+                         ${(discountAmount > 0 || tax > 0) ? `
+                             <div class="text-[10px] text-gray-500 mt-1">
+                                Subtotal: R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                ${discountAmount > 0 ? `| Desc: -R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
+                                ${tax > 0 ? `| Taxa: +R$ ${tax.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
+                             </div>
+                         ` : ''}
+                      </div>
+                    </div>
+                    
+                    ${(quote.notes || quote.terms) ? `
+                    <div class="mt-4 bg-gray-100 p-3 rounded-md">
+                      <p class="text-xs text-gray-700">
+                        <span class="font-bold text-gray-800 uppercase block mb-1">Termos e Condições:</span> 
+                        ${quote.notes ? `${quote.notes}\n` : ''}
+                        ${quote.terms || ''}
+                      </p>
+                    </div>` : ''}
+                 </div>
                  
-                 <table class="meta-table">
-                    <tr>
-                        <td class="meta-label">Data:</td>
-                        <td class="meta-value">${formatDate(quote.created_at)}</td>
-                    </tr>
-                    <tr>
-                        <td class="meta-label">Validade:</td>
-                        <td class="meta-value" style="color: var(--primary)">${formatDate(quote.valid_until)}</td>
-                    </tr>
-                    <tr>
-                        <td class="meta-label">Status:</td>
-                        <td class="meta-value">${getStatusText(quote.status)}</td>
-                    </tr>
-                 </table>
-               </div>
-            </div>
+                 <div class="mb-8 bg-gray-100 p-3 rounded-lg flex justify-between items-center shadow-sm">
+                    <span class="text-xs font-bold text-gray-700 uppercase">Validade da Proposta:</span>
+                    <span class="text-sm text-gray-900 font-bold">${formatDate(quote.valid_until)}</span>
+                 </div>
 
-            <!-- CLIENT BOX -->
-            <div class="client-box">
-                <div>
-                    <div class="box-col-label">Prestador de Serviço</div>
-                    <div class="box-col-value">${company.name}</div>
-                    <div class="box-col-sub">
-                        Resp. Técnico: ${quote.created_by_name || 'Equipe Técnica'}<br>
-                        ${company.email}
+                 <!-- Footer Assinaturas -->
+                 <footer class="pt-8 relative">
+                    <div class="flex justify-between items-end gap-10">
+                      <div class="flex-1 border-t border-gray-800 pt-2">
+                          <p class="font-bold text-gray-900 text-base">${company.name}</p>
+                          <p class="text-[10px] text-gray-600 uppercase font-bold">Departamento Comercial</p>
+                      </div>
+                      <div class="flex-1 border-t border-gray-800 pt-2">
+                          <p class="font-bold text-gray-900 text-base">Aceite do Cliente</p>
+                          <p class="text-[10px] text-gray-600 uppercase font-bold">Data e Assinatura</p>
+                      </div>
                     </div>
+                 </footer>
+              </div>
+
+              <!-- RODAPÉ FIXO -->
+              <div class="absolute left-0 w-full" style="padding: 0 45px 30px 45px; bottom: 0px;">
+                <div class="border-t border-gray-200 py-3 text-center">
+                  <p class="text-[9px] text-gray-500">${company.address} • ${company.city} • CEP ${company.cep}</p>
+                  <p class="text-[9px] text-blue-900 font-bold mt-0.5">${company.phone} | ${company.email}</p>
                 </div>
-                <div style="text-align: right;">
-                    <div class="box-col-label">Cliente</div>
-                    <div class="box-col-value">${quote.clients?.name || 'Cliente'}</div>
-                    <div class="box-col-sub">
-                        ${quote.clients?.address || 'Endereço não informado'}<br>
-                        ${quote.clients?.cnpj_cpf ? `CPF/CNPJ: ${quote.clients.cnpj_cpf}<br>` : ''}
-                        ${quote.clients?.phone || ''} • ${quote.clients?.email || ''}
-                    </div>
-                </div>
-            </div>
-
-            <!-- DESCRIPTION -->
-            ${quote.description ? `
-            <div style="margin-bottom: 40px;">
-                <div class="terms-title">Objeto da Proposta</div>
-                <div style="font-size: 11px; color: var(--slate-600); line-height: 1.6;">${quote.description}</div>
-            </div>` : ''}
-
-            <!-- ITEMS TABLE -->
-            <table class="items-table">
-                <thead>
-                    <tr>
-                        <th>Descrição do Serviço / Item</th>
-                        <th class="col-c">Qtd</th>
-                        <th class="col-r">Valor Unit.</th>
-                        <th class="col-r">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${items.length > 0 ? items.map((item: any) => `
-                        <tr>
-                            <td>
-                                <div class="item-name">${item.name}</div>
-                                ${item.description ? `<div class="item-desc">${item.description}</div>` : ''}
-                            </td>
-                            <td class="col-c">${item.quantity}</td>
-                            <td class="col-r">R$ ${Number(item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                            <td class="col-r" style="font-weight: 700;">R$ ${Number(item.total || (item.quantity * item.unit_price)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                        </tr>
-                    `).join('') : `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #94a3b8;">Nenhum item adicionado.</td></tr>`}
-                </tbody>
-            </table>
-
-            <!-- FINANCIAL SUMMARY -->
-            <div class="financial-grid">
-                <div class="summary-box">
-                    <div class="sum-row">
-                        <span>Subtotal</span>
-                        <span>R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-
-                    ${discountAmount > 0 ? `
-                    <div class="sum-row">
-                        <span>Desconto (${quote.discount_type === 'percentage' ? `${quote.discount}%` : 'Fixo'})</span>
-                        <span style="color: #ef4444;">- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>` : ''}
-
-                    ${tax > 0 ? `
-                    <div class="sum-row">
-                        <span>Taxas / Impostos</span>
-                        <span>+ R$ ${tax.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>` : ''}
-
-                    <div class="sum-row total">
-                        <span>TOTAL</span>
-                        <span style="color: var(--primary)">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TERMS -->
-            ${(quote.notes || quote.terms) ? `
-            <div class="terms-section">
-                <div class="terms-title">Termos, Condições e Observações</div>
-                <div class="terms-content">
-                    ${quote.notes ? `${quote.notes}\n\n` : ''}
-                    ${quote.terms || ''}
-                </div>
-            </div>` : ''}
-
-            <!-- SIGNATURES -->
-            <div class="signatures">
-                <div class="sign-box">
-                    <div class="sign-line">
-                         <div class="sign-name">${company.name}</div>
-                         <div class="sign-role">Prestador de Serviço</div>
-                    </div>
-                </div>
-                <div class="sign-box">
-                    <div class="sign-line">
-                         <div class="sign-name">${quote.clients?.name || 'Cliente'}</div>
-                         <div class="sign-role">Aprovado por</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- FOOTER -->
-            <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--slate-200); text-align: center; font-size: 8px; color: var(--slate-400);">
-                Documento gerado eletronicamente em ${new Date().toLocaleString('pt-BR')} • ${company.name} • ${company.website || 'chameiapp.com'}
-            </div>
-
-          </div>
+              </div>
         </div>
-      </body>
-      </html>
+    </main>
+
+    <!-- BOTÃO FLUTUANTE DE DOWNLOAD -->
+    <div id="generate-pdf-btn-container" class="fixed bottom-6 right-6 z-50 animate-bounce-slow">
+      <button id="generate-pdf-btn" class="flex items-center gap-3 bg-green-600 text-white pl-6 pr-8 py-4 rounded-full shadow-2xl font-bold text-lg transition-all transform hover:scale-105 active:scale-95 border-4 border-white">
+         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+         <span>Baixar PDF</span>
+      </button>
+      <div id="generate-pdf-btn-loading" class="hidden items-center gap-3 bg-green-600 text-white pl-6 pr-8 py-4 rounded-full shadow-2xl font-bold text-lg opacity-75 cursor-wait border-4 border-white">
+         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M3 12a9 9 0 0 1 9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+         <span>Gerando PDF...</span>
+      </div>
+    </div>
+
+<script>
+    const pdfBtn = document.getElementById('generate-pdf-btn');
+    const pdfBtnLoading = document.getElementById('generate-pdf-btn-loading');
+    const loader = document.getElementById('pdf-loader');
+
+    pdfBtn.addEventListener('click', async () => {
+        loader.style.display = 'flex';
+        pdfBtn.classList.add('hidden');
+        pdfBtnLoading.classList.remove('hidden');
+
+        setTimeout(async () => {
+            try {
+                const { jsPDF } = window.jspdf;
+                const element = document.getElementById('document-to-print');
+                
+                const canvas = await window.html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    windowWidth: 794
+                });
+
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const pdfWidth = 210; 
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                const pdf = new jsPDF('p', 'mm', [pdfWidth, pdfHeight]);
+                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save('Proposta_${quoteNumber}.pdf');
+
+            } catch (err) {
+                console.error("Erro ao gerar PDF:", err);
+                alert("Erro ao gerar PDF.");
+            } finally {
+                loader.style.display = 'none';
+                pdfBtn.classList.remove('hidden');
+                pdfBtnLoading.classList.add('hidden');
+            }
+        }, 500);
+    });
+</script>
+</body>
+</html>
     `;
 
     const w = window.open('', '_blank');
