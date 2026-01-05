@@ -10,10 +10,21 @@ interface DocumentUploadProps {
 }
 
 export default function DocumentUpload({ clientId }: DocumentUploadProps) {
-    const [documents, setDocuments] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [uploading, setUploading] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [category, setCategory] = useState('Outros');
+    const [subcategory, setSubcategory] = useState('');
+    const [referenceDate, setReferenceDate] = useState(new Date().toISOString().split('T')[0]);
+
+    const CATEGORIES = [
+        { id: 'ART', label: 'ART', color: 'bg-blue-100 text-blue-700' },
+        { id: 'Laudo', label: 'Laudo Técnico', color: 'bg-orange-100 text-orange-700' },
+        { id: 'Ordem de Serviço', label: 'Ordem de Serviço', color: 'bg-gray-100 text-gray-700' },
+        { id: 'Nota Fiscal', label: 'Nota Fiscal', color: 'bg-green-100 text-green-700' },
+        { id: 'Outros', label: 'Outros', color: 'bg-gray-50 text-gray-500' }
+    ];
+
+    const SUBCATEGORIES: Record<string, string[]> = {
+        'Laudo': ['Cabine Primária', 'Termografia', 'SPDA', 'Quadros Elétricos', 'NR-10', 'Análise de Óleo', 'Outros'],
+    };
 
     useEffect(() => {
         loadDocuments();
@@ -47,10 +58,15 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
             return;
         }
 
+        if (category === 'Laudo' && !subcategory) {
+            toast.error('Selecione uma subcategoria para o Laudo');
+            return;
+        }
+
         setUploading(true);
         try {
             const fileExt = file.name.split('.').pop();
-            const fileName = `${clientId}/${Date.now()}.${fileExt}`;
+            const fileName = `${clientId}/${category}/${Date.now()}.${fileExt}`; // Path organization in storage too
 
             // 1. Upload to Storage
             const { error: uploadError } = await supabase.storage
@@ -59,23 +75,25 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
 
             if (uploadError) throw uploadError;
 
-            // 2. Get Public URL (or keep it private and use downloadUrl logic)
-            // For private buckets, we usually don't get a public URL directly unless we sign it.
-            // We will store the path.
-
-            // 3. Insert into Database
+            // 2. Insert into Database
             const { error: dbError } = await supabase.from('client_documents').insert({
                 client_id: clientId,
                 title: file.name,
-                file_url: fileName, // Store the path
+                file_url: fileName,
                 file_type: fileExt,
                 file_size: file.size,
+                category: category,
+                subcategory: category === 'Laudo' ? subcategory : null,
+                reference_date: referenceDate
             });
 
             if (dbError) throw dbError;
 
             toast.success('Documento enviado com sucesso!');
             loadDocuments();
+            // Reset fields
+            setSubcategory('');
+            setCategory('Outros');
         } catch (error: any) {
             console.error('Erro no upload:', error);
             toast.error(`Erro ao enviar: ${error.message}`);
@@ -89,7 +107,7 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
         try {
             const { data, error } = await supabase.storage
                 .from('documents')
-                .createSignedUrl(doc.file_url, 60); // Valid for 60 seconds
+                .createSignedUrl(doc.file_url, 60);
 
             if (error) throw error;
             window.open(data.signedUrl, '_blank');
@@ -102,14 +120,12 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
         if (!confirm('Tem certeza que deseja excluir este documento?')) return;
 
         try {
-            // 1. Delete from Storage
             const { error: storageError } = await supabase.storage
                 .from('documents')
                 .remove([filePath]);
 
-            if (storageError) console.warn('Erro ao deletar arquivo do storage (pode já não existir):', storageError);
+            if (storageError) console.warn('Erro ao deletar arquivo do storage:', storageError);
 
-            // 2. Delete from Database
             const { error: dbError } = await supabase
                 .from('client_documents')
                 .delete()
@@ -126,25 +142,67 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
 
     return (
         <div className="space-y-6">
-            {/* Upload Area */}
-            <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-100 transition-colors">
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="file-upload"
-                />
-                <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center gap-2">
-                    <div className="p-4 bg-white rounded-full shadow-sm">
-                        {uploading ? <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /> : <FileUp className="w-8 h-8 text-indigo-600" />}
-                    </div>
+            {/* Upload Area & Inputs */}
+            <div className="bg-white border rounded-xl p-4 shadow-sm space-y-4">
+                <h3 className="font-semibold text-gray-800">Novo Documento</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <span className="text-indigo-600 font-bold hover:underline">Clique para enviar</span>
-                        <span className="text-gray-500"> ou arraste e solte</span>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                        <select
+                            value={category}
+                            onChange={(e) => {
+                                setCategory(e.target.value);
+                                setSubcategory('');
+                            }}
+                            className="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                            {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </select>
                     </div>
-                    <p className="text-xs text-gray-400">PDF, DOC, Imagens (Máx 10MB)</p>
-                </label>
+
+                    {category === 'Laudo' && (
+                        <div className="animate-fadeIn">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Laudo</label>
+                            <select
+                                value={subcategory}
+                                onChange={(e) => setSubcategory(e.target.value)}
+                                className="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                                <option value="">Selecione...</option>
+                                {SUBCATEGORIES['Laudo'].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Data de Referência</label>
+                        <input
+                            type="date"
+                            value={referenceDate}
+                            onChange={(e) => setReferenceDate(e.target.value)}
+                            className="w-full rounded-lg border-gray-300 border p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                    </div>
+                </div>
+
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:bg-gray-100 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        id="file-upload"
+                    />
+                    <div className="flex flex-col items-center gap-2">
+                        {uploading ? <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /> : <FileUp className="w-8 h-8 text-indigo-600" />}
+                        <div>
+                            <span className="text-indigo-600 font-bold hover:underline">Clique para enviar</span>
+                            <span className="text-gray-500"> ou arraste</span>
+                        </div>
+                        <p className="text-xs text-gray-400">PDF, DOC, JPG (Máx 10MB)</p>
+                    </div>
+                </div>
             </div>
 
             {/* Documents List */}
