@@ -96,10 +96,23 @@ export default function GlobalDocumentsPage() {
 
     async function handleDownload(doc: DocFile) {
         try {
-            const { data, error } = await supabase.storage.from('documents').createSignedUrl(doc.file_url, 60);
+            const { data, error } = await supabase.storage
+                .from('documents')
+                .createSignedUrl(doc.file_url, 60, {
+                    download: doc.title || 'documento'
+                });
+
             if (error) throw error;
-            window.open(data.signedUrl, '_blank');
+
+            // Create a temporary link to force download
+            const link = document.createElement('a');
+            link.href = data.signedUrl;
+            link.download = doc.title || 'documento';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         } catch (error) {
+            console.error('Download error:', error);
             toast.error('Erro ao baixar documento');
         }
     }
@@ -312,7 +325,16 @@ export default function GlobalDocumentsPage() {
                                 >
                                     <div className="w-16 h-16 mb-2 rounded-full bg-gray-50 flex items-center justify-center overflow-hidden border border-gray-100">
                                         {item.logo_url ? (
-                                            <img src={item.logo_url} alt={item.name} className="w-full h-full object-cover" />
+                                            <img
+                                                src={item.logo_url.startsWith('http') ? item.logo_url : supabase.storage.from('logos').getPublicUrl(item.logo_url).data.publicUrl}
+                                                alt={item.name}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                    (e.target as HTMLImageElement).parentElement?.classList.add('bg-indigo-50');
+                                                    // Force rendering of the fallback icon by manipulating DOM or state (simplified here by just hiding img)
+                                                }}
+                                            />
                                         ) : (
                                             <Building2 size={32} className="text-indigo-600" />
                                         )}
