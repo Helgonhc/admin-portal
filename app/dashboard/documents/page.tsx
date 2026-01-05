@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { File, Download, Search, Folder, Calendar, HardDrive, ChevronRight, Home, ArrowLeft, Users, Building2 } from 'lucide-react';
+import { File, Download, Search, Folder, Calendar, HardDrive, ChevronRight, Home, ArrowLeft, Users, Building2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type DocFile = {
@@ -40,8 +40,9 @@ export default function GlobalDocumentsPage() {
 
     // Navigation State
     // Level 0: null (Show Clients)
-    // Level 1: client_id (Show Categories)
-    // Level 2+: path inside client
+    // Level 1: client_id (Show Years)
+    // Level 2: Year (Show Categories)
+    // Level 3: Category (Show Subcategories or Months)
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [currentPath, setCurrentPath] = useState<string[]>([]);
 
@@ -116,7 +117,15 @@ export default function GlobalDocumentsPage() {
         }
     }
 
-    // --- Folder Logic (Same as Client Portal) ---
+    function getMonthName(month: string) {
+        const months: Record<string, string> = {
+            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril', '05': 'Maio', '06': 'Junho',
+            '07': 'Julho', '08': 'Agosto', '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro', '00': 'Geral'
+        };
+        return months[month] || month;
+    }
+
+    // --- NEW LOGIC: YEAR > CATEGORY > ...
     const getCurrentItems = () => {
         // LEVEL 0: CLIENT LIST
         if (!selectedClient) {
@@ -125,72 +134,77 @@ export default function GlobalDocumentsPage() {
                 .map(c => ({ type: 'client-folder', ...c }));
         }
 
-        // LEVEL 1+: DOCUMENT FOLDERS
-        // Logic identical to Client Portal, operating on `documents` state
+        let docs = documents;
+
+        // LEVEL 1: YEARS (Root of Client)
         if (currentPath.length === 0) {
-            const categories = Array.from(new Set(documents.map(d => d.category || 'Outros')));
-            return categories.map(cat => ({ type: 'folder', name: cat, count: documents.filter(d => (d.category || 'Outros') === cat).length }));
+            const currentYear = new Date().getFullYear();
+            const allowedYears = [currentYear.toString(), (currentYear + 1).toString()]; // Filter 2 years
+
+            const years = Array.from(new Set(docs.map(d => d.reference_date ? d.reference_date.substring(0, 4) : 'Sem Data')))
+                .filter(y => allowedYears.includes(y));
+
+            return years.sort().reverse().map(year => ({
+                type: 'folder',
+                name: year,
+                count: docs.filter(d => (d.reference_date?.substring(0, 4) || 'Sem Data') === year).length
+            }));
         }
 
-        const category = currentPath[0];
-        let docs = documents.filter(d => (d.category || 'Outros') === category);
+        // Filter valid docs for subsequent levels (By Year)
+        const year = currentPath[0];
+        docs = docs.filter(d => (d.reference_date?.substring(0, 4) || 'Sem Data') === year);
+
+        // LEVEL 2: CATEGORIES
+        if (currentPath.length === 1) {
+            const categories = Array.from(new Set(docs.map(d => d.category || 'Outros')));
+            return categories.map(cat => ({
+                type: 'folder',
+                name: cat,
+                count: docs.filter(d => (d.category || 'Outros') === cat).length
+            }));
+        }
+
+        const category = currentPath[1];
+        docs = docs.filter(d => (d.category || 'Outros') === category);
+
+        // LEVEL 3: SUBCATEGORY (if Laudo) OR MONTH (if others)
+        // Adjusting logic: User said "Year first".
+        // If Category is Laudo -> Subcategory -> Month? Or just Subcategory?
+        // Let's assume: Year > Laudo > Subcategory > Month > Files
+        // And: Year > ART > Month > Files
 
         if (category === 'Laudo') {
-            if (currentPath.length === 1) {
-                const subcategories = Array.from(new Set(docs.map(d => d.subcategory || 'Geral')));
-                return subcategories.map(sub => ({ type: 'folder', name: sub, count: docs.filter(d => (d.subcategory || 'Geral') === sub).length }));
-            }
-            const subcategory = currentPath[1];
-            docs = docs.filter(d => (d.subcategory || 'Geral') === subcategory);
-
             if (currentPath.length === 2) {
-                const currentYear = new Date().getFullYear();
-                const allowedYears = [currentYear.toString(), (currentYear + 1).toString()];
-
-                const years = Array.from(new Set(docs.map(d => d.reference_date ? d.reference_date.substring(0, 4) : 'Sem Data')))
-                    .filter(year => allowedYears.includes(year)); // Filter: Only current and next year
-
-                return years.sort().reverse().map(year => ({ type: 'folder', name: year, count: docs.filter(d => (d.reference_date ? d.reference_date.substring(0, 4) : 'Sem Data') === year).length }));
+                const subcategories = Array.from(new Set(docs.map(d => d.subcategory || 'Geral')));
+                return subcategories.map(sub => ({
+                    type: 'folder',
+                    name: sub,
+                    count: docs.filter(d => (d.subcategory || 'Geral') === sub).length
+                }));
             }
-            const year = currentPath[2];
-            docs = docs.filter(d => (d.reference_date ? d.reference_date.substring(0, 4) : 'Sem Data') === year);
+
+            const subcategory = currentPath[2];
+            docs = docs.filter(d => (d.subcategory || 'Geral') === subcategory);
 
             if (currentPath.length === 3) {
                 const months = Array.from(new Set(docs.map(d => d.reference_date ? d.reference_date.substring(5, 7) : '00')));
                 return months.sort().reverse().map(month => ({ type: 'folder', name: getMonthName(month), id: month, count: docs.filter(d => (d.reference_date ? d.reference_date.substring(5, 7) : '00') === month).length }));
             }
+
             const monthName = currentPath[3];
             return docs.filter(d => getMonthName(d.reference_date ? d.reference_date.substring(5, 7) : '00') === monthName).map(d => ({ type: 'file', ...d }));
         }
 
-        // Generic Categories
-        if (currentPath.length === 1) {
-            const currentYear = new Date().getFullYear();
-            const allowedYears = [currentYear.toString(), (currentYear + 1).toString()];
-
-            const years = Array.from(new Set(docs.map(d => d.reference_date ? d.reference_date.substring(0, 4) : 'Sem Data')))
-                .filter(year => allowedYears.includes(year)); // Filter: Only current and next year
-
-            return years.sort().reverse().map(year => ({ type: 'folder', name: year, count: docs.filter(d => (d.reference_date ? d.reference_date.substring(0, 4) : 'Sem Data') === year).length }));
-        }
-        const year = currentPath[1];
-        docs = docs.filter(d => (d.reference_date ? d.reference_date.substring(0, 4) : 'Sem Data') === year);
-
+        // Generic Category (ART, NF...) -> Month -> Files
         if (currentPath.length === 2) {
             const months = Array.from(new Set(docs.map(d => d.reference_date ? d.reference_date.substring(5, 7) : '00')));
             return months.sort().reverse().map(month => ({ type: 'folder', name: getMonthName(month), id: month, count: docs.filter(d => (d.reference_date ? d.reference_date.substring(5, 7) : '00') === month).length }));
         }
+
         const monthName = currentPath[2];
         return docs.filter(d => getMonthName(d.reference_date ? d.reference_date.substring(5, 7) : '00') === monthName).map(d => ({ type: 'file', ...d }));
     };
-
-    function getMonthName(month: string) {
-        const months: Record<string, string> = {
-            '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril', '05': 'Maio', '06': 'Junho',
-            '07': 'Julho', '08': 'Agosto', '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro', '00': 'Geral'
-        };
-        return months[month] || month;
-    }
 
     const items = getCurrentItems();
 
@@ -222,8 +236,8 @@ export default function GlobalDocumentsPage() {
                     </h1>
                     <p className="text-gray-500">
                         {selectedClient
-                            ? 'Navegue pelas pastas deste cliente.'
-                            : 'Selecione um cliente para visualizar seus documentos organizados.'}
+                            ? 'Navegue por Ano > Categoria.'
+                            : 'Selecione um cliente para visualizar seus documentos.'}
                     </p>
                 </div>
 
@@ -308,7 +322,7 @@ export default function GlobalDocumentsPage() {
                                     onClick={() => navigateTo(item)}
                                     className="cursor-pointer p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:scale-105 transition-all flex flex-col items-center justify-center text-center gap-3 bg-white"
                                 >
-                                    <div className={`p-3 rounded-full ${CATEGORY_COLORS[currentPath[0] || item.name] || 'bg-indigo-50 text-indigo-600'}`}>
+                                    <div className={`p-3 rounded-full ${CATEGORY_COLORS[currentPath[1] || item.name] || 'bg-indigo-50 text-indigo-600'}`}>
                                         <Folder size={32} />
                                     </div>
                                     <div>
