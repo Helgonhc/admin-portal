@@ -64,6 +64,7 @@ export default function AgendaPage() {
 
   async function loadData() {
     try {
+      const start = startOfMonth(currentMonth);
       // Para os agendamentos "Próximos", buscamos uma janela maior (ex: 6 meses)
       const futureLimit = addMonths(start, 6);
 
