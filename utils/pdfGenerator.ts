@@ -151,7 +151,7 @@ const getCommonCSS = (color: string) => `
         line-height: 1.6;
         color: var(--slate-700);
         white-space: pre-wrap;
-        min-height: 100px;
+        min-height: 50px;
     }
 
     /* Table */
@@ -172,6 +172,32 @@ const getCommonCSS = (color: string) => `
     }
     .total-label { font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; }
     .total-value { font-size: 22px; font-weight: 900; }
+
+    /* Financial Summary for Quotes */
+    .financial-summary {
+        margin-left: auto;
+        width: 300px;
+        margin-top: 15px;
+    }
+    .financial-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--slate-200);
+        font-size: 11px;
+        color: var(--slate-500);
+    }
+    .financial-row.final {
+        border-bottom: none;
+        border-top: 2px solid var(--slate-900);
+        margin-top: 10px;
+        padding-top: 15px;
+        font-weight: 800;
+        color: var(--slate-900);
+        font-size: 14px;
+    }
+    .text-red { color: #ef4444; }
+    .text-green { color: #10b981; }
 
     /* Signatures - Fixed to Bottom */
     .signature-row { 
@@ -425,6 +451,14 @@ export async function generateQuotePDF(quote: any) {
     const company = await getCompanyConfig();
     const quoteNumber = quote.quote_number || quote.id?.slice(0, 8).toUpperCase() || 'ORC';
     const color = company.color;
+
+    // Calculate discounts and taxes if not pre-calculated
+    const subtotal = quote.subtotal || quote.items?.reduce((acc: number, item: any) => acc + (item.total || (item.quantity * item.unit_price)), 0) || 0;
+    const discountVal = quote.discount || 0;
+    const discountAmount = quote.discount_type === 'percentage' ? subtotal * (discountVal / 100) : discountVal;
+    const tax = quote.tax || 0;
+    const total = quote.total || (subtotal - discountAmount + tax);
+
     const w = window.open('', '_blank');
     if (!w) return;
 
@@ -446,39 +480,101 @@ export async function generateQuotePDF(quote: any) {
           <div class="company-name">${company.name}</div>
           <div class="company-meta">
             CNPJ: ${company.cnpj}<br>
-            ${company.address}
+            ${company.address}<br>
+            📱 ${company.company_phone || company.phone} ${company.email ? `• ✉️ ${company.email}` : ''}
           </div>
         </div>
         <div class="doc-info">
           <div class="doc-type">PROPOSTA COMERCIAL</div>
           <div class="doc-id">#${quoteNumber}</div>
+          <div class="doc-date">EMITIDO EM: ${formatDate(quote.created_at)}</div>
+          <div class="doc-date" style="color: ${color}; margin-top: 4px;">VÁLIDO ATÉ: ${formatDate(quote.valid_until)}</div>
         </div>
       </div>
 
       <div class="section">
         <div class="section-title">DESTINATÁRIO</div>
-        <div class="info-card">
-          <div class="field"><span class="label">CLIENTE</span><span class="value" style="font-size: 14px; color: var(--primary);">${quote.clients?.name || '-'}</span></div>
-          <div class="field"><span class="label">ENDEREÇO</span><span class="value">${quote.clients?.address || '-'}</span></div>
+        <div class="info-grid">
+          <div class="info-card">
+            <div class="field"><span class="label">CLIENTE</span><span class="value" style="font-size: 14px; color: var(--primary);">${quote.clients?.name || '-'}</span></div>
+            <div class="field"><span class="label">TELEFONE / EMAIL</span><span class="value">${quote.clients?.phone || ''} ${quote.clients?.email ? `• ${quote.clients.email}` : ''}</span></div>
+          </div>
+          <div class="info-card">
+             <div class="field"><span class="label">ENDEREÇO</span><span class="value">${quote.clients?.address || '-'}</span></div>
+          </div>
         </div>
       </div>
 
       <div class="section">
-        <div class="section-title">ESCOPO E ESPECIFICAÇÕES</div>
-        <div class="content-box">${quote.description || 'Pelo presente, apresentamos proposta para prestação de serviços conforme descritivo técnico.'}</div>
+        <div class="section-title">OBJETIVO / ESCOPO</div>
+        <div class="content-box" style="min-height: 50px;">${quote.description || 'Prestação de serviços técnicos especializados conforme discriminado abaixo.'}</div>
       </div>
 
-      <div style="background: var(--slate-900); color: white; border-radius: 15px; padding: 40px; margin-top: 40px; text-align: right; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.3);">
-        <p style="text-transform: uppercase; font-size: 9px; font-weight: 800; letter-spacing: 3px; opacity: 0.6; margin-bottom: 8px;">Investimento Total Estimado</p>
-        <h2 style="font-size: 42px; font-weight: 900; letter-spacing: -1.5px; font-family: 'Montserrat', sans-serif;">R$ ${(quote.total_value || quote.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
-        <p style="font-size: 10px; margin-top: 15px; opacity: 0.5;">CONDIÇÕES DE PAGAMENTO: CONFORME CONTRATO • VALIDADE: 07 DIAS.</p>
+      <div class="section">
+        <div class="section-title">ITENS E SERVIÇOS</div>
+        <table class="clean-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">DESCRIÇÃO</th>
+                    <th style="text-align: center;">TIPO</th>
+                    <th style="text-align: center;">QTD</th>
+                    <th style="text-align: right;">v. UNIT</th>
+                    <th style="text-align: right;">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${quote.items?.map((item: any) => `
+                    <tr>
+                        <td>
+                            <div style="font-weight: 700;">${item.name}</div>
+                            ${item.description ? `<div style="font-size: 9px; color: #64748b; margin-top: 2px;">${item.description}</div>` : ''}
+                        </td>
+                        <td style="text-align: center; text-transform: uppercase; font-size: 9px;">${item.item_type === 'labor' ? 'M. Obra' : item.item_type === 'material' ? 'Material' : 'Serviço'}</td>
+                        <td style="text-align: center;">${item.quantity}</td>
+                        <td style="text-align: right;">R$ ${item.unit_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td style="text-align: right; font-weight: 700;">R$ ${(item.total || item.quantity * item.unit_price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="5" style="text-align: center; color: #999;">Nenhum item adicionado</td></tr>'}
+            </tbody>
+        </table>
+
+        <!-- Resumo Financeiro -->
+        <div class="financial-summary">
+            <div class="financial-row">
+                <span>SUBTOTAL</span>
+                <span>R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            ${discountAmount > 0 ? `
+            <div class="financial-row">
+                <span>DESCONTO ${quote.discount_type === 'percentage' ? `(${quote.discount}%)` : ''}</span>
+                <span class="text-red">- R$ ${discountAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>` : ''}
+             ${tax > 0 ? `
+            <div class="financial-row">
+                <span>TAXAS / IMPOSTOS</span>
+                <span>+ R$ ${tax.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>` : ''}
+            <div class="financial-row final">
+                <span>TOTAL A PAGAR</span>
+                <span style="color: ${color};">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+        </div>
       </div>
+
+      ${quote.notes || quote.terms ? `
+      <div class="section">
+        <div class="section-title">TERMOS E CONDIÇÕES</div>
+        <div class="content-box">
+${quote.notes ? `OBSERVAÇÕES:\n${quote.notes}\n\n` : ''}
+${quote.terms || ''}
+        </div>
+      </div>` : ''}
 
       <div class="signature-row">
         <div class="sign-box">
           <div class="sign-line"></div>
           <div class="sign-name">${company.name}</div>
-          <div class="sign-meta">DEPARTAMENTO COMERCIAL</div>
+          <div class="sign-meta">APROVAÇÃO TÉCNICA</div>
         </div>
         <div class="sign-box">
           <div class="sign-line"></div>
@@ -488,7 +584,7 @@ export async function generateQuotePDF(quote: any) {
       </div>
 
       <div class="footer" style="margin-top: auto;">
-        <div>DOCUMENTO COM CARÁTER DE PROPOSTA COMERCIAL</div>
+        <div>DOCUMENTO COM CARÁTER DE PROPOSTA COMERCIAL • VÁLIDO ATÉ ${formatDate(quote.valid_until)}</div>
         <div>PÁGINA 01 / 01</div>
       </div>
     </div>
