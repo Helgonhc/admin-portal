@@ -59,9 +59,15 @@
   --info: #3B82F6;
 }
 
+html {
+  font-size: 14px;
+}
+
 body {
   background-color: #F3F4F6;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Scrollbar personalizada */
@@ -306,7 +312,7 @@ body {
    ======================================== */
 
 .card {
-  @apply bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4;
+  @apply bg-white rounded-lg shadow-sm border border-gray-100 p-2.5 sm:p-3;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -337,7 +343,7 @@ body {
    ======================================== */
 
 .btn {
-  @apply px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-lg font-medium flex items-center gap-1.5 sm:gap-2 justify-center text-[13px] sm:text-sm;
+  @apply px-2 py-1 sm:px-2.5 sm:py-1 rounded-md font-medium flex items-center gap-1.5 justify-center text-[12.5px] sm:text-[13px];
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -415,9 +421,9 @@ body {
    ======================================== */
 
 .input {
-  @apply w-full py-2 sm:py-2 border border-gray-200 rounded-lg outline-none text-sm;
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
+  @apply w-full py-1.5 border border-gray-200 rounded-md outline-none text-[13px];
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
   transition: all 0.2s ease;
 }
 
@@ -508,15 +514,15 @@ body {
 }
 
 .table {
-  @apply w-full text-sm;
+  @apply w-full text-[13px];
 }
 
 .table th {
-  @apply bg-gray-50 px-4 py-3 text-left font-semibold text-gray-600 border-b;
+  @apply bg-gray-50 px-3 py-2 text-left font-semibold text-gray-600 border-b;
 }
 
 .table td {
-  @apply px-4 py-3 border-b border-gray-100;
+  @apply px-3 py-2 border-b border-gray-100;
   transition: background-color 0.15s ease;
 }
 
@@ -533,7 +539,7 @@ body {
    ======================================== */
 
 .sidebar-item {
-  @apply flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 cursor-pointer;
+  @apply flex items-center gap-2.5 px-3 py-2 rounded-md text-gray-600 cursor-pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

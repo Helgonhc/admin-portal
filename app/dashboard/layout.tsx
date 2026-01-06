@@ -69,7 +69,7 @@ export default function DashboardLayout({
   if (!isAuthenticated) return null;
 
   const content = (
-    <div className="p-3 sm:p-4 lg:p-4 pt-14 sm:pt-16 lg:pt-4">
+    <div className="max-w-[1600px] mx-auto p-2 sm:p-3 lg:p-3 pt-14 sm:pt-16 lg:pt-4 pb-20 sm:pb-4">
       {children}
     </div>
   );

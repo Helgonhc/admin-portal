@@ -110,7 +110,7 @@ export default function Sidebar({ onSearchClick, unreadCount = 0 }: SidebarProps
   const SidebarContent = () => (
     <>
       {/* Header do Sidebar */}
-      <div className={`${collapsed ? 'p-2' : 'p-4'} bg-gradient-to-br from-indigo-50 via-white to-purple-50 border-b border-indigo-100`}>
+      <div className={`${collapsed ? 'p-1.5' : 'p-3'} bg-gradient-to-br from-indigo-50 via-white to-purple-50 border-b border-indigo-100`}>
         {collapsed ? (
           // Versão colapsada - só avatar do usuário
           <div className="flex justify-center">
@@ -197,7 +197,7 @@ export default function Sidebar({ onSearchClick, unreadCount = 0 }: SidebarProps
       </div>
 
       {/* Busca Rápida - Novo Posicionamento */}
-      <div className={`px-3 pt-2 pb-1 ${collapsed ? 'flex justify-center' : ''}`}>
+      <div className={`px-2 pt-1.5 pb-0.5 ${collapsed ? 'flex justify-center' : ''}`}>
         <button
           onClick={onSearchClick}
           className={`group flex items-center gap-3 w-full p-2.5 rounded-xl border border-indigo-100 bg-indigo-50/30 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all shadow-sm ${collapsed ? 'justify-center w-10 h-10 p-0' : ''}`}
@@ -214,7 +214,7 @@ export default function Sidebar({ onSearchClick, unreadCount = 0 }: SidebarProps
       </div>
 
       {/* Menu */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {menuItems.map((item) => {
           // Verificar permissão - suporta null, string ou array de strings
           let hasPermission = true;
@@ -316,7 +316,7 @@ export default function Sidebar({ onSearchClick, unreadCount = 0 }: SidebarProps
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl flex flex-col animate-slideIn">
+          <div className="absolute left-0 top-0 bottom-0 w-56 bg-white shadow-xl flex flex-col animate-slideIn">
             <button
               onClick={() => setMobileOpen(false)}
               className="absolute top-4 right-4 p-1 hover:bg-gray-100 rounded"
@@ -330,7 +330,7 @@ export default function Sidebar({ onSearchClick, unreadCount = 0 }: SidebarProps
 
       {/* Desktop Sidebar */}
       <aside
-        className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out relative ${collapsed ? 'w-20' : 'w-72'
+        className={`hidden lg:flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out relative ${collapsed ? 'w-16' : 'w-60'
           }`}
       >
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
