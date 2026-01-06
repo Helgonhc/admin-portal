@@ -15,6 +15,7 @@ export default function OvertimePage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     user_id: '',
     entry_date: new Date().toISOString().split('T')[0],
@@ -23,7 +24,17 @@ export default function OvertimePage() {
     entry_type: 'overtime',
     reason: '',
   });
-  const [saving, setSaving] = useState(false);
+
+  // Enterprise Filters
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+
+  const months = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => (new Date().getFullYear() - 2 + i).toString());
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
@@ -58,10 +69,15 @@ export default function OvertimePage() {
   }
 
   const filteredEntries = entries.filter(entry => {
+    const entryDate = new Date(entry.entry_date + 'T00:00:00');
+    const matchesMonth = selectedMonth === 'all' || entryDate.getMonth().toString() === selectedMonth;
+    const matchesYear = selectedYear === 'all' || entryDate.getFullYear().toString() === selectedYear;
+
     const matchesSearch = entry.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       entry.reason?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || entry.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    return matchesSearch && matchesStatus && matchesMonth && matchesYear;
   });
 
   function calculateHours(start: string, end: string): number {
@@ -251,16 +267,46 @@ export default function OvertimePage() {
             className="input input-with-icon"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="input w-full sm:w-48"
-        >
-          <option value="all">Todos os status</option>
-          <option value="pendente">Pendente ({totals.pending})</option>
-          <option value="aprovado">Aprovado</option>
-          <option value="rejeitado">Rejeitado</option>
-        </select>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="input w-full sm:w-36"
+          >
+            <option value="all">Todos os Meses</option>
+            {months.map((m, i) => (
+              <option key={i} value={i.toString()}>{m}</option>
+            ))}
+          </select>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="input w-full sm:w-28"
+          >
+            <option value="all">Todos os Anos</option>
+            {years.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="input w-full sm:w-48"
+          >
+            <option value="all">Todos os status</option>
+            <option value="pendente">Pendente ({totals.pending})</option>
+            <option value="aprovado">Aprovado</option>
+            <option value="rejeitado">Rejeitado</option>
+          </select>
+          {statusFilter !== 'all' && (
+            <button
+              onClick={() => setStatusFilter('all')}
+              className="btn btn-secondary px-3"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}

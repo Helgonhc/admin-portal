@@ -26,10 +26,20 @@ export default function QuotesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // Modal State
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'items' | 'values' | 'terms'>('info');
+
+  // Enterprise Filters
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+
+  const months = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => (new Date().getFullYear() - 2 + i).toString());
 
   // Form Data - Matching Mobile App Structure
   const [formData, setFormData] = useState({
@@ -305,10 +315,15 @@ export default function QuotesPage() {
   };
 
   const filteredQuotes = quotes.filter(quote => {
+    const quoteDate = new Date(quote.created_at);
+    const matchesMonth = selectedMonth === 'all' || quoteDate.getMonth().toString() === selectedMonth;
+    const matchesYear = selectedYear === 'all' || quoteDate.getFullYear().toString() === selectedYear;
+
     const matchesSearch = quote.title.toLowerCase().includes(search.toLowerCase()) ||
       quote.clients?.name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || quote.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    return matchesSearch && matchesStatus && matchesMonth && matchesYear;
   });
 
   if (loading) {
@@ -350,17 +365,48 @@ export default function QuotesPage() {
             className="input input-with-icon"
           />
         </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="input w-full sm:w-36"
+          >
+            <option value="all">Todos os Meses</option>
+            {months.map((m, i) => (
+              <option key={i} value={i.toString()}>{m}</option>
+            ))}
+          </select>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="input w-full sm:w-28"
+          >
+            <option value="all">Todos os Anos</option>
+            {years.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          {statusFilter !== 'all' && (
+            <button
+              onClick={() => setStatusFilter('all')}
+              className="px-3 py-2 rounded-lg text-xs font-bold uppercase bg-gray-100 text-gray-400 hover:bg-gray-200"
+            >
+              Limpar Status
+            </button>
+          )}
+        </div>
+
         <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
           {['all', 'pending', 'approved', 'rejected', 'converted'].map(st => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors border ${statusFilter === st
+              className={`px-3 py-2 rounded-lg text-[11px] uppercase font-bold whitespace-nowrap transition-colors border ${statusFilter === st
                 ? 'bg-indigo-600 text-white border-indigo-600'
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                 }`}
             >
-              {st === 'all' ? 'Todos' : getStatusLabel(st)}
+              {st === 'all' ? 'Ver Todos' : getStatusLabel(st)}
             </button>
           ))}
         </div>

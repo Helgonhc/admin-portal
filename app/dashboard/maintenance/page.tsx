@@ -39,6 +39,18 @@ export default function MaintenancePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState<'contracts' | 'requests'>('contracts');
+
+  // Enterprise Filters
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+
+  const months = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => (new Date().getFullYear() - 2 + i).toString());
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
@@ -114,8 +126,21 @@ export default function MaintenancePage() {
     const matchesSearch = contract.title.toLowerCase().includes(search.toLowerCase()) ||
       contract.client_name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || contract.urgency_status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    // Data Filter (Proxima Manutenção)
+    let matchesDate = true;
+    if (contract.next_maintenance_date) {
+      const date = new Date(contract.next_maintenance_date + 'T00:00:00');
+      const matchesMonth = selectedMonth === 'all' || date.getMonth().toString() === selectedMonth;
+      const matchesYear = selectedYear === 'all' || date.getFullYear().toString() === selectedYear;
+      matchesDate = matchesMonth && matchesYear;
+    } else if (selectedMonth !== 'all' || selectedYear !== 'all') {
+      matchesDate = false;
+    }
+
+    return matchesSearch && matchesStatus && matchesDate;
   });
+
 
   // Estatísticas
   const vencidos = contracts.filter(c => c.urgency_status === 'vencido').length;
@@ -251,7 +276,7 @@ export default function MaintenancePage() {
   async function handleMarkCompleted(contract: Contract) {
     const today = new Date().toISOString().split('T')[0];
     const scheduledDate = contract.next_maintenance_date;
-    
+
     // Verificar se pode concluir
     if (today < scheduledDate) {
       toast.error(`⚠️ Só é possível concluir esta manutenção a partir de ${new Date(scheduledDate).toLocaleDateString('pt-BR')}`);
@@ -438,9 +463,48 @@ export default function MaintenancePage() {
             className="input input-with-icon"
           />
         </div>
-        <button onClick={() => setStatusFilter('all')} className={`btn ${statusFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}>
-          Todos
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="input w-full sm:w-36"
+          >
+            <option value="all">Todos os Meses</option>
+            {months.map((m, i) => (
+              <option key={i} value={i.toString()}>{m}</option>
+            ))}
+          </select>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="input w-full sm:w-28"
+          >
+            <option value="all">Todos os Anos</option>
+            {years.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="input w-full sm:w-48"
+          >
+            <option value="all">Todas as Urgências</option>
+            <option value="vencido">⚠️ Vencidas</option>
+            <option value="urgente">🔔 Urgentes (7 dias)</option>
+            <option value="proximo">📅 Próximas (30 dias)</option>
+            <option value="futuro">✅ Futuras</option>
+          </select>
+          {statusFilter !== 'all' && (
+            <button
+              onClick={() => setStatusFilter('all')}
+              className="btn btn-secondary px-3"
+              title="Limpar Filtros"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Cards Grid */}
@@ -454,11 +518,10 @@ export default function MaintenancePage() {
           filteredContracts.map((contract) => (
             <div
               key={contract.id}
-              className={`card border-l-4 cursor-pointer hover:shadow-lg transition-shadow ${
-                contract.urgency_status === 'vencido' ? 'border-l-red-500 bg-red-50' :
+              className={`card border-l-4 cursor-pointer hover:shadow-lg transition-shadow ${contract.urgency_status === 'vencido' ? 'border-l-red-500 bg-red-50' :
                 contract.urgency_status === 'urgente' ? 'border-l-amber-500 bg-amber-50' :
-                contract.urgency_status === 'proximo' ? 'border-l-blue-500' : 'border-l-emerald-500'
-              }`}
+                  contract.urgency_status === 'proximo' ? 'border-l-blue-500' : 'border-l-emerald-500'
+                }`}
               onClick={() => openDetails(contract)}
             >
               {/* Header */}
@@ -488,20 +551,18 @@ export default function MaintenancePage() {
                 <div className="bg-gray-50 rounded-lg p-2 text-center">
                   <p className="text-xs text-gray-500">Última</p>
                   <p className="text-xs font-semibold text-gray-700">
-                    {contract.last_maintenance_date 
+                    {contract.last_maintenance_date
                       ? new Date(contract.last_maintenance_date).toLocaleDateString('pt-BR')
                       : '--'}
                   </p>
                 </div>
-                <div className={`rounded-lg p-2 text-center border-2 ${
-                  contract.urgency_status === 'vencido' ? 'bg-red-100 border-red-400' :
+                <div className={`rounded-lg p-2 text-center border-2 ${contract.urgency_status === 'vencido' ? 'bg-red-100 border-red-400' :
                   contract.urgency_status === 'urgente' ? 'bg-amber-100 border-amber-400' : 'bg-indigo-100 border-indigo-400'
-                }`}>
-                  <p className="text-xs text-gray-600 font-medium">📅 Agendada</p>
-                  <p className={`text-xs font-bold ${
-                    contract.urgency_status === 'vencido' ? 'text-red-600' :
-                    contract.urgency_status === 'urgente' ? 'text-amber-600' : 'text-indigo-600'
                   }`}>
+                  <p className="text-xs text-gray-600 font-medium">📅 Agendada</p>
+                  <p className={`text-xs font-bold ${contract.urgency_status === 'vencido' ? 'text-red-600' :
+                    contract.urgency_status === 'urgente' ? 'text-amber-600' : 'text-indigo-600'
+                    }`}>
                     {new Date(contract.next_maintenance_date).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
@@ -518,15 +579,14 @@ export default function MaintenancePage() {
                 <Clock className="w-4 h-4" />
                 <span>Frequência: {getFrequencyLabel(contract.frequency)}</span>
               </div>
-              
+
               {/* Alerta se vencido ou urgente */}
               {(contract.urgency_status === 'vencido' || contract.urgency_status === 'urgente') && (
-                <div className={`flex items-center gap-2 p-2 rounded-lg mb-3 ${
-                  contract.urgency_status === 'vencido' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                }`}>
+                <div className={`flex items-center gap-2 p-2 rounded-lg mb-3 ${contract.urgency_status === 'vencido' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
                   <Bell className="w-4 h-4" />
                   <span className="text-xs font-medium">
-                    {contract.urgency_status === 'vencido' 
+                    {contract.urgency_status === 'vencido'
                       ? '⚠️ Manutenção vencida! Entre em contato.'
                       : '🔔 Manutenção próxima! Envie um lembrete.'}
                   </span>
@@ -628,7 +688,7 @@ export default function MaintenancePage() {
                   <div className="bg-white rounded-lg p-3 text-center border border-gray-200 shadow-sm">
                     <p className="text-xs text-gray-500 mb-1">📋 Última</p>
                     <p className="text-sm font-bold text-gray-700">
-                      {formData.last_maintenance_date 
+                      {formData.last_maintenance_date
                         ? new Date(formData.last_maintenance_date + 'T12:00:00').toLocaleDateString('pt-BR')
                         : '--/--/----'}
                     </p>
@@ -638,7 +698,7 @@ export default function MaintenancePage() {
                   <div className="bg-indigo-100 rounded-lg p-3 text-center border-2 border-indigo-400 shadow-sm">
                     <p className="text-xs text-indigo-600 font-medium mb-1">📅 Agendada</p>
                     <p className="text-sm font-bold text-indigo-700">
-                      {formData.next_maintenance_date 
+                      {formData.next_maintenance_date
                         ? new Date(formData.next_maintenance_date + 'T12:00:00').toLocaleDateString('pt-BR')
                         : '--/--/----'}
                     </p>
@@ -648,7 +708,7 @@ export default function MaintenancePage() {
                   <div className="bg-emerald-50 rounded-lg p-3 text-center border border-emerald-200 shadow-sm">
                     <p className="text-xs text-emerald-600 mb-1">🔮 Próxima</p>
                     <p className="text-sm font-bold text-emerald-700">
-                      {formData.next_maintenance_date 
+                      {formData.next_maintenance_date
                         ? new Date(calculateNextDate(formData.next_maintenance_date, formData.frequency) + 'T12:00:00').toLocaleDateString('pt-BR')
                         : '--/--/----'}
                     </p>
@@ -789,20 +849,18 @@ export default function MaintenancePage() {
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
                   <p className="text-xs text-gray-500 mb-1">Última Realizada</p>
                   <p className="text-sm font-bold text-gray-700">
-                    {selectedContract.last_maintenance_date 
+                    {selectedContract.last_maintenance_date
                       ? new Date(selectedContract.last_maintenance_date).toLocaleDateString('pt-BR')
                       : '--'}
                   </p>
                 </div>
-                <div className={`rounded-lg p-3 text-center border-2 ${
-                  selectedContract.urgency_status === 'vencido' ? 'bg-red-100 border-red-400' :
+                <div className={`rounded-lg p-3 text-center border-2 ${selectedContract.urgency_status === 'vencido' ? 'bg-red-100 border-red-400' :
                   selectedContract.urgency_status === 'urgente' ? 'bg-amber-100 border-amber-400' : 'bg-indigo-100 border-indigo-400'
-                }`}>
-                  <p className="text-xs text-gray-600 font-medium mb-1">📅 Agendada</p>
-                  <p className={`text-sm font-bold ${
-                    selectedContract.urgency_status === 'vencido' ? 'text-red-600' :
-                    selectedContract.urgency_status === 'urgente' ? 'text-amber-600' : 'text-indigo-600'
                   }`}>
+                  <p className="text-xs text-gray-600 font-medium mb-1">📅 Agendada</p>
+                  <p className={`text-sm font-bold ${selectedContract.urgency_status === 'vencido' ? 'text-red-600' :
+                    selectedContract.urgency_status === 'urgente' ? 'text-amber-600' : 'text-indigo-600'
+                    }`}>
                     {new Date(selectedContract.next_maintenance_date).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
@@ -813,7 +871,7 @@ export default function MaintenancePage() {
                   </p>
                 </div>
               </div>
-              
+
               {/* Aviso se não pode concluir ainda */}
               {!canComplete(selectedContract) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">

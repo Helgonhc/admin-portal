@@ -11,6 +11,7 @@ import { Skeleton, ListSkeleton } from '../../../components/Skeleton';
 import { getStatusColor, getStatusLabel } from '../../../utils/statusUtils';
 
 export default function TicketsPage() {
+  const [saving, setSaving] = useState(false);
   const { can } = usePermissions();
   const { profile } = useAuthStore();
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -25,7 +26,17 @@ export default function TicketsPage() {
     description: '',
     priority: 'medium',
   });
-  const [saving, setSaving] = useState(false);
+
+  // Enterprise Filters
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+
+  const months = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => (new Date().getFullYear() - 2 + i).toString());
 
   useEffect(() => {
     loadData();
@@ -64,10 +75,15 @@ export default function TicketsPage() {
   }
 
   const filteredTickets = tickets.filter(ticket => {
+    const ticketDate = new Date(ticket.created_at);
+    const matchesMonth = selectedMonth === 'all' || ticketDate.getMonth().toString() === selectedMonth;
+    const matchesYear = selectedYear === 'all' || ticketDate.getFullYear().toString() === selectedYear;
+
     const matchesSearch = ticket.title.toLowerCase().includes(search.toLowerCase()) ||
       ticket.clients?.name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    return matchesSearch && matchesStatus && matchesMonth && matchesYear;
   });
 
   async function handleCreate() {
@@ -159,18 +175,40 @@ export default function TicketsPage() {
             className="input input-with-icon"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="input w-full sm:w-48"
-        >
-          <option value="all">Todos os status</option>
-          <option value="aberto">Aberto</option>
-          <option value="em_analise">Em Análise</option>
-          <option value="aprovado">Aprovado</option>
-          <option value="convertido">Convertido em OS</option>
-          <option value="rejeitado">Rejeitado</option>
-        </select>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="input w-full sm:w-36"
+          >
+            <option value="all">Todos os Meses</option>
+            {months.map((m, i) => (
+              <option key={i} value={i.toString()}>{m}</option>
+            ))}
+          </select>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="input w-full sm:w-28"
+          >
+            <option value="all">Todos os Anos</option>
+            {years.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="input w-full sm:w-48"
+          >
+            <option value="all">Todos os status</option>
+            <option value="aberto">Aberto</option>
+            <option value="em_analise">Em Análise</option>
+            <option value="aprovado">Aprovado</option>
+            <option value="convertido">Convertido em OS</option>
+            <option value="rejeitado">Rejeitado</option>
+          </select>
+        </div>
       </div>
 
       {/* Table */}
