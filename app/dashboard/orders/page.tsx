@@ -55,6 +55,17 @@ export default function OrdersPage() {
   const [saving, setSaving] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  // Enterprise Filters
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().getMonth().toString()); // 0-indexed
+  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+
+  const months = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => (new Date().getFullYear() - 2 + i).toString());
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -177,10 +188,15 @@ export default function OrdersPage() {
   }
 
   const filteredOrders = orders.filter(order => {
+    const orderDate = new Date(order.created_at);
+    const matchesMonth = selectedMonth === 'all' || orderDate.getMonth().toString() === selectedMonth;
+    const matchesYear = selectedYear === 'all' || orderDate.getFullYear().toString() === selectedYear;
+
     const matchesSearch = order.title.toLowerCase().includes(search.toLowerCase()) ||
       order.clients?.name?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
+
+    return matchesSearch && matchesStatus && matchesMonth && matchesYear;
   });
 
   const kanbanColumns = [
@@ -324,65 +340,141 @@ export default function OrdersPage() {
             className="input input-with-icon dark:bg-gray-800 dark:border-gray-700"
           />
         </div>
-        {viewMode === 'list' && (
+        <div className="flex gap-2 w-full sm:w-auto">
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="input w-full sm:w-48 dark:bg-gray-800 dark:border-gray-700"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="input w-full sm:w-36 dark:bg-gray-800 dark:border-gray-700"
           >
-            <option value="all">Todos os status</option>
-            <option value="pendente">Pendente</option>
-            <option value="em_andamento">Em Andamento</option>
-            <option value="concluido">Concluído</option>
-            <option value="cancelado">Cancelado</option>
+            <option value="all">Todos os Meses</option>
+            {months.map((m, i) => (
+              <option key={i} value={i.toString()}>{m}</option>
+            ))}
           </select>
-        )}
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="input w-full sm:w-28 dark:bg-gray-800 dark:border-gray-700"
+          >
+            <option value="all">Todos os Anos</option>
+            {years.map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          {viewMode === 'list' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input w-full sm:w-40 dark:bg-gray-800 dark:border-gray-700"
+            >
+              <option value="all">Todos os status</option>
+              <option value="pendente">Pendente</option>
+              <option value="em_andamento">Em Andamento</option>
+              <option value="concluido">Concluído</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          )}
+        </div>
       </div>
 
       {/* Main View Area */}
       <div className="flex-1 overflow-hidden">
         {viewMode === 'list' && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pb-6">
-            {filteredOrders.length === 0 ? (
-              <div className="col-span-full text-center py-20 bg-gray-50/50 dark:bg-gray-800/30 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700">
-                <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                <p className="text-gray-500 dark:text-gray-400 font-medium">Nenhuma ordem encontrada</p>
-              </div>
-            ) : (
-              filteredOrders.map((order) => (
-                <Link
-                  key={order.id}
-                  href={`/dashboard/orders/${order.id}`}
-                  className="card card-hover flex flex-col"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <span className={`badge ${getStatusColor(order.status)}`}>
-                      {getStatusLabel(order.status)}
-                    </span>
-                    <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold tracking-wider ${getPriorityColor(order.priority)}`}>
-                      {getPriorityLabel(order.priority)}
-                    </span>
-                  </div>
-                  <h3 className="font-bold text-gray-800 dark:text-gray-100 mb-1 line-clamp-1">{order.title}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 font-medium">{order.clients?.name}</p>
-                  {order.description && (
-                    <p className="text-xs text-gray-600 dark:text-gray-500 line-clamp-2 mb-4 italic flex-1">{order.description}</p>
+          <div className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50 dark:bg-gray-800/50 border-b dark:border-gray-800">
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-gray-400 tracking-widest">Protocolo</th>
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-gray-400 tracking-widest">Ordem de Serviço</th>
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-gray-400 tracking-widest">Cliente</th>
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-gray-400 tracking-widest">Status</th>
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-gray-400 tracking-widest">Prioridade</th>
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-gray-400 tracking-widest">Técnico</th>
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-gray-400 tracking-widest">Data</th>
+                    <th className="px-6 py-4 text-[10px] uppercase font-black text-gray-400 tracking-widest min-w-[100px]">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y dark:divide-gray-800">
+                  {filteredOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-20 text-center">
+                        <ClipboardList className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                        <p className="text-gray-500 dark:text-gray-400 font-medium">Nenhuma ordem encontrada para o período selecionado</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredOrders.map((order) => (
+                      <tr key={order.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors group">
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-xs text-gray-400 uppercase">#{order.id.slice(0, 8)}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Link href={`/dashboard/orders/${order.id}`} className="font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 transition-colors line-clamp-1 italic">
+                            {order.title}
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-600 dark:text-gray-400 font-medium line-clamp-1">{order.clients?.name}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`badge ${getStatusColor(order.status)}`}>
+                            {getStatusLabel(order.status)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${getPriorityColor(order.priority)}`}>
+                            {getPriorityLabel(order.priority)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {(order as any).technician?.full_name ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-[10px] font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800">
+                                {(order as any).technician.full_name.charAt(0)}
+                              </div>
+                              <span className="text-sm font-medium text-gray-600 dark:text-gray-400 line-clamp-1">
+                                {(order as any).technician.full_name}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-300 italic text-xs">Não atribuído</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col text-xs">
+                            <span className="font-bold text-gray-700 dark:text-gray-300">{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
+                            <span className="text-gray-400 font-medium text-[10px]">{new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Link
+                              href={`/dashboard/orders/${order.id}`}
+                              className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                              title="Ver Detalhes"
+                            >
+                              <Eye size={16} />
+                            </Link>
+                            <button
+                              onClick={() => {
+                                const url = `${window.location.origin}/portal/${order.id}`;
+                                navigator.clipboard.writeText(url);
+                                toast.success('Link do cliente copiado!');
+                              }}
+                              className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                              title="Copiar Link"
+                            >
+                              <Copy size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
                   )}
-                  <div className="flex items-center justify-between text-[11px] text-gray-400 dark:text-gray-500 pt-3 border-t dark:border-gray-700">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Calendar size={13} strokeWidth={2.5} />
-                      {new Date(order.created_at).toLocaleDateString('pt-BR')}
-                    </span>
-                    {(order as any).technician?.full_name && (
-                      <span className="flex items-center gap-1.5 font-medium bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded-full">
-                        <User size={13} strokeWidth={2.5} />
-                        {(order as any).technician.full_name.split(' ')[0]}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              ))
-            )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
