@@ -31,8 +31,10 @@ import {
   FileCheck,
   TrendingUp,
   Search,
-  FolderOpen
+  FolderOpen,
+  BellRing
 } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
 
 // Menu items com permissões necessárias
 // permission: null = todos podem ver
@@ -75,10 +77,11 @@ interface AppConfig {
 
 interface SidebarProps {
   onSearchClick?: () => void;
+  onNotificationsClick?: () => void;
   unreadCount?: number;
 }
 
-export default function Sidebar({ onSearchClick, unreadCount = 0 }: SidebarProps) {
+export default function Sidebar({ onSearchClick, onNotificationsClick, unreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const { profile, logout } = useAuthStore();
   const { can, isAdmin } = usePermissions();
@@ -290,13 +293,33 @@ export default function Sidebar({ onSearchClick, unreadCount = 0 }: SidebarProps
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-gray-100">
+      <div className="p-2 border-t border-gray-100 flex flex-col gap-1">
+        <div className={`flex items-center gap-1 ${collapsed ? 'flex-col' : 'px-1'}`}>
+          <button
+            onClick={onNotificationsClick}
+            className={`p-2 rounded-md hover:bg-gray-100 text-gray-400 hover:text-indigo-500 transition-all flex items-center relative ${collapsed ? 'w-10 h-10 justify-center' : 'flex-1 gap-2'}`}
+            title="Notificações"
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className={`absolute bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full ${collapsed ? 'top-1 right-1 w-4 min-w-4 h-4' : 'top-1 right-2 p-0.5 min-w-[16px] h-4'}`}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+            {!collapsed && <span className="text-[13px] font-medium">Alertas</span>}
+          </button>
+          <div className={collapsed ? 'w-10' : ''}>
+            <ThemeToggle />
+          </div>
+        </div>
+
         <button
           onClick={handleLogout}
-          className={`sidebar-item text-red-600 hover:bg-red-50 hover:text-red-700 w-full ${collapsed ? 'justify-center px-2' : ''}`}
+          className={`sidebar-item text-red-600 hover:bg-red-50 hover:text-red-700 w-full ${collapsed ? 'justify-center px-1 h-10' : 'px-3 py-2'}`}
+          title={collapsed ? 'Sair' : undefined}
         >
-          <LogOut size={20} />
-          {!collapsed && <span>Sair</span>}
+          <LogOut size={18} />
+          {!collapsed && <span className="text-[13px]">Sair</span>}
         </button>
       </div>
     </>

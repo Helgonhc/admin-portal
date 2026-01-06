@@ -6,7 +6,6 @@ import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import Sidebar from '../../components/Sidebar';
 import { Shield, Search, Bell } from 'lucide-react';
-import { ThemeToggle } from '../../components/ThemeToggle';
 import { GlobalSearchModal } from '../../components/GlobalSearchModal';
 import { NotificationDrawer } from '../../components/NotificationDrawer';
 import { useRealtimeNotifications } from '../../hooks/useRealtimeNotifications';
@@ -76,23 +75,14 @@ export default function DashboardLayout({
 
   const LayoutWrapper = ({ content, sidebar = true }: { content: React.ReactNode, sidebar?: boolean }) => (
     <div className="min-h-screen flex bg-gray-100 dark:bg-gray-950 transition-colors duration-300">
-      {sidebar && <Sidebar onSearchClick={() => setIsSearchOpen(true)} unreadCount={unreadCount} />}
+      {sidebar && (
+        <Sidebar
+          onSearchClick={() => setIsSearchOpen(true)}
+          onNotificationsClick={() => setIsNotificationsOpen(true)}
+          unreadCount={unreadCount}
+        />
+      )}
       <main className="flex-1 overflow-auto relative">
-        {/* Top Floating Actions */}
-        <div className="absolute top-4 right-4 z-40 flex items-center gap-2">
-          <button
-            onClick={() => setIsNotificationsOpen(true)}
-            className="p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-indigo-500 transition-all shadow-sm flex items-center relative"
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full animate-bounce">
-                {unreadCount}
-              </span>
-            )}
-          </button>
-          <ThemeToggle />
-        </div>
         {content}
       </main>
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
