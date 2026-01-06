@@ -500,278 +500,318 @@ export default function ClientDetailsPage() {
             </div>
           </div>
 
-          {/* Formulário de Edição ou Visualização */}
-          <div className="card">
-            <h3 className="font-semibold text-gray-800 mb-3 sm:mb-4 text-sm sm:text-base">📋 Informações do Cliente</h3>
-
-            {isEditing ? (
-              <div className="space-y-3 sm:space-y-4">
-                {/* Tipo PF/PJ */}
-                <div className="flex gap-1 sm:gap-2 p-1 bg-gray-100 rounded-lg">
-                  <button onClick={() => setFormData({ ...formData, type: 'PF' })} className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-md font-medium transition-all text-xs sm:text-sm ${formData.type === 'PF' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}>
-                    👤 <span className="hidden sm:inline">Pessoa </span>Física
-                  </button>
-                  <button onClick={() => setFormData({ ...formData, type: 'PJ' })} className={`flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-md font-medium transition-all text-xs sm:text-sm ${formData.type === 'PJ' ? 'bg-white shadow text-indigo-600' : 'text-gray-600'}`}>
-                    🏢 <span className="hidden sm:inline">Pessoa </span>Jurídica
-                  </button>
+          {/* Information & Activity Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column: Client Data */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-white rounded-[2rem] border border-slate-200/60 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="font-black text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                    <User size={18} className="text-indigo-500" />
+                    Perfil da Unidade
+                  </h3>
                 </div>
 
-                {/* Documento com busca automática */}
-                <div>
-                  <label className="label">{formData.type === 'PJ' ? 'CNPJ (Busca Auto)' : 'CPF'}</label>
-                  <div className="relative">
-                    <input type="text" value={formData.cnpj_cpf} onChange={(e) => setFormData({ ...formData, cnpj_cpf: e.target.value })} onBlur={handleCnpjBlur} className="input pr-10" placeholder={formData.type === 'PJ' ? '00.000.000/0000-00' : '000.000.000-00'} />
-                    {cnpjLoading ? <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-600 w-4 h-4 sm:w-5 sm:h-5" /> : formData.type === 'PJ' && <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-600 w-4 h-4 sm:w-5 sm:h-5" />}
-                  </div>
-                </div>
+                <div className="p-6 space-y-6">
+                  {isEditing ? (
+                    <div className="space-y-4">
+                      {/* Tipo PF/PJ */}
+                      <div className="flex gap-2 p-1.5 bg-slate-100 rounded-2xl">
+                        <button onClick={() => setFormData({ ...formData, type: 'PF' })} className={`flex-1 py-2.5 px-4 rounded-xl font-bold transition-all text-xs ${formData.type === 'PF' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                          PESSOA FÍSICA
+                        </button>
+                        <button onClick={() => setFormData({ ...formData, type: 'PJ' })} className={`flex-1 py-2.5 px-4 rounded-xl font-bold transition-all text-xs ${formData.type === 'PJ' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
+                          PESSOA JURÍDICA
+                        </button>
+                      </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
-                  <div>
-                    <label className="label">{formData.type === 'PJ' ? 'Razão Social *' : 'Nome Completo *'}</label>
-                    <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="input" />
-                  </div>
-                  {formData.type === 'PJ' && (
-                    <div>
-                      <label className="label">Responsável</label>
-                      <input type="text" value={formData.responsible_name} onChange={(e) => setFormData({ ...formData, responsible_name: e.target.value })} className="input" />
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Documento ({formData.type})</label>
+                          <div className="relative mt-1">
+                            <input type="text" value={formData.cnpj_cpf} onChange={(e) => setFormData({ ...formData, cnpj_cpf: e.target.value })} onBlur={handleCnpjBlur} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" placeholder={formData.type === 'PJ' ? '00.000.000/0000-00' : '000.000.000-00'} />
+                            <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            {cnpjLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-600" size={18} />}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{formData.type === 'PJ' ? 'Razão Social' : 'Nome Completo'}</label>
+                          <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium mt-1" />
+                        </div>
+
+                        {formData.type === 'PJ' && (
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome do Responsável</label>
+                            <input type="text" value={formData.responsible_name} onChange={(e) => setFormData({ ...formData, responsible_name: e.target.value })} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium mt-1" />
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Telefone/WhatsApp</label>
+                            <div className="relative mt-1">
+                              <input type="text" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail Principal</label>
+                            <div className="relative mt-1">
+                              <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium" />
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-4 border-t border-slate-100">
+                          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">📍 LOCALIZAÇÃO</h4>
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400">CEP</label>
+                              <input type="text" value={formData.zip_code} onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })} onBlur={handleCepBlur} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium mt-1" />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-400">Cidade/UF</label>
+                              <div className="flex gap-1">
+                                <input type="text" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium mt-1" />
+                                <input type="text" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} className="w-12 px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium mt-1" maxLength={2} />
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400">Logradouro e Número</label>
+                            <div className="flex gap-2">
+                              <input type="text" value={formData.street} onChange={(e) => setFormData({ ...formData, street: e.target.value })} className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium mt-1" />
+                              <input type="text" value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} className="w-16 px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium mt-1" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <button onClick={handleSave} disabled={processing} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-500/20 transition-all active:scale-95 flex items-center justify-center gap-2 mt-6">
+                          {processing ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                          <span>SALVAR ALTERAÇÕES</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-indigo-50 text-indigo-500 rounded-2xl">
+                          <User size={20} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável</p>
+                          <p className="font-bold text-slate-700 truncate">{client.responsible_name || 'NÃO INFORMADO'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-sky-50 text-sky-500 rounded-2xl">
+                          <Mail size={20} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">E-mail</p>
+                          <p className="font-bold text-slate-700 truncate break-all">{client.email || 'NÃO INFORMADO'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-emerald-50 text-emerald-500 rounded-2xl">
+                          <Phone size={20} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone</p>
+                          <p className="font-bold text-slate-700">{client.phone || 'NÃO INFORMADO'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-rose-50 text-rose-500 rounded-2xl">
+                          <MapPin size={20} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Localização</p>
+                          <p className="font-bold text-slate-700 text-sm leading-snug">{client.address || 'ENDEREÇO NÃO CADASTRADO'}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-6 mt-6 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Calendar size={14} className="text-slate-400" />
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cliente desde {new Date(client.created_at).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        {isAdmin && (
+                          <button onClick={handleDelete} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Excluir Cliente">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Telefone</label>
-                    <input type="text" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="input" />
-                  </div>
-                  <div>
-                    <label className="label">E-mail</label>
-                    <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="input" />
-                  </div>
-                </div>
-
-                {/* Endereço */}
-                <div className="border-t pt-4">
-                  <h4 className="font-semibold text-gray-700 mb-3">📍 Endereço</h4>
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <label className="label">CEP (Busca Auto)</label>
-                      <div className="relative">
-                        <input type="text" value={formData.zip_code} onChange={(e) => setFormData({ ...formData, zip_code: e.target.value })} onBlur={handleCepBlur} className="input pr-10" placeholder="00000-000" maxLength={9} />
-                        {cepLoading ? <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-600" size={20} /> : <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-600" size={20} />}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="label">Cidade</label>
-                      <input type="text" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} className="input" />
-                    </div>
-                    <div>
-                      <label className="label">UF</label>
-                      <input type="text" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} className="input" maxLength={2} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-4 mb-4">
-                    <div className="col-span-3">
-                      <label className="label">Rua</label>
-                      <input type="text" value={formData.street} onChange={(e) => setFormData({ ...formData, street: e.target.value })} className="input" />
-                    </div>
-                    <div>
-                      <label className="label">Nº</label>
-                      <input type="text" value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} className="input" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="label">Bairro</label>
-                      <input type="text" value={formData.neighborhood} onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })} className="input" />
-                    </div>
-                    <div>
-                      <label className="label">Complemento</label>
-                      <input type="text" value={formData.complement} onChange={(e) => setFormData({ ...formData, complement: e.target.value })} className="input" />
-                    </div>
-                  </div>
-                </div>
-
-                <button onClick={handleSave} disabled={processing} className="btn btn-primary">
-                  {processing ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                  Salvar Alterações
-                </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {client.responsible_name && (
-                  <div className="flex items-center gap-3">
-                    <User className="text-gray-400" size={20} />
-                    <div><p className="text-xs text-gray-500">Responsável</p><p className="font-medium">{client.responsible_name}</p></div>
-                  </div>
-                )}
-                {client.email && (
-                  <div className="flex items-center gap-3">
-                    <Mail className="text-gray-400" size={20} />
-                    <div><p className="text-xs text-gray-500">E-mail</p><p className="font-medium">{client.email}</p></div>
-                  </div>
-                )}
-                {client.phone && (
-                  <div className="flex items-center gap-3">
-                    <Phone className="text-gray-400" size={20} />
-                    <div><p className="text-xs text-gray-500">Telefone</p><p className="font-medium">{client.phone}</p></div>
-                  </div>
-                )}
-                {client.address && (
-                  <div className="flex items-center gap-3">
-                    <MapPin className="text-gray-400" size={20} />
-                    <div><p className="text-xs text-gray-500">Endereço</p><p className="font-medium">{client.address}</p></div>
-                  </div>
-                )}
-                {client.cnpj_cpf && (
-                  <div className="flex items-center gap-3">
-                    <Hash className="text-gray-400" size={20} />
-                    <div><p className="text-xs text-gray-500">{client.type === 'PF' ? 'CPF' : 'CNPJ'}</p><p className="font-medium">{client.cnpj_cpf}</p></div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+            </div>
 
-          {/* Agenda e Atividades Próximas */}
-          {(maintenances.length > 0 || appointments.length > 0) && (
-            <div className="card border-l-4 border-indigo-500">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                  <Calendar size={20} className="text-indigo-600" />
-                  Agenda do Cliente (Próximas Atividades)
-                </h3>
-                <Link href="/dashboard/agenda" className="text-xs text-indigo-600 hover:underline">Ver Agenda Geral</Link>
-              </div>
+            {/* Right Column: Activities & History */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Agenda / Upcoming Activities */}
+              {(maintenances.length > 0 || appointments.length > 0) && (
+                <div className="bg-white rounded-[2.5rem] border border-slate-200/60 shadow-sm overflow-hidden border-l-8 border-l-indigo-500 animate-fadeInRight">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                      <Calendar size={18} className="text-indigo-500" />
+                      Agenda da Unidade
+                    </h3>
+                    <Link href="/dashboard/agenda" className="text-[10px] font-black text-indigo-500 hover:text-indigo-700 uppercase p-2 bg-indigo-50 rounded-xl transition-colors">ABRIR AGENDA GERAL</Link>
+                  </div>
 
-              <div className="space-y-3">
-                {/* Agendamentos e Manutenções Combinados */}
-                {[
-                  ...appointments.map(a => ({ ...a, type: 'appointment' })),
-                  ...maintenances.map(m => ({ ...m, type: 'maintenance' }))
-                ].sort((a, b) => {
-                  const dateA = a.requested_date || a.next_maintenance_date;
-                  const dateB = b.requested_date || b.next_maintenance_date;
-                  return dateA.localeCompare(dateB);
-                }).map((event: any, idx) => (
-                  <div key={idx} className={`p-3 rounded-lg border border-gray-100 flex items-center justify-between bg-white hover:bg-gray-50 transition-colors`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${event.type === 'maintenance' ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                        {event.type === 'maintenance' ? <Wrench size={18} /> : <Calendar size={18} />}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-sm text-gray-800">
-                          {event.type === 'maintenance' ? (event.maintenance_type_name || event.title) : (event.title || event.service_type)}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-gray-500 font-medium">
-                            {new Date((event.requested_date || event.next_maintenance_date) + 'T12:00:00').toLocaleDateString('pt-BR')}
-                          </span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${event.type === 'maintenance' ? 'bg-purple-50 text-purple-700' : 'bg-indigo-50 text-indigo-700'
+                  <div className="p-6 space-y-3">
+                    {[
+                      ...appointments.map(a => ({ ...a, type: 'appointment' })),
+                      ...maintenances.map(m => ({ ...m, type: 'maintenance' }))
+                    ].sort((a, b) => {
+                      const dateA = a.requested_date || a.next_maintenance_date;
+                      const dateB = b.requested_date || b.next_maintenance_date;
+                      return dateA.localeCompare(dateB);
+                    }).slice(0, 5).map((event: any, idx) => (
+                      <div key={idx} className="group p-4 rounded-3xl border border-slate-100 flex items-center justify-between bg-white hover:border-indigo-200 hover:shadow-md hover:shadow-indigo-500/5 transition-all">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-3 rounded-2xl ${event.type === 'maintenance' ? 'bg-purple-100 text-purple-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                            {event.type === 'maintenance' ? <Wrench size={20} /> : <Clock size={20} />}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-bold text-slate-800 text-sm truncate">
+                              {event.type === 'maintenance' ? (event.maintenance_type_name || event.title || 'MANUTENÇÃO PERIÓDICA') : (event.title || event.service_type || 'AGENDAMENTO TÉCNICO')}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-black text-slate-400 uppercase">
+                                {new Date((event.requested_date || event.next_maintenance_date) + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </span>
+                              <span className="w-1 h-1 rounded-full bg-slate-300" />
+                              <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${event.type === 'maintenance' ? 'bg-purple-50 text-purple-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                {event.type === 'maintenance' ? 'Preventiva' : 'Solicitação'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className={`text-[9px] font-black px-3 py-1.5 rounded-xl uppercase border ${event.status === 'confirmed' || event.status === 'confirmado' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                              event.status === 'pending' || event.status === 'pendente' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                'bg-slate-50 text-slate-400 border-slate-100'
                             }`}>
-                            {event.type === 'maintenance' ? 'Manutenção Preventiva' : 'Agendamento'}
+                            {event.status === 'pending' || event.status === 'pendente' ? 'Aguardando' :
+                              event.status === 'confirmed' || event.status === 'confirmado' ? 'Confirmado' : event.status}
                           </span>
+                          <Link href={event.type === 'maintenance' ? '/dashboard/maintenance' : '/dashboard/agenda'} className="p-2 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl transition-all">
+                            <ArrowLeft className="rotate-180" size={18} />
+                          </Link>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${event.status === 'confirmed' || event.status === 'confirmado' ? 'bg-green-100 text-green-700' :
-                        event.status === 'pending' || event.status === 'pendente' ? 'bg-amber-100 text-amber-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                        {event.status === 'pending' || event.status === 'pendente' ? 'Pendente' :
-                          event.status === 'confirmed' || event.status === 'confirmado' ? 'Confirmado' : event.status}
-                      </span>
-                      <Link
-                        href={event.type === 'maintenance' ? '/dashboard/maintenance' : '/dashboard/agenda'}
-                        className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-indigo-600"
-                      >
-                        <ArrowLeft className="rotate-180" size={16} />
-                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Grid OS & Equipments */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Equipments Panel */}
+                <div className="bg-white rounded-[2.5rem] border border-slate-200/60 shadow-sm overflow-hidden flex flex-col">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-emerald-50/10">
+                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                      <Wrench size={18} className="text-emerald-500" />
+                      Frota de Equipamentos
+                    </h3>
+                  </div>
+                  <div className="p-6 space-y-3 flex-1">
+                    {equipments.length === 0 ? (
+                      <div className="py-10 text-center">
+                        <Wrench className="w-12 h-12 text-slate-100 mx-auto mb-2" />
+                        <p className="text-xs font-bold text-slate-300 uppercase italic">Nenhum item cadastrado</p>
+                      </div>
+                    ) : (
+                      equipments.map((eq) => (
+                        <Link key={eq.id} href={`/dashboard/equipments/${eq.id}`} className="flex items-center justify-between p-4 bg-slate-50/50 border border-transparent hover:border-emerald-200 hover:bg-white hover:shadow-md transition-all rounded-2xl group">
+                          <div>
+                            <p className="font-bold text-slate-800 text-sm group-hover:text-emerald-600 transition-colors uppercase">{eq.name}</p>
+                            <p className="text-[10px] font-bold text-slate-400 tracking-tighter uppercase">{eq.model || 'MODELO_GENÉRICO'}</p>
+                          </div>
+                          <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${getStatusColor(eq.status)}`}>{eq.status}</span>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-4 bg-slate-50 border-t border-slate-100">
+                    <Link href={`/dashboard/equipments?client=${params.id}`} className="w-full py-3 block text-center text-xs font-black text-slate-500 hover:text-emerald-600 transition-colors uppercase tracking-widest">VER ACERVO COMPLETO</Link>
+                  </div>
+                </div>
+
+                {/* OS History Panel */}
+                <div className="bg-white rounded-[2.5rem] border border-slate-200/60 shadow-sm overflow-hidden flex flex-col">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-50/10">
+                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                      <FileText size={18} className="text-indigo-500" />
+                      Histórico Técnico (OS)
+                    </h3>
+                  </div>
+                  <div className="p-6 space-y-3 flex-1">
+                    {recentOrders.length === 0 ? (
+                      <div className="py-10 text-center">
+                        <FileText className="w-12 h-12 text-slate-100 mx-auto mb-2" />
+                        <p className="text-xs font-bold text-slate-300 uppercase italic">Sem ordens registradas</p>
+                      </div>
+                    ) : (
+                      recentOrders.map((order) => (
+                        <Link key={order.id} href={`/dashboard/orders/${order.id}`} className="flex items-center justify-between p-4 bg-slate-50/50 border border-transparent hover:border-indigo-200 hover:bg-white hover:shadow-md transition-all rounded-2xl group">
+                          <div className="min-w-0 flex-1 pr-2">
+                            <p className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors uppercase truncate">{order.title || 'ORDEM_SERVICO'}</p>
+                            <p className="text-[10px] font-bold text-slate-400 tracking-tighter uppercase">{new Date(order.created_at).toLocaleDateString('pt-BR')}</p>
+                          </div>
+                          <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${getStatusColor(order.status)}`}>{order.status}</span>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-4 bg-slate-50 border-t border-slate-100">
+                    <Link href={`/dashboard/orders?client=${params.id}`} className="w-full py-3 block text-center text-xs font-black text-slate-500 hover:text-indigo-600 transition-colors uppercase tracking-widest">VER HISTÓRICO TOTAL</Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Users Network Panel */}
+              {users.length > 0 && (
+                <div className="bg-white rounded-[2.5rem] border border-slate-200/60 shadow-sm overflow-hidden animate-fadeInUp">
+                  <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-purple-50/10">
+                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                      <Users size={18} className="text-purple-500" />
+                      Rede de Acesso (Usuários)
+                    </h3>
+                    {isAdmin && (
+                      <Link href={`/dashboard/clients/${params.id}/users`} className="text-[10px] font-black text-purple-500 hover:text-purple-700 uppercase p-2 bg-purple-50 rounded-xl transition-colors">GERENCIAR ACESSOS</Link>
+                    )}
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {users.map((user) => (
+                        <div key={user.id} className="flex items-center gap-4 p-4 bg-slate-50/30 border border-slate-100 rounded-3xl hover:bg-white hover:border-purple-200 transition-all">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg shadow-sm ${user.is_active ? 'bg-purple-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                            {user.full_name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-slate-800 text-sm truncate">{user.full_name}</p>
+                            <p className="text-[10px] font-bold text-slate-400 truncate">{user.email}</p>
+                          </div>
+                          <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest ${user.is_active ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                            {user.is_active ? 'ATIVO' : 'OFF'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Equipamentos */}
-          {equipments.length > 0 && (
-            <div className="card">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-800">🔧 Equipamentos</h3>
-                <Link href={`/dashboard/equipments?client=${params.id}`} className="text-sm text-indigo-600 hover:underline">Ver todos</Link>
-              </div>
-              <div className="space-y-2">
-                {equipments.map((eq) => (
-                  <Link key={eq.id} href={`/dashboard/equipments/${eq.id}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div><p className="font-medium">{eq.name}</p>{eq.model && <p className="text-sm text-gray-500">{eq.model}</p>}</div>
-                    <span className={`badge ${getStatusColor(eq.status)}`}>{eq.status}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Últimas OS */}
-          {recentOrders.length > 0 && (
-            <div className="card">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-800">📋 Últimas Ordens de Serviço</h3>
-                <Link href={`/dashboard/orders?client=${params.id}`} className="text-sm text-indigo-600 hover:underline">Ver todas</Link>
-              </div>
-              <div className="space-y-2">
-                {recentOrders.map((order) => (
-                  <Link key={order.id} href={`/dashboard/orders/${order.id}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                    <div><p className="font-medium">{order.title}</p><p className="text-sm text-gray-500">{new Date(order.created_at).toLocaleDateString('pt-BR')}</p></div>
-                    <span className={`badge ${getStatusColor(order.status)}`}>{order.status}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Usuários do Cliente */}
-          {users.length > 0 && (
-            <div className="card">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-800">👥 Usuários Vinculados</h3>
-                {isAdmin && (
-                  <Link href={`/dashboard/clients/${params.id}/users`} className="text-sm text-indigo-600 hover:underline">Gerenciar</Link>
-                )}
-              </div>
-              <div className="space-y-2">
-                {users.map((user) => (
-                  <div key={user.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${user.is_active ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-200 text-gray-500'}`}>
-                      {user.full_name?.charAt(0)}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{user.full_name}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
-                    </div>
-                    <span className={`badge ${user.is_active ? 'badge-success' : 'badge-danger'}`}>
-                      {user.is_active ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Cadastro */}
-          <div className="card">
-            <h3 className="font-semibold text-gray-800 mb-3">📅 Cadastro</h3>
-            <p className="text-gray-600">Cliente desde {new Date(client.created_at).toLocaleDateString('pt-BR')}</p>
           </div>
-
-          {/* Actions - SÓ ADMIN PODE EXCLUIR */}
-          {isAdmin && (
-            <div className="flex flex-wrap gap-3">
-              <button onClick={handleDelete} disabled={processing} className="btn btn-danger">
-                <Trash2 size={20} /> Excluir Cliente
-              </button>
-            </div>
-          )}
         </>
       )}
 

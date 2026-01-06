@@ -536,29 +536,42 @@ export default function ClientsPage() {
   return (
     <div className="space-y-4 sm:space-y-6 animate-fadeIn">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Carteira de Clientes</h1>
-          <p className="text-sm text-gray-500">{clients.length} clientes cadastrados</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Carteira de Clientes</h1>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+            <p className="text-sm font-medium text-slate-500">{clients.length} clientes na rede</p>
+          </div>
         </div>
         {can('can_create_clients') && (
-          <button onClick={() => openModal()} className="btn btn-primary w-full sm:w-auto">
-            <Plus size={18} />
+          <button onClick={() => openModal()} className="group btn-primary px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all hover:-translate-y-0.5 active:scale-95 bg-indigo-600 text-white">
+            <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
             <span>Novo Cliente</span>
           </button>
         )}
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
+      <div className="relative group/search">
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <Search className="h-5 w-5 text-slate-400 group-focus-within/search:text-indigo-500 transition-colors" />
+        </div>
         <input
           type="text"
-          placeholder="Buscar nome, email ou documento..."
+          placeholder="Pesquisar por nome, email, documento ou responsável..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="input input-with-icon text-sm"
+          className="block w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl leading-5 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 sm:text-sm transition-all shadow-sm"
         />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Cards Grid */}
@@ -566,197 +579,235 @@ export default function ClientsPage() {
         {filteredClients.length === 0 ? (
           <div className="col-span-full text-center py-8 sm:py-12 text-gray-500">
             <Building2 className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-300" />
-            <p className="text-base sm:text-lg">Nenhum cliente encontrado</p>
+            <p className="text-base sm:text-lg text-slate-400 font-medium">Nenhum cliente encontrado</p>
           </div>
         ) : (
           filteredClients.map((client) => (
-            <div key={client.id} className={`card card-interactive group border-l-4 ${maintenanceStatus[client.id]?.vencidas > 0
-              ? 'border-l-red-500 bg-red-50/20'
-              : maintenanceStatus[client.id]?.urgentes > 0
-                ? 'border-l-amber-400 bg-amber-50/20'
-                : 'border-l-indigo-500 bg-white'
-              } hover:border-l-indigo-600 transition-all duration-300`}>
-              {/* Header do Card */}
-              <div className="flex items-start gap-4 mb-4">
-                <div className="relative">
-                  {client.client_logo_url ? (
-                    <img
-                      src={client.client_logo_url}
-                      alt={client.name}
-                      className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover border-2 border-white shadow-sm ring-1 ring-gray-100 flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-700 rounded-2xl flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-md flex-shrink-0">
-                      {client.name[0].toUpperCase()}
+            <div
+              key={client.id}
+              className={`
+                relative flex flex-col bg-white rounded-3xl border border-slate-200/60 shadow-sm 
+                hover:shadow-xl hover:shadow-indigo-500/10 hover:-translate-y-1.5 transition-all duration-500 overflow-hidden group
+                ${maintenanceStatus[client.id]?.vencidas > 0 ? 'ring-2 ring-red-500/20' : ''}
+              `}
+            >
+              {/* Top Colored Bar for Maintenance Status */}
+              <div className={`h-1.5 w-full ${maintenanceStatus[client.id]?.vencidas > 0
+                ? 'bg-red-500'
+                : maintenanceStatus[client.id]?.urgentes > 0
+                  ? 'bg-amber-400'
+                  : 'bg-indigo-500'
+                }`} />
+
+              <div className="p-5 sm:p-6 flex flex-col h-full">
+                {/* Client Header Info */}
+                <div className="flex items-start gap-4 mb-5">
+                  <div className="relative group/logo">
+                    {client.client_logo_url ? (
+                      <div className="relative">
+                        <img
+                          src={client.client_logo_url}
+                          alt={client.name}
+                          className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-slate-100 shadow-sm transition-transform duration-500 group-hover/logo:scale-105"
+                        />
+                        <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/5" />
+                      </div>
+                    ) : (
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg transition-transform duration-500 group-hover/logo:scale-105">
+                        {client.name[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div className={`
+                      absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center shadow-md animate-bounce-subtle
+                      ${client.type === 'PJ' ? 'bg-indigo-600' : 'bg-emerald-500'}
+                    `} title={client.type}>
+                      {client.type === 'PJ' ? <Building2 size={12} className="text-white" /> : <User size={12} className="text-white" />}
                     </div>
-                  )}
-                  <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center shadow-sm ${client.type === 'PJ' ? 'bg-indigo-600' : 'bg-emerald-500'}`} title={client.type}>
-                    {client.type === 'PJ' ? <Building2 size={10} className="text-white" /> : <User size={10} className="text-white" />}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-bold text-slate-800 truncate text-lg leading-tight uppercase tracking-tight group-hover:text-indigo-600 transition-colors">
+                        {client.name}
+                      </h3>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      {client.responsible_name && (
+                        <div className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-full flex items-center gap-1 border border-indigo-100">
+                          <User size={10} /> {client.responsible_name}
+                        </div>
+                      )}
+                      {client.cnpj_cpf && (
+                        <div className="px-2 py-0.5 bg-slate-50 text-slate-500 text-[10px] font-mono rounded-full border border-slate-100">
+                          {client.cnpj_cpf}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    {can('can_edit_clients') && (
+                      <button onClick={() => openModal(client)} className="p-2 hover:bg-indigo-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors bg-slate-50/50">
+                        <Edit size={16} />
+                      </button>
+                    )}
+                    {can('can_delete_clients') && (
+                      <button onClick={() => handleDelete(client)} className="p-2 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-500 transition-colors bg-slate-50/50">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <h3 className="font-black text-gray-900 truncate text-base sm:text-lg leading-tight group-hover:text-indigo-600 transition-colors uppercase tracking-tight">
-                      {client.name}
-                    </h3>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {client.responsible_name && (
-                      <p className="text-xs text-indigo-500 font-bold flex items-center gap-1">
-                        <User size={10} /> {client.responsible_name}
-                      </p>
-                    )}
-                    {client.cnpj_cpf && (
-                      <p className="text-[10px] font-medium text-gray-400 font-mono bg-gray-50 px-1.5 rounded">{client.cnpj_cpf}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-0.5 sm:gap-1 flex-shrink-0">
-                  {can('can_edit_clients') && (
-                    <button onClick={() => openModal(client)} className="p-1 sm:p-1.5 hover:bg-gray-100 rounded text-gray-500">
-                      <Edit size={14} className="sm:w-4 sm:h-4" />
+                {/* Contact List */}
+                <div className="space-y-3 mb-6 flex-1">
+                  {client.phone && (
+                    <a href={`tel:${client.phone}`} className="flex items-center gap-3 text-slate-600 hover:text-indigo-600 transition-colors group/contact">
+                      <div className="p-2 bg-indigo-50 rounded-lg group-hover/contact:bg-indigo-100 transition-colors text-indigo-600">
+                        <Phone size={14} />
+                      </div>
+                      <span className="text-sm font-medium">{client.phone}</span>
+                    </a>
+                  )}
+                  {client.email && (
+                    <a href={`mailto:${client.email}`} className="flex items-center gap-3 text-slate-600 hover:text-indigo-600 transition-colors group/contact">
+                      <div className="p-2 bg-indigo-50 rounded-lg group-hover/contact:bg-indigo-100 transition-colors text-indigo-600">
+                        <Mail size={14} />
+                      </div>
+                      <span className="text-sm font-medium truncate">{client.email}</span>
+                    </a>
+                  )}
+                  {client.address && (
+                    <button
+                      onClick={() => handleOpenMap(client.address)}
+                      className="flex items-center gap-3 text-slate-600 hover:text-rose-600 transition-colors group/contact text-left w-full"
+                    >
+                      <div className="p-2 bg-rose-50 rounded-lg group-hover/contact:bg-rose-100 transition-colors text-rose-500">
+                        <MapPin size={14} />
+                      </div>
+                      <span className="text-sm font-medium line-clamp-2 leading-relaxed">{client.address}</span>
                     </button>
                   )}
-                  {can('can_delete_clients') && (
-                    <button onClick={() => handleDelete(client)} className="p-1 sm:p-1.5 hover:bg-red-50 rounded text-red-500">
-                      <Trash2 size={14} className="sm:w-4 sm:h-4" />
+                </div>
+
+                {/* Primary Actions Grid */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="relative group/wp">
+                    <button
+                      onClick={() => handleWhatsApp(client, 'vazio')}
+                      className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl flex items-center justify-center gap-2 text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      <MessageCircle size={16} />
+                      <span>Whats</span>
                     </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Informações de Contato */}
-              <div className="space-y-1.5 sm:space-y-2 mb-3 sm:mb-4 text-xs sm:text-sm">
-                {client.phone && (
-                  <a href={`tel:${client.phone}`} className="flex items-center gap-1.5 sm:gap-2 text-indigo-600 hover:underline">
-                    <Phone size={12} className="sm:w-3.5 sm:h-3.5 flex-shrink-0" />
-                    <span className="truncate">{client.phone}</span>
-                  </a>
-                )}
-                {client.email && (
-                  <a href={`mailto:${client.email}`} className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-indigo-600">
-                    <Mail size={12} className="sm:w-3.5 sm:h-3.5 flex-shrink-0" />
-                    <span className="truncate">{client.email}</span>
-                  </a>
-                )}
-                {client.address && (
-                  <button
-                    onClick={() => handleOpenMap(client.address)}
-                    className="flex items-center gap-1.5 sm:gap-2 text-gray-600 hover:text-rose-600 text-left w-full"
-                  >
-                    <MapPin size={12} className="sm:w-3.5 sm:h-3.5 text-rose-500 flex-shrink-0" />
-                    <span className="truncate flex-1">{client.address}</span>
-                    <Navigation size={10} className="sm:w-3 sm:h-3 text-rose-500 flex-shrink-0" />
-                  </button>
-                )}
-              </div>
-
-              {/* Botões de Ação Rápida */}
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                <div className="relative group">
-                  <button
-                    onClick={() => handleWhatsApp(client, 'vazio')}
-                    className="w-full py-2 px-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl flex items-center justify-center gap-1 text-[10px] sm:text-xs font-bold shadow-sm shadow-emerald-100 transition-all hover:-translate-y-0.5"
-                  >
-                    <MessageCircle size={14} />
-                    <span className="hidden xs:inline">WhatsApp</span>
-                  </button>
-                  {/* Dropdown de mensagens */}
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 min-w-[140px] overflow-hidden">
-                    <button onClick={() => handleWhatsApp(client, 'caminho')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 flex items-center gap-2">🚗 A caminho</button>
-                    <button onClick={() => handleWhatsApp(client, 'cheguei')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 flex items-center gap-2">📍 Cheguei</button>
-                    <button onClick={() => handleWhatsApp(client, 'concluido')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 flex items-center gap-2">✅ Concluído</button>
-                    <button onClick={() => handleWhatsApp(client, 'vazio')} className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 border-t">💬 Em branco</button>
+                    {/* Floating Dropdown */}
+                    <div className="absolute left-0 right-0 bottom-full mb-2 bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover/wp:opacity-100 group-hover/wp:visible transition-all z-20 min-w-[160px] overflow-hidden p-1.5 ring-1 ring-black/5 animate-slideUp">
+                      <button onClick={() => handleWhatsApp(client, 'caminho')} className="w-full px-3 py-2 text-left text-xs text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-2 transition-colors font-medium">🚗 A caminho</button>
+                      <button onClick={() => handleWhatsApp(client, 'cheguei')} className="w-full px-3 py-2 text-left text-xs text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-2 transition-colors font-medium">📍 Cheguei</button>
+                      <button onClick={() => handleWhatsApp(client, 'concluido')} className="w-full px-3 py-2 text-left text-xs text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-2 transition-colors font-medium">✅ Concluído</button>
+                    </div>
                   </div>
-                </div>
-                <a
-                  href={`mailto:${client.email}`}
-                  className="py-2 px-1 bg-slate-600 hover:bg-slate-700 text-white rounded-xl flex items-center justify-center gap-1 text-[10px] sm:text-xs font-bold shadow-sm shadow-gray-100 transition-all hover:-translate-y-0.5"
-                >
-                  <Mail size={14} />
-                  <span className="hidden xs:inline">E-mail</span>
-                </a>
-                <Link
-                  href={`/dashboard/equipments?client=${client.id}`}
-                  className="py-2 px-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center gap-1 text-[10px] sm:text-xs font-bold shadow-sm shadow-indigo-100 transition-all hover:-translate-y-0.5"
-                >
-                  <Building2 size={14} />
-                  Equip.
-                </Link>
-              </div>
-
-              {/* Botões de Portal - SÓ ADMIN PODE VER */}
-              {isAdmin && (
-                <div className="space-y-1.5 sm:space-y-2">
-                  {/* Botão Liberar Portal */}
-                  <button
-                    onClick={() => handleOpenPortalModal(client)}
-                    className="w-full py-1.5 sm:py-2 px-2 sm:px-3 border-2 border-orange-400 text-orange-600 hover:bg-orange-50 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium"
+                  <a
+                    href={`mailto:${client.email}`}
+                    className="py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-2xl flex items-center justify-center gap-2 text-xs font-bold shadow-lg shadow-slate-800/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    <Globe size={12} className="sm:w-4 sm:h-4" />
-                    <span className="truncate">Liberar Portal</span>
-                    <Lock size={10} className="sm:w-3.5 sm:h-3.5" />
-                  </button>
-
-                  {/* Botão Gerenciar Usuários */}
+                    <Mail size={16} />
+                    <span>Email</span>
+                  </a>
                   <Link
-                    href={`/dashboard/clients/${client.id}/users`}
-                    className="w-full py-1.5 sm:py-2 px-2 sm:px-3 border-2 border-purple-400 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium"
+                    href={`/dashboard/equipments?client=${client.id}`}
+                    className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl flex items-center justify-center gap-2 text-xs font-bold shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    <Users size={12} className="sm:w-4 sm:h-4" />
-                    <span>👥 Gerenciar Usuários</span>
+                    <Building2 size={16} />
+                    <span>Equip.</span>
                   </Link>
+                </div>
 
-                  {/* Botão Bloquear/Desbloquear Portal */}
-                  <button
-                    onClick={() => handleTogglePortalBlock(client)}
-                    className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1 sm:gap-2 text-[10px] sm:text-sm font-medium ${client.portal_blocked
-                      ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'border-2 border-red-400 text-red-600 hover:bg-red-50'
-                      }`}
+                {/* Admin/Portal Section */}
+                {isAdmin && (
+                  <div className="mt-auto space-y-2 border-t border-slate-100 pt-4">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleOpenPortalModal(client)}
+                        className={`flex-1 py-2.5 px-3 rounded-2xl border-2 flex items-center justify-center gap-2 text-xs font-bold transition-all
+                          ${client.portal_enabled
+                            ? 'border-indigo-100 text-indigo-400 cursor-default bg-indigo-50/30'
+                            : 'border-amber-400 text-amber-600 hover:bg-amber-50 active:scale-[0.98]'
+                          }
+                        `}
+                      >
+                        <Globe size={14} />
+                        {client.portal_enabled ? 'Portal Ativo' : 'Liberar Portal'}
+                      </button>
+
+                      <Link
+                        href={`/dashboard/clients/${client.id}/users`}
+                        className="p-2.5 border-2 border-purple-200 text-purple-600 hover:bg-purple-50 rounded-2xl flex items-center justify-center transition-all active:scale-[0.98]"
+                        title="Gerenciar Usuários"
+                      >
+                        <Users size={18} />
+                      </Link>
+                    </div>
+
+                    <button
+                      onClick={() => handleTogglePortalBlock(client)}
+                      className={`w-full py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-sm
+                        ${client.portal_blocked
+                          ? 'bg-red-600 text-white hover:bg-red-700 shadow-red-200'
+                          : 'bg-white border-2 border-slate-200 text-slate-600 hover:border-red-200 hover:text-red-500'
+                        }
+                      `}
+                    >
+                      {client.portal_blocked ? <Unlock size={14} /> : <Lock size={14} />}
+                      {client.portal_blocked ? 'Desbloquear Acesso' : 'Bloquear Portal'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Indicators - Floating or Footers */}
+                {client.portal_blocked && (
+                  <div className="absolute top-3 right-3 animate-pulse">
+                    <div className="bg-red-500 text-white p-1 rounded-full shadow-lg" title={`Bloqueado: ${client.portal_blocked_reason || 'Sem motivo'}`}>
+                      <Shield size={12} strokeWidth={3} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Maintenance Alert - More visible and premium */}
+                {(maintenanceStatus[client.id]?.vencidas > 0 || maintenanceStatus[client.id]?.urgentes > 0) && (
+                  <Link
+                    href="/dashboard/maintenance"
+                    className={`mt-4 p-3 rounded-2xl flex items-center gap-3 transition-all hover:scale-[1.01] active:scale-[0.99] border
+                      ${maintenanceStatus[client.id]?.vencidas > 0
+                        ? 'bg-red-50 border-red-100 text-red-700'
+                        : 'bg-amber-50 border-amber-100 text-amber-700'
+                      }
+                    `}
                   >
-                    {client.portal_blocked ? <Unlock size={12} className="sm:w-4 sm:h-4" /> : <Lock size={12} className="sm:w-4 sm:h-4" />}
-                    {client.portal_blocked ? '🔓 Desbloquear' : '🔒 Bloquear Portal'}
-                  </button>
-                </div>
-              )}
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${maintenanceStatus[client.id]?.vencidas > 0 ? 'bg-red-100' : 'bg-amber-100'
+                      }`}>
+                      <AlertTriangle size={16} className="animate-pulse" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black uppercase tracking-wider mb-0.5">Pendência Técnica</p>
+                      <p className="text-xs font-bold truncate">
+                        {maintenanceStatus[client.id]?.vencidas > 0
+                          ? `${maintenanceStatus[client.id].vencidas} Manutenção(ões) VENCIDA(S)`
+                          : `${maintenanceStatus[client.id].urgentes} Manutenção(ões) Urgente(s)`
+                        }
+                      </p>
+                    </div>
+                  </Link>
+                )}
 
-              {/* Indicador de Bloqueio */}
-              {client.portal_blocked && (
-                <div className="mt-1.5 sm:mt-2 p-1.5 sm:p-2 bg-red-50 border border-red-200 rounded-lg flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-red-700">
-                  <Lock size={10} className="sm:w-3 sm:h-3 flex-shrink-0" />
-                  <span className="truncate">Bloqueado: {client.portal_blocked_reason || 'Sem motivo'}</span>
-                </div>
-              )}
-
-              {/* Indicador de Manutenção Atrasada/Urgente */}
-              {(maintenanceStatus[client.id]?.vencidas > 0 || maintenanceStatus[client.id]?.urgentes > 0) && (
                 <Link
-                  href="/dashboard/maintenance"
-                  className={`mt-1.5 sm:mt-2 p-1.5 sm:p-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-semibold border-2 ${maintenanceStatus[client.id]?.vencidas > 0
-                    ? 'bg-red-50 border-red-400 text-red-700'
-                    : 'bg-amber-50 border-amber-400 text-amber-700'
-                    }`}
+                  href={`/dashboard/clients/${client.id}`}
+                  className="mt-5 w-full py-2.5 text-center text-xs font-bold text-slate-400 hover:text-indigo-600 border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all"
                 >
-                  <AlertTriangle size={12} className="sm:w-3.5 sm:h-3.5 flex-shrink-0" />
-                  <span className="flex-1">
-                    {maintenanceStatus[client.id]?.vencidas > 0
-                      ? `⚠️ ${maintenanceStatus[client.id].vencidas} manutenção(ões) VENCIDA(S)!`
-                      : `🔔 ${maintenanceStatus[client.id].urgentes} manutenção(ões) urgente(s)`
-                    }
-                  </span>
-                  <Calendar size={10} className="sm:w-3 sm:h-3 flex-shrink-0" />
+                  Ver Detalhes do Cliente
                 </Link>
-              )}
-
-              {/* Link Ver Detalhes */}
-              <Link
-                href={`/dashboard/clients/${client.id}`}
-                className="mt-2 sm:mt-3 block text-center text-xs sm:text-sm text-indigo-600 hover:underline"
-              >
-                Ver detalhes →
-              </Link>
+              </div>
             </div>
           ))
         )}
