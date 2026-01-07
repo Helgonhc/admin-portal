@@ -11,6 +11,7 @@ interface DocumentUploadProps {
 
 export default function DocumentUpload({ clientId }: DocumentUploadProps) {
     const [documents, setDocuments] = useState<any[]>([]);
+    const [telemetryDocuments, setTelemetryDocuments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,14 +39,17 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
 
     async function loadDocuments() {
         try {
-            const { data, error } = await supabase
-                .from('client_documents')
-                .select('*')
-                .eq('client_id', clientId)
-                .order('created_at', { ascending: false });
+            const [clientDocsRes, telemetryDocsRes] = await Promise.all([
+                supabase.from('client_documents').select('*').eq('client_id', clientId).order('created_at', { ascending: false }),
+                supabase.from('installation_documents')
+                    .select('*, installations!inner(client_id, title)')
+                    .eq('installations.client_id', clientId)
+                    .order('created_at', { ascending: false })
+            ]);
 
-            if (error) throw error;
-            setDocuments(data || []);
+            if (clientDocsRes.error) throw clientDocsRes.error;
+            setDocuments(clientDocsRes.data || []);
+            setTelemetryDocuments(telemetryDocsRes.data || []);
         } catch (error) {
             console.error('Erro ao carregar documentos:', error);
             toast.error('Erro ao carregar lista de documentos');
@@ -120,7 +124,7 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
     async function handleDownload(doc: any) {
         try {
             const { data, error } = await supabase.storage
-                .from('documents')
+                .from(doc.installations ? 'installation-documents' : 'documents')
                 .createSignedUrl(doc.file_url, 60);
 
             if (error) throw error;
@@ -267,6 +271,44 @@ export default function DocumentUpload({ clientId }: DocumentUploadProps) {
                     </div>
                 )}
             </div>
+
+            {/* Telemetry Documents Section */}
+            {telemetryDocuments.length > 0 && (
+                <div className="pt-6 border-t border-gray-100">
+                    <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-indigo-500" />
+                        Documentos de Telemetria ({telemetryDocuments.length})
+                    </h3>
+
+                    <div className="grid gap-3">
+                        {telemetryDocuments.map((doc) => (
+                            <div key={doc.id} className="flex items-center justify-between p-4 bg-indigo-50/30 border border-indigo-100 rounded-xl hover:shadow-md transition-all group">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                                        <File size={20} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-800 text-sm">{doc.name || doc.title}</h4>
+                                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                                            <span className="font-bold text-indigo-500">{doc.installations?.title}</span>
+                                            <span>•</span>
+                                            <span>{new Date(doc.created_at).toLocaleDateString('pt-BR')}</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => handleDownload(doc)}
+                                    className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors"
+                                    title="Baixar"
+                                >
+                                    <Download size={18} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

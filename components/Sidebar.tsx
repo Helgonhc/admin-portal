@@ -32,7 +32,8 @@ import {
   TrendingUp,
   Search,
   FolderOpen,
-  BellRing
+  BellRing,
+  Droplets
 } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -56,6 +57,7 @@ const menuItems = [
   { name: 'Banco de Horas', href: '/dashboard/overtime', icon: Clock, permission: null },
   { name: 'Estoque', href: '/dashboard/inventory', icon: Package, permission: 'can_manage_inventory' },
   { name: 'Chat', href: '/dashboard/chat', icon: MessageSquare, permission: null },
+  { name: 'Telemetria', href: '/dashboard/installations', icon: Droplets, permission: null },
   { name: 'Notificações', href: '/dashboard/notifications', icon: Bell, permission: null, hasBadge: true },
   { name: 'Baixar App', href: '/dashboard/download', icon: Download, permission: null },
 ];

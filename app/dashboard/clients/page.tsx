@@ -2,29 +2,39 @@
 
 import { useState, useEffect } from 'react';
 import { supabase, Client } from '../../../lib/supabase';
-import {
-  Plus, Search, Edit, Trash2, Eye, Loader2, Building2,
-  Globe, Lock, Users, MessageCircle, Phone, Mail, MapPin,
-  Navigation, Unlock, UserPlus, Upload, Image, X, Shield,
-  AlertTriangle, Calendar, User
-} from 'lucide-react';
+import { Plus, Search, Filter, X, MoreVertical, Building2, User, Phone, Mail, MapPin, Shield, Calendar, Wrench, ChevronRight, Edit, Trash2, Eye, Loader2, Globe, Lock, Users, MessageCircle, Navigation, Unlock, UserPlus, Upload, Image, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Skeleton, ListSkeleton } from '../../../components/Skeleton';
 import { usePermissions } from '../../../hooks/usePermissions';
+
+const BRAZIL_STATES = [
+  { value: 'AC', label: 'Acre' }, { value: 'AL', label: 'Alagoas' }, { value: 'AP', label: 'Amapá' },
+  { value: 'AM', label: 'Amazonas' }, { value: 'BA', label: 'Bahia' }, { value: 'CE', label: 'Ceará' },
+  { value: 'DF', label: 'Distrito Federal' }, { value: 'ES', label: 'Espírito Santo' }, { value: 'GO', label: 'Goiás' },
+  { value: 'MA', label: 'Maranhão' }, { value: 'MT', label: 'Mato Grosso' }, { value: 'MS', label: 'Mato Grosso do Sul' },
+  { value: 'MG', label: 'Minas Gerais' }, { value: 'PA', label: 'Pará' }, { value: 'PB', label: 'Paraíba' },
+  { value: 'PR', label: 'Paraná' }, { value: 'PE', label: 'Pernambuco' }, { value: 'PI', label: 'Piauí' },
+  { value: 'RJ', label: 'Rio de Janeiro' }, { value: 'RN', label: 'Rio Grande do Norte' }, { value: 'RS', label: 'Rio Grande do Sul' },
+  { value: 'RO', label: 'Rondônia' }, { value: 'RR', label: 'Roraima' }, { value: 'SC', label: 'Santa Catarina' },
+  { value: 'SP', label: 'São Paulo' }, { value: 'SE', label: 'Sergipe' }, { value: 'TO', label: 'Tocantins' }
+].map(s => ({ ...s, flag: `https://cdn.jsdelivr.net/gh/arthurreira/br-state-flags@main/svgs/optimized/${s.value.toLowerCase()}.svg` }));
 
 export default function ClientsPage() {
   const { can, isAdmin } = usePermissions();
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterState, setFilterState] = useState('');
+  const [isStateOpen, setIsStateOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [maintenanceStatus, setMaintenanceStatus] = useState<Record<string, { vencidas: number; urgentes: number }>>({});
 
   // Verificar permissão de acesso
   const canViewClients = can('can_view_all_clients');
   const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
 
   // Form data completo igual ao app
   const [formData, setFormData] = useState({
@@ -241,11 +251,16 @@ export default function ClientsPage() {
     }
   }
 
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(search.toLowerCase()) ||
-    client.email?.toLowerCase().includes(search.toLowerCase()) ||
-    client.cnpj_cpf?.includes(search)
-  );
+  const filteredClients = clients.filter(client => {
+    const matchesSearch = client.name.toLowerCase().includes(search.toLowerCase()) ||
+      client.email?.toLowerCase().includes(search.toLowerCase()) ||
+      client.cnpj_cpf?.includes(search) ||
+      client.responsible_name?.toLowerCase().includes(search.toLowerCase());
+
+    const matchesState = filterState ? client.state === filterState : true;
+
+    return matchesSearch && matchesState;
+  });
 
   function openModal(client?: any) {
     if (client) {
@@ -538,7 +553,10 @@ export default function ClientsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Carteira de Clientes</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <img src="https://cdn.jsdelivr.net/gh/lipis/flag-icons@main/flags/4x3/br.svg" className="w-8 h-6 object-cover rounded-[3px] shadow-sm" alt="Brasil" />
+            Carteira de Clientes
+          </h1>
           <div className="flex items-center gap-2 mt-1">
             <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
             <p className="text-sm font-medium text-slate-500">{clients.length} clientes na rede</p>
@@ -552,26 +570,78 @@ export default function ClientsPage() {
         )}
       </div>
 
-      {/* Search */}
-      <div className="relative group/search">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-slate-400 group-focus-within/search:text-indigo-500 transition-colors" />
+      {/* Search and Filters */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative group/search flex-1">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-slate-400 group-focus-within/search:text-indigo-500 transition-colors" />
+          </div>
+          <input
+            type="text"
+            placeholder="Pesquisar por nome, email, documento ou responsável..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="block w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl leading-5 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 sm:text-sm transition-all shadow-sm"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
-        <input
-          type="text"
-          placeholder="Pesquisar por nome, email, documento ou responsável..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="block w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl leading-5 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 sm:text-sm transition-all shadow-sm"
-        />
-        {search && (
+
+        <div className="relative min-w-[240px]">
           <button
-            onClick={() => setSearch('')}
-            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+            onClick={() => setIsStateOpen(!isStateOpen)}
+            className="w-full pl-4 pr-10 py-4 bg-white border border-slate-200 focus:border-indigo-500 rounded-2xl outline-none transition-all font-bold text-sm flex items-center gap-2 group shadow-sm hover:border-slate-300 text-slate-700"
           >
-            <X size={16} />
+            {filterState ? (
+              <>
+                <img src={`https://cdn.jsdelivr.net/gh/arthurreira/br-state-flags@main/svgs/optimized/${filterState.toLowerCase()}.svg`} className="w-5 h-3.5 object-cover rounded-[1px]" alt={filterState} />
+                <span>{filterState}</span>
+              </>
+            ) : (
+              <>
+                <img src="https://cdn.jsdelivr.net/gh/lipis/flag-icons@main/flags/4x3/br.svg" className="w-5 h-3.5 object-cover rounded-[1px] shadow-sm" alt="Brasil" />
+                <span>Brasil</span>
+              </>
+            )}
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 transition-transform duration-300" style={{ transform: isStateOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)' }}>
+              <ChevronRight size={14} className="rotate-90 text-slate-400" />
+            </div>
           </button>
-        )}
+
+          {isStateOpen && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 max-h-64 overflow-y-auto animate-fadeIn p-1">
+              <button
+                onClick={() => {
+                  setFilterState('');
+                  setIsStateOpen(false);
+                }}
+                className="w-full px-3 py-2.5 text-left hover:bg-slate-50 rounded-xl flex items-center gap-3 transition-colors text-sm font-bold text-slate-700"
+              >
+                <img src="https://cdn.jsdelivr.net/gh/lipis/flag-icons@main/flags/4x3/br.svg" className="w-5 h-3.5 object-cover rounded-[1px] shadow-sm" alt="Brasil" />
+                <span>Brasil (Todos)</span>
+              </button>
+              {BRAZIL_STATES.map(state => (
+                <button
+                  key={state.value}
+                  onClick={() => {
+                    setFilterState(state.value);
+                    setIsStateOpen(false);
+                  }}
+                  className={`w-full px-3 py-2.5 text-left hover:bg-slate-50 rounded-xl flex items-center gap-3 transition-colors text-sm font-bold ${filterState === state.value ? 'bg-indigo-50 text-indigo-600' : 'text-slate-700'}`}
+                >
+                  <img src={state.flag} className="w-5 h-3.5 object-cover rounded-[1px] shadow-sm" alt={state.value} />
+                  <span>{state.value} - {state.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Cards Grid */}
@@ -625,14 +695,27 @@ export default function ClientsPage() {
                     </div>
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-bold text-slate-800 truncate text-lg leading-tight uppercase tracking-tight group-hover:text-indigo-600 transition-colors">
-                        {client.name}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center">
+                    <div className="flex items-center justify-between gap-2 overflow-hidden mb-1">
+                      <h3 className="font-bold text-slate-800 text-lg leading-tight uppercase tracking-tight group-hover:text-indigo-600 transition-colors flex items-center gap-2 max-w-full">
+                        <span className="truncate">{client.name}</span>
+                        {client.state && (
+                          <img
+                            src={`https://cdn.jsdelivr.net/gh/arthurreira/br-state-flags@main/svgs/optimized/${client.state.toLowerCase()}.svg`}
+                            className="w-5 h-3.5 object-cover rounded-[2px] shadow-sm flex-shrink-0"
+                            alt={client.state}
+                            title={`Estado: ${client.state}`}
+                          />
+                        )}
                       </h3>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 mt-1">
+                      {client.is_telemetry_client && (
+                        <div className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[10px] font-black rounded-full flex items-center gap-1 border border-purple-100 animate-pulse">
+                          <Wrench size={10} /> TELEMETRIA
+                        </div>
+                      )}
                       {client.responsible_name && (
                         <div className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-full flex items-center gap-1 border border-indigo-100">
                           <User size={10} /> {client.responsible_name}
