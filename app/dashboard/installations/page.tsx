@@ -21,6 +21,8 @@ const BRAZIL_STATES = [
 import InstallationForm from '../../../components/installations/InstallationForm';
 import InstallationKanban from '../../../components/installations/InstallationKanban';
 import InstallationDocuments from '../../../components/installations/InstallationDocuments';
+import './TelemetryPrint.css';
+import { FileDown, Printer } from 'lucide-react';
 
 export default function InstallationsPage() {
     const [loading, setLoading] = useState(true);
@@ -92,6 +94,51 @@ export default function InstallationsPage() {
         return matchesSearch && matchesState;
     });
 
+    // Função para exportar para Excel (CSV)
+    const handleExportExcel = () => {
+        if (filteredInstallations.length === 0) {
+            toast.error('Nenhum dado para exportar');
+            return;
+        }
+
+        // Cabeçalho do CSV
+        const headers = ['Título', 'Cliente', 'Estado', 'Cidade', 'Endereço', 'Data Início', 'Data Fim', 'Status', 'Técnico', 'Necessita Viagem'];
+
+        // Mapear dados
+        const rows = filteredInstallations.map(inst => [
+            inst.title || '',
+            inst.clients?.name || '',
+            inst.state || '',
+            inst.city || '',
+            `"${inst.location_address || ''}"`, // Aspas para endereços com vírgula
+            inst.start_date ? format(new Date(inst.start_date), 'dd/MM/yyyy HH:mm') : '',
+            inst.end_date ? format(new Date(inst.end_date), 'dd/MM/yyyy HH:mm') : '',
+            inst.status || '',
+            inst.technician_name || '',
+            inst.requires_travel ? 'Sim' : 'Não'
+        ]);
+
+        // Gerar string CSV (separado por ponto e vírgula para abrir direto no Excel PT-BR)
+        const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+
+        // Criar blob e link de download
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `agenda_telemetria_${format(new Date(), 'dd_MM_yyyy')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast.success('Excel exportado com sucesso!');
+    };
+
+    // Função para imprimir
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
         <div className="space-y-6 animate-fadeIn pb-10 px-4 sm:px-0">
             {/* Header Estilizado */}
@@ -135,6 +182,24 @@ export default function InstallationsPage() {
                             Agenda
                         </button>
                     </div>
+
+                    <button
+                        onClick={handleExportExcel}
+                        className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl hover:bg-emerald-100 transition-all shadow-sm flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-emerald-100 dark:border-emerald-800"
+                        title="Exportar para Excel"
+                    >
+                        <FileDown size={20} />
+                        Excel
+                    </button>
+
+                    <button
+                        onClick={handlePrint}
+                        className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-slate-100 dark:border-slate-800"
+                        title="Imprimir Agenda"
+                    >
+                        <Printer size={20} />
+                        Papel
+                    </button>
 
                     <button
                         onClick={() => {

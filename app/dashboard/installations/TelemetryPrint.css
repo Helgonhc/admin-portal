@@ -1,0 +1,107 @@
+@media print {
+
+    /* Esconder elementos não essenciais */
+    header,
+    aside,
+    nav,
+    .btn,
+    button,
+    input,
+    .no-print,
+    .btn-primary,
+    .sidebar-item,
+    .lucide-plus,
+    .lucide-search,
+    .lucide-filter {
+        display: none !important;
+    }
+
+    /* Reset de layout */
+    body {
+        background: white !important;
+        color: black !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .min-h-screen,
+    .overflow-auto,
+    .flex-1 {
+        overflow: visible !important;
+        display: block !important;
+        height: auto !important;
+        min-height: auto !important;
+        position: static !important;
+        width: 100% !important;
+    }
+
+    /* Estilo do conteúdo */
+    .animate-fadeIn {
+        animation: none !important;
+        opacity: 1 !important;
+    }
+
+    .bg-white,
+    .dark\:bg-slate-900,
+    .bg-slate-50,
+    .dark\:bg-slate-800\/50 {
+        background: white !important;
+        border: 1px solid #eee !important;
+        box-shadow: none !important;
+    }
+
+    .rounded-\[2\.5rem\],
+    .rounded-3xl,
+    .rounded-2xl {
+        border-radius: 8px !important;
+    }
+
+    /* Títulos e Textos */
+    .text-3xl {
+        font-size: 20pt !important;
+        margin-bottom: 20px !important;
+    }
+
+    .text-slate-800,
+    .dark\:text-white,
+    .text-gray-900 {
+        color: black !important;
+    }
+
+    .text-gray-500,
+    .text-slate-500 {
+        color: #666 !important;
+    }
+
+    /* Itens da Agenda */
+    .mt-12 {
+        margin-top: 20px !important;
+    }
+
+    .gap-6 {
+        gap: 10px !important;
+    }
+
+    .p-5,
+    .p-8,
+    .p-12 {
+        padding: 10px !important;
+    }
+
+    /* Forçar quebras de página se houver muitos itens */
+    .flex.flex-col.sm\:flex-row {
+        page-break-inside: avoid !important;
+        border-bottom: 1px solid #ddd !important;
+        padding-bottom: 10px !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* Forçar exibição de cores/fundos de status se possível */
+    .bg-emerald-100,
+    .bg-blue-100,
+    .bg-amber-100,
+    .bg-slate-100 {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
