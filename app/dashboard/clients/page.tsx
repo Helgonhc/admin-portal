@@ -413,8 +413,9 @@ export default function ClientsPage() {
       .maybeSingle();
 
     if (existingProfile) {
-      toast.success(`Este cliente já possui acesso ao portal.\n\nEmail: ${existingProfile.email}`);
-      return;
+      toast('Usuário já existe. Prossiga para redefinir a senha.', { icon: 'ℹ️' });
+      // Preencher dados se possível
+      if (existingProfile.email) setPortalEmail(existingProfile.email);
     }
 
     setSelectedClient(client);
@@ -438,31 +439,26 @@ export default function ClientsPage() {
     setCreatingPortal(true);
 
     try {
-      // Usar função SQL para criar usuário (não afeta sessão do admin/APK)
-      const { data: result, error: rpcError } = await supabase.rpc('create_user_admin', {
-        p_email: portalEmail.trim().toLowerCase(),
-        p_password: portalPassword,
-        p_full_name: (selectedClient.responsible_name || selectedClient.name).trim(),
-        p_role: 'client',
-        p_phone: selectedClient.phone || null,
-        p_cpf: null,
-        p_cargo: null,
+      // Usar API Route para garantir criação segura e hash de senha correto
+      const response = await fetch('/api/create-portal-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: portalEmail.trim().toLowerCase(),
+          password: portalPassword,
+          full_name: (selectedClient.responsible_name || selectedClient.name).trim(),
+          client_id: selectedClient.id,
+          phone: selectedClient.phone || null,
+        })
       });
 
-      if (rpcError) {
-        console.error('Erro na função SQL:', rpcError);
-        throw new Error(`Erro ao criar usuário: ${rpcError.message}. Execute o SQL CRIAR_USUARIO_SEM_AFETAR_SESSAO.sql no Supabase.`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao criar usuário');
       }
 
-      if (result && !result.success) {
-        throw new Error(result.error || 'Erro ao criar usuário');
-      } else if (result && result.success) {
-        // Atualizar o profile com o client_id (a função SQL não faz isso automaticamente para clientes)
-        await supabase
-          .from('profiles')
-          .update({ client_id: selectedClient.id })
-          .eq('id', result.user_id);
-      }
+      // O perfil já é criado/atualizado pela API Route, não precisamos fazer update manual aqui
 
       // Atualizar cliente com portal liberado
       await supabase
