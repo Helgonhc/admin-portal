@@ -7,6 +7,8 @@ import { ptBR } from 'date-fns/locale';
 
 interface InstallationKanbanProps {
     installations: any[];
+    selectedIds: Set<string>;
+    onToggleSelection: (id: string) => void;
     onEdit: (installation: any) => void;
     onStatusChange: (id: string, newStatus: string) => void;
     onViewDocuments: (installation: any) => void;
@@ -19,7 +21,7 @@ const COLUMNS = [
     { id: 'completed', title: 'Concluídos', subtitle: 'Histórico de sucesso', color: 'emerald', iconColor: 'text-emerald-600', bgColor: 'bg-emerald-50', darkBg: 'dark:bg-emerald-900/20', borderColor: 'border-emerald-200' },
 ];
 
-export default function InstallationKanban({ installations, onEdit, onStatusChange, onViewDocuments }: InstallationKanbanProps) {
+export default function InstallationKanban({ installations, selectedIds, onToggleSelection, onEdit, onStatusChange, onViewDocuments }: InstallationKanbanProps) {
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
         pending: true,
         scheduled: true,
@@ -86,9 +88,28 @@ export default function InstallationKanban({ installations, onEdit, onStatusChan
                                 items.map(item => (
                                     <div
                                         key={item.id}
-                                        className="group bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-[1.5rem] p-4 border border-slate-100 dark:border-slate-800 shadow-sm transition-all duration-300 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-900/50"
+                                        className={`group bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-[1.5rem] p-4 border transition-all duration-300 hover:shadow-xl relative overflow-hidden
+                                            ${selectedIds.has(item.id)
+                                                ? 'border-indigo-500 bg-indigo-50/10 dark:bg-indigo-900/10'
+                                                : 'border-slate-100 dark:border-slate-800'}`}
                                     >
                                         <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                                            {/* CHECKBOX DE SELEÇÃO ELITE */}
+                                            <div className="shrink-0 flex items-center pr-2">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onToggleSelection(item.id);
+                                                    }}
+                                                    className={`w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all duration-300
+                                                        ${selectedIds.has(item.id)
+                                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200 rotate-12'
+                                                            : 'border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800 hover:border-indigo-300'}`}
+                                                >
+                                                    {selectedIds.has(item.id) && <CheckCircle2 size={16} />}
+                                                </button>
+                                            </div>
+
 
                                             {/* Col 1: Identificação Principal */}
                                             <div className="flex-1 min-w-0">

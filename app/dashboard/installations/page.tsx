@@ -36,6 +36,19 @@ export default function InstallationsPage() {
     const [isStateOpen, setIsStateOpen] = useState(false);
     const [companyConfig, setCompanyConfig] = useState<any>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    const toggleSelection = (id: string) => {
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) newSet.delete(id);
+            else newSet.add(id);
+            return newSet;
+        });
+    };
+
+    const clearSelection = () => setSelectedIds(new Set());
+    const selectAllVisible = () => setSelectedIds(new Set(filteredInstallations.map(i => i.id)));
 
     // Mapeamento de Status para PT-BR (Compartilhado)
     const statusMap: Record<string, string> = {
@@ -129,9 +142,13 @@ export default function InstallationsPage() {
             // aba principal: AGENDA TÉCNICA
             const worksheet = workbook.addWorksheet('AGENDA TÉCNICA');
 
+            // --- FILTER BY SELECTION IF ANY ---
+            const dataToExport = selectedIds.size > 0
+                ? filteredInstallations.filter(i => selectedIds.has(i.id))
+                : filteredInstallations;
 
             // Ordenação Cronológica (Mais antigo primeiro = Ordem da Agenda)
-            const sortedData = [...filteredInstallations].sort((a, b) => {
+            const sortedData = [...dataToExport].sort((a, b) => {
                 const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
                 const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
                 return dateA - dateB;
@@ -312,8 +329,13 @@ export default function InstallationsPage() {
             const pageHeight = doc.internal.pageSize.height;
             const margin = 10;
 
+            // --- FILTER BY SELECTION IF ANY ---
+            const dataToExport = selectedIds.size > 0
+                ? filteredInstallations.filter(i => selectedIds.has(i.id))
+                : filteredInstallations;
+
             // Ordenação Cronológica
-            const sortedData = [...filteredInstallations].sort((a, b) => {
+            const sortedData = [...dataToExport].sort((a, b) => {
                 const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
                 const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
                 return dateA - dateB;
@@ -522,6 +544,13 @@ export default function InstallationsPage() {
                     </div>
 
                     <button
+                        onClick={selectAllVisible}
+                        className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 dark:border-indigo-800"
+                    >
+                        Selecionar Tudo
+                    </button>
+
+                    <button
                         onClick={handleExportPDF}
                         className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 transition-all shadow-sm flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-red-100 dark:border-red-800"
                         title="Exportar PDF Profissional"
@@ -551,6 +580,51 @@ export default function InstallationsPage() {
                     </button>
                 </div>
             </div>
+
+            {/* BARRA DE SELEÇÃO FLUTUANTE */}
+            {selectedIds.size > 0 && (
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[60] animate-slideUp">
+                    <div className="bg-slate-900 dark:bg-slate-800 text-white px-8 py-5 rounded-[2rem] shadow-2xl border border-slate-700 flex items-center gap-8 backdrop-blur-xl bg-opacity-90">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black">
+                                {selectedIds.size}
+                            </div>
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-slate-400 leading-none mb-1">Itens Selecionados</p>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase">Exportação Filtrada Ativa</p>
+                            </div>
+                        </div>
+
+                        <div className="w-[1px] h-10 bg-slate-700" />
+
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={handleExportPDF}
+                                className="flex items-center gap-2 px-4 py-2 hover:bg-slate-700 rounded-xl transition-all text-xs font-black uppercase tracking-widest"
+                            >
+                                <File size={16} className="text-red-400" />
+                                PDF
+                            </button>
+                            <button
+                                onClick={handleExportExcel}
+                                className="flex items-center gap-2 px-4 py-2 hover:bg-slate-700 rounded-xl transition-all text-xs font-black uppercase tracking-widest"
+                            >
+                                <FileDown size={16} className="text-emerald-400" />
+                                EXCEL
+                            </button>
+
+                            <div className="w-[1px] h-6 bg-slate-700" />
+
+                            <button
+                                onClick={clearSelection}
+                                className="px-4 py-2 bg-slate-700 hover:bg-red-600 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest"
+                            >
+                                Limpar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Barra de Filtros e Busca */}
             <div className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-5 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800">
@@ -649,6 +723,8 @@ export default function InstallationsPage() {
                         {view === 'kanban' ? (
                             <InstallationKanban
                                 installations={filteredInstallations}
+                                selectedIds={selectedIds}
+                                onToggleSelection={toggleSelection}
                                 onEdit={(item) => {
                                     setSelectedInstallation(item);
                                     setShowForm(true);
@@ -741,17 +817,31 @@ export default function InstallationsPage() {
                                                                     setSelectedInstallation(inst);
                                                                     setShowForm(true);
                                                                 }}
-                                                                className={`p-1.5 rounded-lg text-[9px] font-bold truncate cursor-pointer transition-all border group
-                                                                    ${inst.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100 dark:border-emerald-800/30' :
-                                                                        inst.status === 'in_progress' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 border-amber-100 dark:border-amber-800/30' :
-                                                                            'bg-slate-50 dark:bg-slate-800 text-slate-600 border-slate-100 dark:border-slate-700'}
+                                                                className={`p-1.5 rounded-lg text-[9px] font-bold truncate cursor-pointer transition-all border group relative
+                                                                    ${selectedIds.has(inst.id) ? 'border-indigo-500 ring-1 ring-indigo-500 shadow-lg' :
+                                                                        inst.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100 dark:border-emerald-800/30' :
+                                                                            inst.status === 'in_progress' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 border-amber-100 dark:border-amber-800/30' :
+                                                                                'bg-slate-50 dark:bg-slate-800 text-slate-600 border-slate-100 dark:border-slate-700'}
                                                                     hover:shadow-md hover:-translate-y-0.5
                                                                 `}
                                                             >
+                                                                {/* MINI CHECKBOX CALENDÁRIO */}
+                                                                <div
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        toggleSelection(inst.id);
+                                                                    }}
+                                                                    className={`absolute right-1 top-1 w-3 h-3 rounded-full border border-current flex items-center justify-center
+                                                                        ${selectedIds.has(inst.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white/50 dark:bg-slate-800'}
+                                                                    `}
+                                                                >
+                                                                    {selectedIds.has(inst.id) && <div className="w-1 h-1 bg-white rounded-full" />}
+                                                                </div>
+
                                                                 <div className="flex items-center gap-1">
                                                                     <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0" />
                                                                     <span className="shrink-0 opacity-60">[{format(new Date(inst.start_date || inst.scheduled_date), 'HH:mm')}]</span>
-                                                                    <span className="truncate">{inst.clients?.name || inst.title}</span>
+                                                                    <span className="truncate pr-3">{inst.clients?.name || inst.title}</span>
                                                                 </div>
                                                             </div>
                                                         ))}
