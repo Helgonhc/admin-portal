@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Plus, LayoutGrid, Calendar as CalendarIcon, Loader2, Search, Filter, X, ChevronRight, List, Globe, Plane, Droplets } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const BRAZIL_STATES = [
@@ -22,7 +22,7 @@ import InstallationForm from '../../../components/installations/InstallationForm
 import InstallationKanban from '../../../components/installations/InstallationKanban';
 import InstallationDocuments from '../../../components/installations/InstallationDocuments';
 import './TelemetryPrint.css';
-import { FileDown, Printer } from 'lucide-react';
+import { FileDown, Printer, File } from 'lucide-react';
 
 export default function InstallationsPage() {
     const [loading, setLoading] = useState(true);
@@ -34,10 +34,31 @@ export default function InstallationsPage() {
     const [search, setSearch] = useState('');
     const [filterState, setFilterState] = useState('');
     const [isStateOpen, setIsStateOpen] = useState(false);
+    const [companyConfig, setCompanyConfig] = useState<any>(null);
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+
+    // Mapeamento de Status para PT-BR (Compartilhado)
+    const statusMap: Record<string, string> = {
+        'pending': 'PENDENTE',
+        'scheduled': 'AGENDADO',
+        'in_progress': 'EM ANDAMENTO',
+        'completed': 'CONCLUÍDO',
+        'cancelled': 'CANCELADO'
+    };
 
     useEffect(() => {
         loadInstallations();
+        loadCompanyConfig();
     }, []);
+
+    async function loadCompanyConfig() {
+        try {
+            const { data } = await supabase.from('app_config').select('*').single();
+            if (data) setCompanyConfig(data);
+        } catch (error) {
+            console.error('Erro ao carregar branding:', error);
+        }
+    }
 
     async function loadInstallations() {
         setLoading(true);
@@ -53,7 +74,7 @@ export default function InstallationsPage() {
             // Fetch clients separately to bypass FK relationship issues in Supabase
             const { data: clientsData } = await supabase
                 .from('clients')
-                .select('id, name, is_telemetry_client');
+                .select('id, name, is_telemetry_client, cnpj_cpf');
 
             const mergedData = instData.map(inst => ({
                 ...inst,
@@ -94,49 +115,366 @@ export default function InstallationsPage() {
         return matchesSearch && matchesState;
     });
 
-    // Função para exportar para Excel (CSV)
-    const handleExportExcel = () => {
+    // Função para exportar para Excel (Ultra-Premium com ExcelJS)
+    const handleExportExcel = async () => {
         if (filteredInstallations.length === 0) {
             toast.error('Nenhum dado para exportar');
             return;
         }
 
-        // Cabeçalho do CSV
-        const headers = ['Título', 'Cliente', 'Estado', 'Cidade', 'Endereço', 'Data Início', 'Data Fim', 'Status', 'Técnico', 'Necessita Viagem'];
+        toast.loading('Preparando Excel Corporativo...');
+        try {
+            const ExcelJS = (await import('exceljs')).default;
+            const workbook = new ExcelJS.Workbook();
+            // aba principal: AGENDA TÉCNICA
+            const worksheet = workbook.addWorksheet('AGENDA TÉCNICA');
 
-        // Mapear dados
-        const rows = filteredInstallations.map(inst => [
-            inst.title || '',
-            inst.clients?.name || '',
-            inst.state || '',
-            inst.city || '',
-            `"${inst.location_address || ''}"`, // Aspas para endereços com vírgula
-            inst.start_date ? format(new Date(inst.start_date), 'dd/MM/yyyy HH:mm') : '',
-            inst.end_date ? format(new Date(inst.end_date), 'dd/MM/yyyy HH:mm') : '',
-            inst.status || '',
-            inst.technician_name || '',
-            inst.requires_travel ? 'Sim' : 'Não'
-        ]);
 
-        // Gerar string CSV (separado por ponto e vírgula para abrir direto no Excel PT-BR)
-        const csvContent = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+            // Ordenação Cronológica (Mais antigo primeiro = Ordem da Agenda)
+            const sortedData = [...filteredInstallations].sort((a, b) => {
+                const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+                const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+                return dateA - dateB;
+            });
 
-        // Criar blob e link de download
-        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `agenda_telemetria_${format(new Date(), 'dd_MM_yyyy')}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+            // --- CONSTRUÇÃO DA AGENDA (Mesa de Operações) ---
+            const rows = sortedData.map(inst => [
+                inst.start_date ? format(new Date(inst.start_date), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '',
+                inst.end_date ? format(new Date(inst.end_date), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '---',
+                (inst.technician_name || 'PENDENTE').toUpperCase(),
+                statusMap[inst.status] || inst.status.toUpperCase(),
+                (inst.clients?.name || 'CLIENTE AVULSO').toUpperCase(),
+                inst.cnpj || inst.clients?.cnpj_cpf || '',
+                (inst.title || '').toUpperCase(),
+                inst.location_address || '',
+                (inst.neighborhood || '').toUpperCase(),
+                (inst.city || '').toUpperCase(),
+                (inst.state || '').toUpperCase(),
+                (inst.contact_name || '').toUpperCase(),
+                inst.contact_phone || '',
+                inst.id?.substring(0, 8).toUpperCase() || ''
+            ]);
 
-        toast.success('Excel exportado com sucesso!');
+            // Definição Manual de Cabeçalhos (Para evitar conflitos do addTable)
+            const headerNames = ['DATA INÍCIO', 'DATA FIM', 'TÉCNICO', 'STATUS', 'CLIENTE', 'CNPJ', 'TÍTULO DO SERVIÇO', 'LOGRADOURO/Nº', 'BAIRRO', 'CIDADE', 'UF', 'CONTATO', 'TELEFONE', 'ID SERVIÇO'];
+            const headerRow = worksheet.getRow(1);
+            headerRow.values = headerNames;
+            headerRow.height = 40;
+            headerRow.eachCell((cell) => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } }; // Slate 900
+                cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 12, name: 'Segoe UI' };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = { bottom: { style: 'thick', color: { argb: 'FF334155' } } };
+            });
+
+            // Adicionar Dados
+            worksheet.addRows(rows);
+
+            // Ativar Filtros Automáticos
+            worksheet.autoFilter = {
+                from: { row: 1, column: 1 },
+                to: { row: 1, column: headerNames.length }
+            };
+
+            // Ajuste de Larguras (Premium Spacing)
+            const columnWidths = [24, 24, 28, 22, 42, 22, 48, 42, 28, 28, 12, 28, 22, 18];
+            columnWidths.forEach((width, i) => {
+                worksheet.getColumn(i + 1).width = width;
+            });
+
+            // ESTILO DE ELITE: TIPOGRAFIA SEGURA E NEUTRA
+            worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+                if (rowNumber === 1) return; // Pular cabeçalho já estilizado
+
+                row.height = 36; // Altura Master para elegância
+
+                const statusValue = (row.getCell(4).value?.toString() || '').trim().toUpperCase(); // Coluna D (STATUS)
+
+                row.eachCell((cell, colNumber) => {
+                    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                    cell.font = { size: 11, name: 'Segoe UI', color: { argb: 'FF334155' } }; // Slate 700
+                    cell.border = { bottom: { style: 'thin', color: { argb: 'FFF1F5F9' } } };
+
+                    // Zebrado suave
+                    if (rowNumber % 2 === 0) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+                    }
+
+                    // --- COLORIZAÇÃO ABSOLUTA DA CÉLULA DE STATUS (COLUNA D) ---
+                    // Forçamos o fundo colorido de TODOS os status durante o export para impacto imediato
+                    if (colNumber === 4) {
+                        cell.font = { ...cell.font, bold: true };
+                        if (statusValue === 'CONCLUÍDO') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } }; // Emerald 500
+                            cell.font = { ...cell.font, color: { argb: 'FFFFFFFF' } };
+                        } else if (statusValue === 'EM ANDAMENTO') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF59E0B' } }; // Amber 500
+                            cell.font = { ...cell.font, color: { argb: 'FFFFFFFF' } };
+                        } else if (statusValue === 'AGENDADO') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } }; // Blue 500
+                            cell.font = { ...cell.font, color: { argb: 'FFFFFFFF' } };
+                        } else if (statusValue === 'CANCELADO') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEF4444' } }; // Red 500
+                            cell.font = { ...cell.font, color: { argb: 'FFFFFFFF' } };
+                        } else if (statusValue === 'PENDENTE') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF64748B' } }; // Slate 500
+                            cell.font = { ...cell.font, color: { argb: 'FFFFFFFF' } };
+                        }
+                    }
+
+                    // Centralização de colunas de metadados
+                    if ([1, 2, 4, 11, 14].includes(colNumber)) {
+                        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    }
+                });
+            });
+
+            // REGRAS DE FORMATAÇÃO CONDICIONAL - PARA MUDANÇAS DENTRO DO EXCEL
+            // Aplicamos uma faixa larga (500 linhas) para garantir que funcione se o usuário adicionar dados.
+            worksheet.addConditionalFormatting({
+                ref: `D2:D500`,
+                rules: [
+                    {
+                        priority: 1, type: 'cellIs', operator: 'equal', formulae: ['"CONCLUÍDO"'],
+                        style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } }, font: { color: { argb: 'FFFFFFFF' }, bold: true } }
+                    },
+                    {
+                        priority: 2, type: 'cellIs', operator: 'equal', formulae: ['"EM ANDAMENTO"'],
+                        style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF59E0B' } }, font: { color: { argb: 'FFFFFFFF' }, bold: true } }
+                    },
+                    {
+                        priority: 3, type: 'cellIs', operator: 'equal', formulae: ['"PENDENTE"'],
+                        style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF64748B' } }, font: { color: { argb: 'FFFFFFFF' }, bold: true } }
+                    },
+                    {
+                        priority: 4, type: 'cellIs', operator: 'equal', formulae: ['"AGENDADO"'],
+                        style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3B82F6' } }, font: { color: { argb: 'FFFFFFFF' }, bold: true } }
+                    },
+                    {
+                        priority: 5, type: 'cellIs', operator: 'equal', formulae: ['"CANCELADO"'],
+                        style: { fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEF4444' } }, font: { color: { argb: 'FFFFFFFF' }, bold: true } }
+                    }
+                ]
+            });
+
+            // Data Validation (Status) na Coluna D
+            // Aplicamos também a uma faixa larga para consistência com as cores
+            for (let i = 2; i <= 500; i++) {
+                worksheet.getCell(`D${i}`).dataValidation = {
+                    type: 'list',
+                    allowBlank: true,
+                    formulae: [`"PENDENTE,AGENDADO,EM ANDAMENTO,CONCLUÍDO,CANCELADO"`],
+                    showErrorMessage: true,
+                    errorTitle: 'Status Inválido',
+                    error: 'Selecione um status da lista.'
+                };
+            }
+
+
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `AGENDA_TECNICA_${format(new Date(), 'dd_MM_yyyy_HHmm')}.xlsx`;
+            anchor.click();
+            window.URL.revokeObjectURL(url);
+
+            toast.dismiss();
+            toast.success('Excel ELETRICOM OS gerado!');
+        } catch (error) {
+            console.error('Erro Excel:', error);
+            toast.dismiss();
+            toast.error('Erro ao gerar Excel Corporativo');
+        }
     };
 
     // Função para imprimir
     const handlePrint = () => {
         window.print();
+    };
+
+    // Função para exportar PDF Definitivo (Premium Logo & Precision Columns V24)
+    const handleExportPDF = async () => {
+        if (filteredInstallations.length === 0) {
+            toast.error('Nenhum dado para exportar');
+            return;
+        }
+
+        toast.loading('Gerando PDF de Alta Definição...');
+        try {
+            const jsPDF = (await import('jspdf')).default;
+            const autoTable = (await import('jspdf-autotable')).default;
+
+            const doc = new jsPDF('l', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.width;
+            const pageHeight = doc.internal.pageSize.height;
+            const margin = 10;
+
+            // Ordenação Cronológica
+            const sortedData = [...filteredInstallations].sort((a, b) => {
+                const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+                const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+                return dateA - dateB;
+            });
+
+            // Função para desenhar Header e Footer (Versão Premium V24)
+            const drawHeaderFooter = (data: any) => {
+                // 1. Barra de Acentuação Premium (Indigo)
+                doc.setFillColor(30, 58, 138);
+                doc.rect(0, 0, pageWidth, 5, 'F');
+
+                // 2. Fundo de Header
+                doc.setFillColor(248, 250, 252);
+                doc.rect(0, 5, pageWidth, 30, 'F');
+
+                // 3. LOGO (Esquerda - OTIMIZADA V24)
+                if (companyConfig?.logo_url) {
+                    try {
+                        // Posicionamento Centralizado Verticalmente (Header: 30mm | Logo: 20mm | Y Start: 10)
+                        doc.addImage(companyConfig.logo_url, 'PNG', margin + 2, 10, 32, 20, undefined, 'SLOW');
+                    } catch (e) {
+                        console.error('Logo error:', e);
+                    }
+                }
+
+                // 4. BLOCO CENTRAL - DADOS DA EMPRESA (DINÂMICO)
+                const cName = (companyConfig?.company_name || 'AEC SERVIÇOS - ELETRICOM').toUpperCase();
+                const cCNPJ = companyConfig?.cnpj ? `CNPJ: ${companyConfig.cnpj}` : 'CNPJ: 07.456.654/0001-08';
+                const cPhone = companyConfig?.phone ? ` | TEL: ${companyConfig.phone}` : '';
+                const cEmail = companyConfig?.email ? ` | EMAIL: ${companyConfig.email}` : '';
+
+                const addressParts = [
+                    companyConfig?.street,
+                    companyConfig?.number,
+                    companyConfig?.neighborhood,
+                    companyConfig?.city,
+                    companyConfig?.state
+                ].filter(Boolean).join(', ');
+                const cAddress = addressParts || 'AV. DIAMANTE, 485 - CONTAGEM/MG';
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(11);
+                doc.setTextColor(15, 23, 42);
+                doc.text(cName, pageWidth / 2, 12, { align: 'center' });
+
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(71, 85, 105);
+                doc.text(`${cCNPJ}${cPhone}${cEmail}`, pageWidth / 2, 17, { align: 'center' });
+                doc.text(`ENDEREÇO: ${cAddress.toUpperCase()}`, pageWidth / 2, 21, { align: 'center' });
+
+                // 5. TÍTULO DO RELATÓRIO
+                doc.setFont('helvetica', 'black');
+                doc.setFontSize(15);
+                doc.setTextColor(30, 58, 138);
+                doc.text('CRONOGRAMA DE INSTALAÇÃO DE TELEMETRIA', pageWidth / 2, 29, { align: 'center' });
+
+                // 6. METADADOS (Direita - Compacto)
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(100, 116, 139);
+                doc.text(`EMISSÃO: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pageWidth - margin, 10, { align: 'right' });
+
+                // 7. LINHA DIVISÓRIA
+                doc.setDrawColor(203, 213, 225);
+                doc.setLineWidth(0.3);
+                doc.line(margin, 35, pageWidth - margin, 35);
+
+                // 8. FOOTER (Limpo - Sem Créditos)
+                doc.setDrawColor(226, 232, 240);
+                doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+                doc.setFontSize(8);
+                doc.setTextColor(71, 85, 105);
+                doc.setFont('helvetica', 'bold');
+                doc.text(cName, margin, pageHeight - 8);
+
+                const pg = `PÁGINA ${data.pageNumber} DE ${doc.getNumberOfPages()}`;
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(148, 163, 184);
+                doc.text(pg, pageWidth - margin, pageHeight - 8, { align: 'right' });
+            };
+
+            const tableRows = sortedData.map(inst => [
+                inst.start_date ? format(new Date(inst.start_date), 'dd/MM/yyyy HH:mm') : '',
+                inst.end_date ? format(new Date(inst.end_date), 'dd/MM/yyyy HH:mm') : '---',
+                (inst.technician_name || 'PENDENTE').toUpperCase(),
+                (inst.clients?.name || 'VULSO').toUpperCase(),
+                (inst.cnpj || inst.clients?.cnpj_cpf || '---'),
+                (inst.title || '').toUpperCase(),
+                (inst.state || '---').toUpperCase(),
+                (inst.contact_name || '').toUpperCase(),
+                statusMap[inst.status] || (inst.status || '').toUpperCase()
+            ]);
+
+            autoTable(doc, {
+                startY: 38,
+                head: [['INÍCIO', 'FIM', 'TÉCNICO', 'CLIENTE', 'CNPJ/CPF', 'SERVIÇO', 'UF', 'CONTATO', 'STATUS']],
+                body: tableRows,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [30, 58, 138],
+                    textColor: [255, 255, 255],
+                    fontSize: 8.2,
+                    fontStyle: 'bold',
+                    halign: 'center',
+                    cellPadding: 2,
+                    lineWidth: 0.1,
+                    lineColor: [255, 255, 255]
+                },
+                bodyStyles: {
+                    fontSize: 7.2,
+                    valign: 'middle',
+                    cellPadding: 1.5,
+                    textColor: [15, 23, 42]
+                },
+                columnStyles: {
+                    0: { cellWidth: 24 }, // Início
+                    1: { cellWidth: 24 }, // Fim
+                    2: { cellWidth: 48 }, // Técnico (H. HENRIQUE DA CRUZ Z - Zero-Break)
+                    3: { cellWidth: 35 }, // Cliente
+                    4: { cellWidth: 30 }, // CNPJ
+                    5: { cellWidth: 50 }, // Serviço
+                    6: { cellWidth: 12, halign: 'center' }, // UF (Single Line)
+                    7: { cellWidth: 28 }, // Contato
+                    8: { cellWidth: 26, halign: 'center' } // Status
+                },
+                alternateRowStyles: {
+                    fillColor: [250, 251, 253]
+                },
+                margin: { left: margin, right: margin, bottom: 15 },
+                didDrawPage: drawHeaderFooter,
+                didParseCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 8) {
+                        const statusText = data.cell.text[0];
+                        data.cell.styles.textColor = [255, 255, 255];
+                        data.cell.styles.fontStyle = 'bold';
+
+                        if (statusText === 'CONCLUÍDO') {
+                            data.cell.styles.fillColor = [16, 185, 129];
+                        } else if (statusText === 'EM ANDAMENTO') {
+                            data.cell.styles.fillColor = [245, 158, 11];
+                        } else if (statusText === 'AGENDADO') {
+                            data.cell.styles.fillColor = [37, 99, 235];
+                        } else if (statusText === 'CANCELADO') {
+                            data.cell.styles.fillColor = [220, 38, 38];
+                        } else if (statusText === 'PENDENTE') {
+                            data.cell.styles.fillColor = [100, 116, 139];
+                        }
+                    }
+                }
+            });
+
+            doc.save(`AEC_AGENDA_TELEMETRIA_${format(new Date(), 'dd_MM_yyyy')}.pdf`);
+            toast.dismiss();
+            toast.success('PDF V24 Gerado com Sucesso!');
+        } catch (error) {
+            console.error('Erro PDF:', error);
+            toast.dismiss();
+            toast.error('Erro ao gerar PDF');
+        }
     };
 
     return (
@@ -153,7 +491,7 @@ export default function InstallationsPage() {
                         </h1>
                         <p className="text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            Fluxo de Operações Ativo
+                            ELETRICOM OS - Operações
                         </p>
                     </div>
                 </div>
@@ -184,21 +522,21 @@ export default function InstallationsPage() {
                     </div>
 
                     <button
+                        onClick={handleExportPDF}
+                        className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl hover:bg-red-100 transition-all shadow-sm flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-red-100 dark:border-red-800"
+                        title="Exportar PDF Profissional"
+                    >
+                        <File size={20} />
+                        PDF
+                    </button>
+
+                    <button
                         onClick={handleExportExcel}
                         className="p-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl hover:bg-emerald-100 transition-all shadow-sm flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-emerald-100 dark:border-emerald-800"
                         title="Exportar para Excel"
                     >
                         <FileDown size={20} />
                         Excel
-                    </button>
-
-                    <button
-                        onClick={handlePrint}
-                        className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl hover:bg-slate-100 transition-all shadow-sm flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-slate-100 dark:border-slate-800"
-                        title="Imprimir Agenda"
-                    >
-                        <Printer size={20} />
-                        Papel
                     </button>
 
                     <button
@@ -299,113 +637,135 @@ export default function InstallationsPage() {
                 </div>
             </div>
 
-            {/* Conteúdo Principal */}
-            {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 bg-white/50 dark:bg-gray-900/50 rounded-3xl animate-pulse">
-                    <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-                    <p className="text-gray-500 font-medium font-bold uppercase tracking-widest text-[10px]">Sincronizando cronograma...</p>
-                </div>
-            ) : (
-                <div className="min-h-[600px]">
-                    {view === 'kanban' ? (
-                        <InstallationKanban
-                            installations={filteredInstallations}
-                            onEdit={(item) => {
-                                setSelectedInstallation(item);
-                                setShowForm(true);
-                            }}
-                            onStatusChange={handleStatusChange}
-                            onViewDocuments={(item) => {
-                                setSelectedInstallation(item);
-                                setShowDocuments(true);
-                            }}
-                        />
-                    ) : (
-                        <div className="bg-white dark:bg-slate-900 p-8 sm:p-12 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden relative">
-                            <div className="flex flex-col items-center justify-center text-center">
-                                <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center mb-6 rotate-6 group">
-                                    <CalendarIcon className="w-12 h-12 text-indigo-500 -rotate-6 group-hover:rotate-0 transition-transform" />
-                                </div>
-                                <h3 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tight">Agenda Técnica</h3>
-                                <p className="text-slate-500 dark:text-slate-400 max-w-sm mt-3 font-bold text-sm">
-                                    Acompanhe as próximas instalações <br />
-                                    <span className="text-indigo-500 font-black">Organização por data e horário.</span>
-                                </p>
-                            </div>
-
-                            <div className="mt-12 w-full max-w-4xl mx-auto space-y-4">
-                                {filteredInstallations
-                                    .filter(i => (i.start_date || i.scheduled_date) && i.status !== 'completed')
-                                    .sort((a, b) => {
-                                        const dateA = new Date(a.start_date || a.scheduled_date).getTime();
-                                        const dateB = new Date(b.start_date || b.scheduled_date).getTime();
-                                        return dateA - dateB;
-                                    })
-                                    .map(item => {
-                                        const date = item.start_date || item.scheduled_date;
-                                        return (
-                                            <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 dark:bg-slate-800/50 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 hover:border-indigo-200 transition-all text-left group">
-                                                <div className="flex flex-col items-center justify-center bg-white dark:bg-slate-800 w-20 h-20 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 shrink-0 group-hover:scale-105 transition-transform">
-                                                    <span className="text-[10px] font-black underline uppercase text-indigo-500">
-                                                        {date ? format(new Date(date), 'MMM', { locale: ptBR }) : '-'}
-                                                    </span>
-                                                    <span className="text-2xl font-black text-slate-800 dark:text-white">
-                                                        {date ? format(new Date(date), 'dd') : '-'}
-                                                    </span>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${item.status === 'pending' ? 'bg-slate-100 text-slate-600' :
-                                                            item.status === 'scheduled' ? 'bg-blue-100 text-blue-600' :
-                                                                item.status === 'in_progress' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'
-                                                            }`}>
-                                                            {item.status}
-                                                        </span>
-                                                        <span className="text-[10px] font-bold text-slate-400">
-                                                            {date ? format(new Date(date), 'HH:mm') : 'N/A'}
-                                                        </span>
-                                                    </div>
-                                                    <h4 className="font-bold text-slate-800 dark:text-white text-lg truncate flex items-center gap-2">
-                                                        {item.title}
-                                                        {item.state && (
-                                                            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500 font-black text-[10px]">
-                                                                <img src={`https://raw.githubusercontent.com/stefanocurvello/flags-br/master/svg/${item.state.toLowerCase()}.svg`} className="w-3.5 h-2.5 object-cover rounded-[1px]" alt={item.state} />
-                                                                {item.state}
-                                                            </div>
-                                                        )}
-                                                        {item.requires_travel && <Plane size={14} className="text-blue-500 animate-pulse" />}
-                                                    </h4>
-                                                    <p className="text-sm text-slate-500 truncate flex items-center gap-1">
-                                                        {item.location_address}
-                                                    </p>
-                                                    {item.start_date && (
-                                                        <p className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-lg w-fit">
-                                                            Período: {format(new Date(item.start_date), 'dd/MM HH:mm')} → {item.end_date ? format(new Date(item.end_date), 'dd/MM HH:mm') : 'Indefinido'}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedInstallation(item);
-                                                        setShowForm(true);
-                                                    }}
-                                                    className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-100 dark:shadow-none hover:bg-indigo-700 transition-all"
-                                                >
-                                                    Detalhes
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                {filteredInstallations.filter(i => (i.start_date || i.scheduled_date) && i.status !== 'completed').length === 0 && (
-                                    <div className="py-20 text-center text-slate-400 font-black uppercase tracking-[0.2em] text-[10px] border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-[2rem]">
-                                        Nenhuma instalação agendada para os próximos dias
+            {/* Conteúdo Principal para Captura de PDF */}
+            <div id="agenda-content" className="bg-white dark:bg-transparent rounded-[2.5rem]">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-white/50 dark:bg-gray-900/50 rounded-3xl animate-pulse">
+                        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+                        <p className="text-gray-500 font-medium font-bold uppercase tracking-widest text-[10px]">Sincronizando ELETRICOM OS...</p>
+                    </div>
+                ) : (
+                    <div className="min-h-[600px]">
+                        {view === 'kanban' ? (
+                            <InstallationKanban
+                                installations={filteredInstallations}
+                                onEdit={(item) => {
+                                    setSelectedInstallation(item);
+                                    setShowForm(true);
+                                }}
+                                onStatusChange={handleStatusChange}
+                                onViewDocuments={(item) => {
+                                    setSelectedInstallation(item);
+                                    setShowDocuments(true);
+                                }}
+                            />
+                        ) : (
+                            <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden relative animate-fadeIn">
+                                {/* Header do Calendário */}
+                                <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center">
+                                            <CalendarIcon className="text-indigo-600" size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                                {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                                            </h3>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Agenda Técnica de Operações</p>
+                                        </div>
                                     </div>
-                                )}
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-500 hover:text-indigo-600">
+                                            <ChevronRight className="rotate-180" size={20} />
+                                        </button>
+                                        <button onClick={() => setCurrentMonth(new Date())} className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all"> Hoje </button>
+                                        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all text-slate-500 hover:text-indigo-600">
+                                            <ChevronRight size={20} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Grade do Calendário */}
+                                <div className="grid grid-cols-7 gap-[1px] bg-slate-100 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                                    {/* Dias da Semana */}
+                                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                                        <div key={day} className="bg-slate-50 dark:bg-slate-900/50 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
+                                            {day}
+                                        </div>
+                                    ))}
+
+                                    {/* Células dos Dias */}
+                                    {(() => {
+                                        const monthStart = startOfMonth(currentMonth);
+                                        const monthEnd = endOfMonth(monthStart);
+                                        const startDate = startOfWeek(monthStart);
+                                        const endDate = endOfWeek(monthEnd);
+                                        const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+
+                                        return calendarDays.map((day, idx) => {
+                                            const dayInst = filteredInstallations.filter(inst => {
+                                                const instDate = inst.start_date || inst.scheduled_date;
+                                                return instDate && isSameDay(new Date(instDate), day);
+                                            });
+
+                                            const isToday = isSameDay(day, new Date());
+                                            const isMonth = isSameMonth(day, monthStart);
+
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className={`min-h-[140px] p-2 transition-all bg-white dark:bg-slate-900 flex flex-col gap-1 hover:z-10 hover:shadow-2xl hover:scale-[1.02] cursor-default border-slate-50 dark:border-slate-800
+                                                        ${!isMonth ? 'opacity-30 bg-slate-50/50 dark:bg-slate-950/20' : ''}
+                                                        ${isToday ? 'bg-indigo-50/30 dark:bg-indigo-900/10' : ''}
+                                                    `}
+                                                >
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span className={`text-sm font-black w-8 h-8 flex items-center justify-center rounded-xl transition-all
+                                                            ${isToday ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : isMonth ? 'text-slate-700 dark:text-slate-200' : 'text-slate-300'}
+                                                        `}>
+                                                            {format(day, 'd')}
+                                                        </span>
+                                                        {dayInst.length > 0 && (
+                                                            <span className="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 text-[9px] font-black px-1.5 py-0.5 rounded-lg border border-indigo-200/50">
+                                                                {dayInst.length}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar pr-1 pb-1">
+                                                        {dayInst.map(inst => (
+                                                            <div
+                                                                key={inst.id}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedInstallation(inst);
+                                                                    setShowForm(true);
+                                                                }}
+                                                                className={`p-1.5 rounded-lg text-[9px] font-bold truncate cursor-pointer transition-all border group
+                                                                    ${inst.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-100 dark:border-emerald-800/30' :
+                                                                        inst.status === 'in_progress' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 border-amber-100 dark:border-amber-800/30' :
+                                                                            'bg-slate-50 dark:bg-slate-800 text-slate-600 border-slate-100 dark:border-slate-700'}
+                                                                    hover:shadow-md hover:-translate-y-0.5
+                                                                `}
+                                                            >
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 shrink-0" />
+                                                                    <span className="shrink-0 opacity-60">[{format(new Date(inst.start_date || inst.scheduled_date), 'HH:mm')}]</span>
+                                                                    <span className="truncate">{inst.clients?.name || inst.title}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        });
+                                    })()}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
-            )}
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Modals */}
             {showForm && (

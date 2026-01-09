@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2, MapPin, User, Phone, Clipboard, CheckCircle2, File, Plus, Search, Building2, Wifi, Trash2, Plane, Globe, Droplets } from 'lucide-react';
+import { X, Loader2, MapPin, User, Phone, Clipboard, CheckCircle2, File, Plus, Search, Building2, Wifi, Trash2, Plane, Globe, Droplets, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -66,6 +66,11 @@ interface InstallationFormData {
     wifi_ssid: string;
     wifi_password: string;
     cnpj: string;
+    technician_name: string;
+    technician_id?: string;
+    city: string;
+    neighborhood: string;
+    cep: string;
 }
 
 export default function InstallationForm({ installation, onClose, onSuccess }: InstallationFormProps) {
@@ -95,17 +100,85 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
         tower_cells: installation?.tower_cells || 1,
         wifi_ssid: installation?.wifi_ssid || '',
         wifi_password: installation?.wifi_password || '',
-        cnpj: '',
+        cnpj: installation?.cnpj || '',
+        technician_name: installation?.technician_name || '',
+        technician_id: installation?.technician_id || '',
+        city: installation?.city || '',
+        neighborhood: installation?.neighborhood || '',
+        cep: installation?.cep || '',
     });
 
     const [fetchingCnpj, setFetchingCnpj] = useState(false);
 
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+        tech: false,
+        schedule: false,
+        castelo: true,
+        documents: true
+    });
+
+    const toggleSection = (id: string) => {
+        setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const [technicians, setTechnicians] = useState<any[]>([]);
+    const [currentUser, setCurrentUser] = useState<any>(null);
+
+    // Carregar CNPJ se o cliente mudar (e campo estiver vazio)
+    useEffect(() => {
+        if (!isNewClient && formData.client_id && !formData.cnpj) {
+            const client = clients.find(c => c.id === formData.client_id);
+            if (client) {
+                setFormData(prev => ({ ...prev, cnpj: client.cnpj_cpf || '' }));
+            }
+        }
+    }, [formData.client_id, isNewClient, clients, formData.cnpj]);
+
     useEffect(() => {
         loadClients();
+        loadTechnicians();
+        loadCurrentUser();
         if (installation?.id) {
             loadFiles();
         }
-    }, []);
+    }, [installation]);
+
+    async function loadCurrentUser() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            setCurrentUser(profile);
+        }
+    }
+
+    async function loadTechnicians() {
+        try {
+            const { data } = await supabase
+                .from('profiles')
+                .select('id, full_name, email')
+                .order('full_name');
+            setTechnicians(data || []);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    const handleAssignToMe = () => {
+        if (currentUser) {
+            setFormData({
+                ...formData,
+                technician_id: currentUser.id,
+                technician_name: currentUser.full_name || currentUser.username || ''
+            });
+            toast.success('Atribuído a você!');
+        } else {
+            toast.error('Não foi possível identificar seu perfil');
+        }
+    };
 
     async function loadClients() {
         try {
@@ -188,7 +261,7 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
     }
 
     async function handleCnpjBlur() {
-        if (!isNewClient || !formData.cnpj) return;
+        if (!formData.cnpj) return;
         const cleanDoc = formData.cnpj.replace(/\D/g, '');
         if (cleanDoc.length !== 14) return;
 
@@ -201,7 +274,11 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
                 setFormData(prev => ({
                     ...prev,
                     title: data.razao_social || prev.title,
-                    location_address: `${data.logradouro}, ${data.numero}${data.complemento ? ` - ${data.complemento}` : ''} - ${data.bairro}, ${data.municipio}/${data.uf}`,
+                    location_address: `${data.logradouro}${data.numero ? `, ${data.numero}` : ''}${data.complemento ? ` - ${data.complemento}` : ''}`,
+                    neighborhood: data.bairro || '',
+                    city: data.municipio || '',
+                    state: data.uf || '',
+                    cep: data.cep || '',
                     contact_name: data.responsavel_contato || prev.contact_name,
                     contact_phone: data.ddd_telefone_1 || prev.contact_phone,
                 }));
@@ -271,6 +348,12 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
                 tower_cells: parseInt(formData.tower_cells.toString()) || 1,
                 wifi_ssid: formData.wifi_ssid,
                 wifi_password: formData.wifi_password,
+                technician_name: formData.technician_name,
+                technician_id: formData.technician_id || null,
+                cnpj: formData.cnpj,
+                city: formData.city,
+                neighborhood: formData.neighborhood,
+                cep: formData.cep,
                 updated_at: new Date().toISOString()
             };
 
@@ -371,134 +454,244 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
                                         <Building2 size={16} />
                                     </div>
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Identificação do Atendimento</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleSection('tech')}
+                                        className="ml-auto p-1 hover:bg-slate-100 rounded-lg transition-all"
+                                    >
+                                        <ChevronRight size={18} className={`text-slate-300 transition-transform ${collapsedSections.tech ? '' : 'rotate-90'}`} />
+                                    </button>
                                 </div>
 
-                                <div className="grid gap-5 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-                                    <div>
-                                        <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Título da Instalação *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={formData.title}
-                                            onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                            placeholder="Ex: Instalação Telemetria - Castelo Central"
-                                            className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-slate-900 dark:text-white"
-                                        />
-                                    </div>
+                                <div className={`transition-all duration-300 overflow-hidden ${collapsedSections.tech ? 'max-h-0 opacity-0' : 'max-h-[2000px] opacity-100'}`}>
 
-                                    <div>
+                                    <div className="grid gap-5 bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+                                        <div>
+                                            <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Título da Instalação *</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={formData.title}
+                                                onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                                placeholder="Ex: Instalação Telemetria - Castelo Central"
+                                                className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all font-medium text-slate-900 dark:text-white"
+                                            />
+                                        </div>
+
                                         <div>
                                             <div className="flex items-center justify-between mb-2 ml-1">
-                                                <label className="block text-[11px] font-black text-slate-400 uppercase">Cliente Associado</label>
+                                                <label className="block text-[11px] font-black text-indigo-600 uppercase">Técnico Responsável *</label>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setIsNewClient(!isNewClient)}
-                                                    className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border-2 transition-all ${isNewClient ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 text-slate-400 hover:border-indigo-500 hover:text-indigo-600'
-                                                        }`}
+                                                    onClick={handleAssignToMe}
+                                                    className="text-[10px] font-black text-indigo-500 hover:text-indigo-700 uppercase flex items-center gap-1 transition-colors"
                                                 >
-                                                    {isNewClient ? 'Novo Cadastro' : 'Puxar da Carteira'}
+                                                    <User size={10} />
+                                                    Atribuir a mim
                                                 </button>
                                             </div>
-
-                                            {isNewClient ? (
-                                                <div className="space-y-4 animate-fadeIn">
-                                                    <div className="relative">
-                                                        <label className="label-sm">CNPJ do Novo Cliente</label>
-                                                        <div className="relative">
-                                                            <Building2 className={`absolute left-4 top-1/2 -translate-y-1/2 ${fetchingCnpj ? 'text-indigo-500 animate-spin' : 'text-slate-400'}`} size={18} />
-                                                            <input
-                                                                type="text"
-                                                                value={formData.cnpj}
-                                                                onBlur={handleCnpjBlur}
-                                                                onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
-                                                                placeholder="00.000.000/0000-00 (Busca automática)"
-                                                                className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-indigo-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold placeholder:font-medium"
-                                                            />
-                                                            {fetchingCnpj && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-500 animate-spin" size={18} />}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ) : (
+                                            <div className="relative group">
+                                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500 pointer-events-none" size={18} />
                                                 <select
-                                                    value={formData.client_id}
+                                                    required
+                                                    value={formData.technician_id || ''}
                                                     onChange={e => {
-                                                        const clientId = e.target.value;
-                                                        const client = clients.find(c => c.id === clientId);
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            client_id: clientId,
-                                                            title: client ? `Instalação - ${client.name}` : prev.title,
-                                                            location_address: client?.address || prev.location_address,
-                                                            contact_name: client?.responsible_name || prev.contact_name,
-                                                            contact_phone: client?.phone || prev.contact_phone,
-                                                            state: client?.state || prev.state
-                                                        }));
+                                                        const selected = technicians.find(t => t.id === e.target.value);
+                                                        setFormData({
+                                                            ...formData,
+                                                            technician_id: e.target.value,
+                                                            technician_name: selected?.full_name || ''
+                                                        });
                                                     }}
-                                                    className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
+                                                    className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-indigo-100 dark:border-indigo-900/30 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold text-indigo-900 dark:text-indigo-100 appearance-none cursor-pointer"
                                                 >
-                                                    <option value="">Selecione um cliente existente...</option>
-                                                    {clients.map(c => (
-                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                    <option value="">Selecione um técnico...</option>
+                                                    {technicians.map(t => (
+                                                        <option key={t.id} value={t.id}>{t.full_name?.toUpperCase()}</option>
                                                     ))}
                                                 </select>
-                                            )}
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-400">
+                                                    <ChevronRight className="rotate-90" size={18} />
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-                                        <div className="md:col-span-8">
-                                            <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Endereço de Instalação</label>
-                                            <div className="relative group">
-                                                <MapPin className="absolute left-4 top-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
-                                                <textarea
-                                                    value={formData.location_address}
-                                                    onChange={e => setFormData({ ...formData, location_address: e.target.value })}
-                                                    placeholder="Endereço completo para o técnico..."
-                                                    className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl min-h-[100px] focus:border-indigo-500 outline-none transition-all font-medium"
+                                        <div>
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2 ml-1">
+                                                    <label className="block text-[11px] font-black text-slate-400 uppercase">Cliente Associado</label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsNewClient(!isNewClient)}
+                                                        className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border-2 transition-all ${isNewClient ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 text-slate-400 hover:border-indigo-500 hover:text-indigo-600'
+                                                            }`}
+                                                    >
+                                                        {isNewClient ? 'Novo Cadastro' : 'Puxar da Carteira'}
+                                                    </button>
+                                                </div>
+
+                                                {isNewClient ? (
+                                                    <div className="space-y-4 animate-fadeIn">
+                                                        <div className="p-5 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 shadow-inner">
+                                                            <label className="block text-[11px] font-black text-indigo-600 uppercase mb-2">CNPJ do Novo Cliente (Inicie por aqui)</label>
+                                                            <div className="relative">
+                                                                <Building2 className={`absolute left-4 top-1/2 -translate-y-1/2 ${fetchingCnpj ? 'text-indigo-500 animate-spin' : 'text-indigo-600'}`} size={18} />
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.cnpj}
+                                                                    onBlur={handleCnpjBlur}
+                                                                    onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
+                                                                    placeholder="00.000.000/0000-00 (Busca automática)"
+                                                                    className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-indigo-200 dark:border-indigo-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold placeholder:font-medium shadow-sm hover:border-indigo-400"
+                                                                />
+                                                                {fetchingCnpj && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 text-indigo-500 animate-spin" size={18} />}
+                                                            </div>
+                                                            <p className="mt-2 text-[10px] text-indigo-400 font-bold uppercase tracking-widest px-1">Ao preencher, os dados da empresa serão carregados automaticamente.</p>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-4">
+                                                        <select
+                                                            value={formData.client_id}
+                                                            onChange={e => {
+                                                                const clientId = e.target.value;
+                                                                const client = clients.find(c => c.id === clientId);
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    client_id: clientId,
+                                                                    title: client ? `Instalação - ${client.name}` : prev.title,
+                                                                    location_address: client?.address || prev.location_address,
+                                                                    contact_name: client?.responsible_name || prev.contact_name,
+                                                                    contact_phone: client?.phone || prev.contact_phone,
+                                                                    state: client?.state || prev.state,
+                                                                    cnpj: client?.cnpj_cpf || ''
+                                                                }));
+                                                            }}
+                                                            className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
+                                                        >
+                                                            <option value="">Selecione um cliente existente...</option>
+                                                            {clients.map(c => (
+                                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                                            ))}
+                                                        </select>
+
+                                                        {/* CNPJ EDITÁVEL NO EDIT/CLIENTE EXISTENTE */}
+                                                        <div className="p-5 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-inner group transition-all hover:bg-white">
+                                                            <div className="flex items-center justify-between mb-2 ml-1">
+                                                                <label className="block text-[11px] font-black text-slate-400 uppercase">CNPJ do Atendimento</label>
+                                                                <Building2 className="text-indigo-500 opacity-50 group-hover:opacity-100 transition-opacity" size={14} />
+                                                            </div>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="text"
+                                                                    value={formData.cnpj}
+                                                                    onBlur={handleCnpjBlur}
+                                                                    onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
+                                                                    placeholder="00.000.000/0000-00"
+                                                                    className="w-full px-4 py-3 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold text-slate-700 dark:text-slate-300"
+                                                                />
+                                                                {fetchingCnpj && (
+                                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                                        <Loader2 className="text-indigo-500 animate-spin" size={16} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <p className="mt-2 text-[9px] text-slate-400 font-bold uppercase tracking-widest px-1">Você pode alterar o CNPJ deste agendamento aqui (Busca automática ativa).</p>
+                                                        </div>
+
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                                            <div className="md:col-span-8">
+                                                <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Endereço (Rua, Nº, Compl.)</label>
+                                                <div className="relative group">
+                                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        value={formData.location_address}
+                                                        onChange={e => setFormData({ ...formData, location_address: e.target.value })}
+                                                        placeholder="Rua Exemplo, 123..."
+                                                        className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="md:col-span-4">
+                                                <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Bairro</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.neighborhood}
+                                                    onChange={e => setFormData({ ...formData, neighborhood: e.target.value })}
+                                                    placeholder="Bairro"
+                                                    className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
                                                 />
                                             </div>
                                         </div>
-                                        <div className="md:col-span-4">
-                                            <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Estado (UF)</label>
-                                            <div className="relative group">
-                                                <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+                                            <div className="md:col-span-5">
+                                                <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Cidade</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.city}
+                                                    onChange={e => setFormData({ ...formData, city: e.target.value })}
+                                                    placeholder="Cidade"
+                                                    className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-3">
+                                                <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Estado (UF)</label>
                                                 <select
                                                     value={formData.state}
                                                     onChange={e => setFormData({ ...formData, state: e.target.value })}
-                                                    className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold appearance-none cursor-pointer"
+                                                    className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold appearance-none cursor-pointer"
                                                 >
                                                     <option value="">UF</option>
-                                                    {BRAZIL_STATES.map(s => <option key={s.value} value={s.value}>{s.value} - {s.label}</option>)}
+                                                    {BRAZIL_STATES.map(s => <option key={s.value} value={s.value}>{s.value}</option>)}
                                                 </select>
                                             </div>
+                                            <div className="md:col-span-4">
+                                                <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">CEP</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.cep}
+                                                    onChange={e => setFormData({ ...formData, cep: e.target.value })}
+                                                    placeholder="00000-000"
+                                                    className="w-full px-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                        <div>
-                                            <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Contato no Local</label>
-                                            <div className="relative group">
-                                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                                <input
-                                                    type="text"
-                                                    value={formData.contact_name}
-                                                    onChange={e => setFormData({ ...formData, contact_name: e.target.value })}
-                                                    className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
-                                                />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                            <div>
+                                                <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Contato no Local</label>
+                                                <div className="relative group">
+                                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        value={formData.contact_name}
+                                                        onChange={e => setFormData({ ...formData, contact_name: e.target.value })}
+                                                        className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Telefone WhatsApp</label>
+                                                <div className="relative group">
+                                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                                    <input
+                                                        type="text"
+                                                        value={formData.contact_phone}
+                                                        onChange={e => setFormData({ ...formData, contact_phone: e.target.value })}
+                                                        className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-[11px] font-black text-slate-400 uppercase mb-2 ml-1">Telefone WhatsApp</label>
-                                            <div className="relative group">
-                                                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                                                <input
-                                                    type="text"
-                                                    value={formData.contact_phone}
-                                                    onChange={e => setFormData({ ...formData, contact_phone: e.target.value })}
-                                                    className="w-full pl-12 pr-5 py-4 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-2xl focus:border-indigo-500 outline-none transition-all font-medium"
-                                                />
-                                            </div>
-                                        </div>
+
+
                                     </div>
                                 </div>
                             </section>
@@ -509,67 +702,76 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
                                         <Clipboard size={16} />
                                     </div>
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Cronograma e Status</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleSection('schedule')}
+                                        className="ml-auto p-1 hover:bg-slate-100 rounded-lg transition-all"
+                                    >
+                                        <ChevronRight size={18} className={`text-slate-300 transition-transform ${collapsedSections.schedule ? '' : 'rotate-90'}`} />
+                                    </button>
                                 </div>
-                                <div className="bg-orange-50/20 dark:bg-orange-900/10 p-6 rounded-3xl border border-orange-100 dark:border-orange-900/30 space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                        <div className="space-y-4 bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-orange-50">
-                                            <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">Início da Instalação</h4>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <input
-                                                    type="date"
-                                                    value={formData.start_date}
-                                                    onChange={e => setFormData({ ...formData, start_date: e.target.value })}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-orange-100 dark:border-orange-900/20 rounded-xl focus:border-orange-500 outline-none transition-all font-bold text-xs"
-                                                />
-                                                <input
-                                                    type="time"
-                                                    value={formData.start_time}
-                                                    onChange={e => setFormData({ ...formData, start_time: e.target.value })}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-orange-100 dark:border-orange-900/20 rounded-xl focus:border-orange-500 outline-none transition-all font-bold text-xs"
-                                                />
+                                <div className={`transition-all duration-300 overflow-hidden ${collapsedSections.schedule ? 'max-h-0 opacity-0' : 'max-h-[1000px] opacity-100'}`}>
+                                    <div className="bg-orange-50/20 dark:bg-orange-900/10 p-6 rounded-3xl border border-orange-100 dark:border-orange-900/30 space-y-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                            <div className="space-y-4 bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-orange-50">
+                                                <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">Início da Instalação</h4>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="date"
+                                                        value={formData.start_date}
+                                                        onChange={e => setFormData({ ...formData, start_date: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-orange-100 dark:border-orange-900/20 rounded-xl focus:border-orange-500 outline-none transition-all font-bold text-xs"
+                                                    />
+                                                    <input
+                                                        type="time"
+                                                        value={formData.start_time}
+                                                        onChange={e => setFormData({ ...formData, start_time: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-orange-100 dark:border-orange-900/20 rounded-xl focus:border-orange-500 outline-none transition-all font-bold text-xs"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-4 bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-orange-50">
+                                                <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">Previsão de Término</h4>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input
+                                                        type="date"
+                                                        value={formData.end_date}
+                                                        onChange={e => setFormData({ ...formData, end_date: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-orange-100 dark:border-orange-900/20 rounded-xl focus:border-orange-500 outline-none transition-all font-bold text-xs"
+                                                    />
+                                                    <input
+                                                        type="time"
+                                                        value={formData.end_time}
+                                                        onChange={e => setFormData({ ...formData, end_time: e.target.value })}
+                                                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-orange-100 dark:border-orange-900/20 rounded-xl focus:border-orange-500 outline-none transition-all font-bold text-xs"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="space-y-4 bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-orange-50">
-                                            <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-tighter">Previsão de Término</h4>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <input
-                                                    type="date"
-                                                    value={formData.end_date}
-                                                    onChange={e => setFormData({ ...formData, end_date: e.target.value })}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-orange-100 dark:border-orange-900/20 rounded-xl focus:border-orange-500 outline-none transition-all font-bold text-xs"
-                                                />
-                                                <input
-                                                    type="time"
-                                                    value={formData.end_time}
-                                                    onChange={e => setFormData({ ...formData, end_time: e.target.value })}
-                                                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border-2 border-orange-100 dark:border-orange-900/20 rounded-xl focus:border-orange-500 outline-none transition-all font-bold text-xs"
-                                                />
+                                        <div className="flex items-center justify-between gap-5 bg-white p-4 rounded-2xl border border-orange-50">
+                                            <div>
+                                                <label className="block text-[11px] font-black text-orange-600/60 uppercase mb-1 ml-1">Status do Fluxo</label>
+                                                <select
+                                                    value={formData.status}
+                                                    onChange={e => setFormData({ ...formData, status: e.target.value })}
+                                                    className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-orange-500 outline-none transition-all font-bold text-sm rounded-xl"
+                                                >
+                                                    {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                                </select>
                                             </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-5 bg-white p-4 rounded-2xl border border-orange-50">
-                                        <div>
-                                            <label className="block text-[11px] font-black text-orange-600/60 uppercase mb-1 ml-1">Status do Fluxo</label>
-                                            <select
-                                                value={formData.status}
-                                                onChange={e => setFormData({ ...formData, status: e.target.value })}
-                                                className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-orange-500 outline-none transition-all font-bold text-sm rounded-xl"
-                                            >
-                                                {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                                            </select>
-                                        </div>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, requires_travel: !formData.requires_travel })}
-                                            className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${formData.requires_travel
-                                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 rotate-0'
-                                                : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-                                                }`}
-                                        >
-                                            <Plane size={16} className={formData.requires_travel ? 'animate-bounce' : ''} />
-                                            {formData.requires_travel ? 'Viagem Necessária' : 'Sem Deslocamento Aéreo'}
-                                        </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, requires_travel: !formData.requires_travel })}
+                                                className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${formData.requires_travel
+                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 rotate-0'
+                                                    : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                                                    }`}
+                                            >
+                                                <Plane size={16} className={formData.requires_travel ? 'animate-bounce' : ''} />
+                                                {formData.requires_travel ? 'Viagem Necessária' : 'Sem Deslocamento Aéreo'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </section>
@@ -585,85 +787,94 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
                                         <Clipboard size={16} />
                                     </div>
                                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Especificações do Castelo</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleSection('castelo')}
+                                        className="ml-auto p-1 hover:bg-slate-100 rounded-lg transition-all"
+                                    >
+                                        <ChevronRight size={18} className={`text-slate-300 transition-transform ${collapsedSections.castelo ? '' : 'rotate-90'}`} />
+                                    </button>
                                 </div>
 
-                                <div className="bg-purple-50/30 dark:bg-purple-900/10 p-6 rounded-3xl border border-purple-100 dark:border-purple-900/30 space-y-6">
-                                    <div>
-                                        <label className="block text-[11px] font-black text-purple-600 uppercase mb-3 ml-1">Quantas células tem no castelo?</label>
-                                        <div className="flex gap-2">
-                                            {[1, 2, 3, 4].map(n => (
-                                                <button
-                                                    key={n}
-                                                    type="button"
-                                                    onClick={() => setFormData({ ...formData, tower_cells: n })}
-                                                    className={`flex-1 py-3 rounded-xl font-black text-sm border-2 transition-all ${formData.tower_cells === n
-                                                        ? 'bg-purple-600 border-purple-600 text-white shadow-lg'
-                                                        : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-400 hover:border-purple-300'
-                                                        }`}
-                                                >
-                                                    {n} {n === 1 ? 'Célula' : 'Células'}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-4 ml-1">
-                                            <div className="w-1.5 h-6 bg-purple-500 rounded-full" />
-                                            <label className="block text-[11px] font-black text-purple-600 uppercase tracking-widest">Itens de Instalação</label>
-                                        </div>
-                                        <div className="grid grid-cols-1 gap-3">
-                                            {TELEMETRY_LEVELS.map(level => {
-                                                const selected = formData.telemetry_items.find(i => i.name === level);
-                                                return (
-                                                    <div
-                                                        key={level}
-                                                        className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all ${selected
-                                                            ? 'border-purple-500 bg-purple-50/50 shadow-md shadow-purple-100'
-                                                            : 'border-slate-50 hover:border-slate-200 bg-slate-50/50'
+                                <div className={`transition-all duration-300 overflow-hidden ${collapsedSections.castelo ? 'max-h-0 opacity-0' : 'max-h-[2000px] opacity-100'}`}>
+                                    <div className="bg-purple-50/30 dark:bg-purple-900/10 p-6 rounded-3xl border border-purple-100 dark:border-purple-900/30 space-y-6">
+                                        <div>
+                                            <label className="block text-[11px] font-black text-purple-600 uppercase mb-3 ml-1">Quantas células tem no castelo?</label>
+                                            <div className="flex gap-2">
+                                                {[1, 2, 3, 4].map(n => (
+                                                    <button
+                                                        key={n}
+                                                        type="button"
+                                                        onClick={() => setFormData({ ...formData, tower_cells: n })}
+                                                        className={`flex-1 py-3 rounded-xl font-black text-sm border-2 transition-all ${formData.tower_cells === n
+                                                            ? 'bg-purple-600 border-purple-600 text-white shadow-lg'
+                                                            : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-400 hover:border-purple-300'
                                                             }`}
                                                     >
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => toggleItem(level)}
-                                                            className="flex items-center gap-4 flex-1 text-left"
-                                                        >
-                                                            <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${selected ? 'bg-purple-600 border-purple-600 text-white' : 'border-slate-200 bg-white'
-                                                                }`}>
-                                                                {selected && <CheckCircle2 size={14} />}
-                                                            </div>
-                                                            <span className={`text-sm font-bold ${selected ? 'text-purple-900' : 'text-slate-500'}`}>
-                                                                {level}
-                                                            </span>
-                                                        </button>
+                                                        {n} {n === 1 ? 'Célula' : 'Células'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
 
-                                                        {selected && (
-                                                            <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-inner border border-purple-100 animate-slideLeft">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => updateItemQuantity(level, selected.quantity - 1)}
-                                                                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
-                                                                >
-                                                                    -
-                                                                </button>
-                                                                <input
-                                                                    type="number"
-                                                                    value={selected.quantity}
-                                                                    onChange={e => updateItemQuantity(level, parseInt(e.target.value) || 1)}
-                                                                    className="w-10 text-center font-black text-purple-600 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                                                />
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => updateItemQuantity(level, selected.quantity + 1)}
-                                                                    className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
-                                                                >
-                                                                    +
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-4 ml-1">
+                                                <div className="w-1.5 h-6 bg-purple-500 rounded-full" />
+                                                <label className="block text-[11px] font-black text-purple-600 uppercase tracking-widest">Itens de Instalação</label>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                {TELEMETRY_LEVELS.map(level => {
+                                                    const selected = formData.telemetry_items.find(i => i.name === level);
+                                                    return (
+                                                        <div
+                                                            key={level}
+                                                            className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all ${selected
+                                                                ? 'border-purple-500 bg-purple-50/50 shadow-md shadow-purple-100'
+                                                                : 'border-slate-50 hover:border-slate-200 bg-slate-50/50'
+                                                                }`}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleItem(level)}
+                                                                className="flex items-center gap-4 flex-1 text-left"
+                                                            >
+                                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${selected ? 'bg-purple-600 border-purple-600 text-white' : 'border-slate-200 bg-white'
+                                                                    }`}>
+                                                                    {selected && <CheckCircle2 size={14} />}
+                                                                </div>
+                                                                <span className={`text-sm font-bold ${selected ? 'text-purple-900' : 'text-slate-500'}`}>
+                                                                    {level}
+                                                                </span>
+                                                            </button>
+
+                                                            {selected && (
+                                                                <div className="flex items-center gap-2 bg-white p-1 rounded-xl shadow-inner border border-purple-100 animate-slideLeft">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => updateItemQuantity(level, selected.quantity - 1)}
+                                                                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                                                                    >
+                                                                        -
+                                                                    </button>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={selected.quantity}
+                                                                        onChange={e => updateItemQuantity(level, parseInt(e.target.value) || 1)}
+                                                                        className="w-10 text-center font-black text-purple-600 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => updateItemQuantity(level, selected.quantity + 1)}
+                                                                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -785,10 +996,10 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
                         />
                     </div>
 
-                </form>
+                </form >
 
                 {/* Footer com Ações */}
-                <div className="p-8 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-950">
+                < div className="p-8 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-950" >
                     <div className="hidden md:flex items-center gap-2 text-slate-400 font-bold text-[10px] uppercase tracking-widest">
                         <CheckCircle2 size={14} className="text-emerald-500" /> Auto-save ativado em arquivos
                     </div>
@@ -809,8 +1020,8 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
                             {installation ? 'Salvar Ajustes' : 'Confirmar Agenda'}
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 }

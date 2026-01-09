@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS installations (
     tower_cells INTEGER DEFAULT 1,
     wifi_ssid TEXT,
     wifi_password TEXT,
+    technician_name TEXT,
+    cnpj TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -65,6 +67,12 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='installations' AND column_name='wifi_password') THEN
         ALTER TABLE installations ADD COLUMN wifi_password TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='installations' AND column_name='technician_name') THEN
+        ALTER TABLE installations ADD COLUMN technician_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='installations' AND column_name='cnpj') THEN
+        ALTER TABLE installations ADD COLUMN cnpj TEXT;
     END IF;
 END $$;
 

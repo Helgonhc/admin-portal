@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, User, Clock, MoreVertical, Plus, CheckCircle2, AlertCircle, FileText, Building2, Clipboard, Plane, Droplets } from 'lucide-react';
+import { MapPin, User, Clock, MoreVertical, Plus, CheckCircle2, AlertCircle, FileText, Building2, Clipboard, Plane, Droplets, ChevronRight, LayoutList, Calendar, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -13,110 +13,168 @@ interface InstallationKanbanProps {
 }
 
 const COLUMNS = [
-    { id: 'pending', title: 'Pendente', color: 'bg-gray-100 text-gray-700 border-gray-200' },
-    { id: 'scheduled', title: 'Agendado', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-    { id: 'in_progress', title: 'Em Andamento', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-    { id: 'completed', title: 'Concluído', color: 'bg-green-50 text-green-700 border-green-200' },
+    { id: 'pending', title: 'Pendentes', subtitle: 'Aguardando ação inicial', color: 'indigo', iconColor: 'text-indigo-600', bgColor: 'bg-indigo-50', darkBg: 'dark:bg-indigo-900/20', borderColor: 'border-indigo-200' },
+    { id: 'scheduled', title: 'Agendados', subtitle: 'Prontos para execução', color: 'blue', iconColor: 'text-blue-600', bgColor: 'bg-blue-50', darkBg: 'dark:bg-blue-900/20', borderColor: 'border-blue-200' },
+    { id: 'in_progress', title: 'Em Andamento', subtitle: 'Operações em campo', color: 'amber', iconColor: 'text-amber-600', bgColor: 'bg-amber-50', darkBg: 'dark:bg-amber-900/20', borderColor: 'border-amber-200' },
+    { id: 'completed', title: 'Concluídos', subtitle: 'Histórico de sucesso', color: 'emerald', iconColor: 'text-emerald-600', bgColor: 'bg-emerald-50', darkBg: 'dark:bg-emerald-900/20', borderColor: 'border-emerald-200' },
 ];
 
 export default function InstallationKanban({ installations, onEdit, onStatusChange, onViewDocuments }: InstallationKanbanProps) {
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+        pending: true,
+        scheduled: true,
+        in_progress: true,
+        completed: true
+    });
+
+    const toggleSection = (id: string) => {
+        setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
     const getInstallationsByStatus = (status: string) => {
         return installations.filter(i => i.status === status);
     };
 
     return (
-        <div className="flex gap-6 overflow-x-auto pb-6 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+        <div className="space-y-12 pb-12 animate-fadeIn">
             {COLUMNS.map(column => {
                 const items = getInstallationsByStatus(column.id);
+                if (items.length === 0 && column.id === 'completed') return null;
+
+                const isCollapsed = collapsedSections[column.id];
+
+                const statusColorClass = column.iconColor;
+                const statusBgClass = column.bgColor;
+                const statusDarkBgClass = column.darkBg;
+                const statusBorderClass = column.borderColor;
+
                 return (
-                    <div key={column.id} className="flex-shrink-0 w-[22rem] flex flex-col group/column">
-                        {/* Header Column */}
-                        <div className={`flex items-center justify-between p-4 rounded-2xl mb-4 border ${column.color} shadow-sm backdrop-blur-sm`}>
-                            <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${column.id === 'pending' ? 'bg-gray-400' : column.id === 'scheduled' ? 'bg-blue-500' : column.id === 'in_progress' ? 'bg-amber-500' : 'bg-emerald-500'} ring-4 ring-white/50`} />
-                                <span className="font-black text-sm uppercase tracking-widest">{column.title}</span>
+                    <div key={column.id} className="relative">
+                        {/* Header da Seção de Fluxo */}
+                        <div
+                            className="flex items-center justify-between mb-4 px-2 cursor-pointer group/header hover:opacity-80 transition-all select-none"
+                            onClick={() => toggleSection(column.id)}
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${statusBgClass} ${statusDarkBgClass} ${statusColorClass} transition-transform duration-500 ${isCollapsed ? '' : 'rotate-12'}`}>
+                                    {column.id === 'pending' && <AlertCircle size={24} />}
+                                    {column.id === 'scheduled' && <Calendar size={24} />}
+                                    {column.id === 'in_progress' && <Droplets size={24} />}
+                                    {column.id === 'completed' && <CheckCircle2 size={24} />}
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-3">
+                                        {column.title}
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusBgClass} ${statusColorClass} border ${statusBorderClass} font-black`}>
+                                            {items.length} ITENS
+                                        </span>
+                                        <ChevronRight size={18} className={`text-slate-300 transition-transform duration-300 ${isCollapsed ? '' : 'rotate-90'}`} />
+                                    </h3>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">{column.subtitle}</p>
+                                </div>
                             </div>
-                            <span className="bg-white/80 px-3 py-1 rounded-lg text-xs font-black shadow-sm">
-                                {items.length}
-                            </span>
                         </div>
 
-                        {/* Items Area */}
-                        <div className="flex-1 space-y-4 min-h-[500px]">
+                        {/* List Area */}
+                        <div className={`space-y-3 overflow-hidden transition-all duration-500 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0 mb-0' : 'max-h-[5000px] opacity-100 mb-8'}`}>
                             {items.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-20 opacity-30 border-2 border-dashed border-slate-200 rounded-3xl">
-                                    <Clipboard size={32} className="mb-2" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Sem itens</span>
+                                <div className="py-10 flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-900/30 rounded-[2rem] border-2 border-dashed border-slate-100 dark:border-slate-800">
+                                    <LayoutList className="text-slate-200 mb-2" size={32} />
+                                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Nenhum serviço nesta fase</span>
                                 </div>
                             ) : (
                                 items.map(item => (
                                     <div
                                         key={item.id}
-                                        className="bg-white dark:bg-slate-900 rounded-[1.5rem] p-5 shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-xl hover:border-indigo-200 hover:-translate-y-1 transition-all group duration-300"
+                                        className="group bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-[1.5rem] p-4 border border-slate-100 dark:border-slate-800 shadow-sm transition-all duration-300 hover:shadow-xl hover:border-indigo-200 dark:hover:border-indigo-900/50"
                                     >
-                                        <div className="flex flex-col gap-4">
-                                            {/* Header do Card */}
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        {item.state && (
-                                                            <div className="px-2 py-0.5 bg-slate-100 rounded-md flex items-center gap-1.5 border border-slate-200">
-                                                                <img src={`https://cdn.jsdelivr.net/gh/arthurreira/br-state-flags@main/svgs/optimized/${item.state.toLowerCase()}.svg`} className="w-3.5 h-2.5 object-cover rounded-[1px]" alt={item.state} />
-                                                                <span className="text-[9px] font-black text-slate-500">{item.state}</span>
-                                                            </div>
-                                                        )}
-                                                        {item.clients?.is_telemetry_client && (
-                                                            <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-md text-[9px] font-black border border-purple-100">
-                                                                TELEMETRIA
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <h4 className="font-black text-slate-800 dark:text-white text-base leading-snug line-clamp-2" title={item.title}>
-                                                        {item.title}
-                                                    </h4>
-                                                    <p className="text-xs text-slate-400 font-medium mt-1 truncate">{item.clients?.name || 'Cliente Avulso'}</p>
+                                        <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+
+                                            {/* Col 1: Identificação Principal */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    {item.state && (
+                                                        <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-100 shadow-sm">
+                                                            <img src={`https://raw.githubusercontent.com/stefanocurvello/flags-br/master/svg/${item.state.toLowerCase()}.svg`} className="w-3.5 h-2.5 object-cover rounded-[1px]" alt={item.state} />
+                                                            <span className="text-[9px] font-black text-slate-500 uppercase">{item.state}</span>
+                                                        </div>
+                                                    )}
+                                                    {item.clients?.is_telemetry_client && (
+                                                        <span className="text-[9px] font-black px-2 py-0.5 bg-indigo-50 text-indigo-500 rounded-lg border border-indigo-100">TELEMETRIA</span>
+                                                    )}
+                                                    {item.requires_travel && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 bg-rose-50 text-rose-500 rounded-lg border border-rose-100">
+                                                            <Plane size={10} /> VIAGEM
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <button
-                                                    onClick={() => onEdit(item)}
-                                                    className="p-2 hover:bg-slate-50 rounded-xl text-slate-300 hover:text-indigo-600 transition-colors"
-                                                >
-                                                    <MoreVertical size={18} />
-                                                </button>
+                                                <h4 className="text-lg font-black text-slate-900 dark:text-white truncate group-hover:text-indigo-600 transition-colors">
+                                                    {item.title}
+                                                </h4>
+                                                <p className="text-xs font-bold text-slate-400 mt-0.5 uppercase tracking-wide flex items-center gap-2">
+                                                    <Building2 size={12} className="text-slate-300" />
+                                                    {item.clients?.name || 'Cliente Avulso'}
+                                                </p>
                                             </div>
 
-                                            {/* Info Técnica */}
-                                            <div className="grid grid-cols-2 gap-2 py-3 border-y border-slate-50">
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-[9px] font-bold text-slate-300 uppercase">Data/Hora</span>
-                                                    <div className="flex items-center gap-1.5 text-slate-600">
-                                                        <Clock size={14} className="text-indigo-500" />
-                                                        <span className="text-xs font-bold">
-                                                            {item.start_date
-                                                                ? format(new Date(item.start_date), "dd/MM HH:mm")
-                                                                : item.scheduled_date ? format(new Date(item.scheduled_date), "dd/MM HH:mm") : '--/--'
-                                                            }
-                                                        </span>
+                                            {/* Col 2: Logística e Técnico */}
+                                            <div className="lg:w-72 space-y-2">
+                                                <div className="flex items-center gap-3 text-slate-600 dark:text-slate-300">
+                                                    <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                                                        <Clock size={16} className="text-indigo-500" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Agendamento</p>
+                                                        <p className="text-xs font-black truncate">
+                                                            {item.start_date ? format(new Date(item.start_date), "dd/MM/yyyy HH:mm") : 'A definir'}
+                                                        </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-[9px] font-bold text-slate-300 uppercase">Local</span>
-                                                    <div className="flex items-center gap-1.5 text-slate-600">
-                                                        <MapPin size={14} className="text-rose-500" />
-                                                        <span className="text-xs font-medium truncate" title={item.location_address}>
-                                                            {item.city || 'Ver endereço'}
-                                                        </span>
+                                                <div className="flex items-center gap-3 text-slate-600 dark:text-slate-300">
+                                                    <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                                                        <User size={16} className="text-emerald-500" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Responsável</p>
+                                                        <p className="text-xs font-black truncate uppercase">
+                                                            {item.technician_name || 'PENDENTE'}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* Actions Footer */}
-                                            <div className="flex items-center gap-2 pt-1">
+                                            {/* Col 3: Localização */}
+                                            <div className="lg:w-64 flex items-start gap-3">
+                                                <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center shrink-0 mt-1">
+                                                    <MapPin size={16} className="text-rose-500" />
+                                                </div>
+                                                <div className="min-w-0 overflow-hidden">
+                                                    <p className="text-[9px] font-black text-slate-300 uppercase leading-none mb-1">Local da Operação</p>
+                                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">
+                                                        {item.location_address || 'Endereço não informado'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Col 4: Ações de Fluxo Elite */}
+                                            <div className="flex items-center gap-2 lg:ml-auto">
                                                 <button
                                                     onClick={() => onViewDocuments(item)}
-                                                    className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-indigo-600 rounded-xl font-bold text-[10px] uppercase transition-colors flex items-center justify-center gap-2"
+                                                    className="p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 rounded-2xl shadow-sm transition-all active:scale-90"
+                                                    title="Documentos"
                                                 >
-                                                    <FileText size={14} /> Docs
+                                                    <FileText size={20} />
                                                 </button>
+
+                                                <button
+                                                    onClick={() => onEdit(item)}
+                                                    className="p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 rounded-2xl shadow-sm transition-all active:scale-90"
+                                                    title="Ajustar"
+                                                >
+                                                    <MoreVertical size={20} />
+                                                </button>
+
+                                                <div className="w-[1px] h-10 bg-slate-100 dark:bg-slate-800 mx-1 hidden lg:block" />
 
                                                 {column.id !== 'completed' && (
                                                     <button
@@ -124,18 +182,19 @@ export default function InstallationKanban({ installations, onEdit, onStatusChan
                                                             column.id === 'pending' ? 'scheduled' :
                                                                 column.id === 'scheduled' ? 'in_progress' : 'completed'
                                                         )}
-                                                        className={`flex-1 py-2.5 rounded-xl font-black text-[10px] uppercase transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-white
-                                                            ${column.id === 'pending' ? 'bg-blue-500 hover:bg-blue-600' :
-                                                                column.id === 'scheduled' ? 'bg-amber-500 hover:bg-amber-600' :
-                                                                    'bg-emerald-500 hover:bg-emerald-600'
+                                                        className={`h-12 px-6 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3 text-white min-w-[140px]
+                                                            ${column.id === 'pending' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100 dark:shadow-none' :
+                                                                column.id === 'scheduled' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100 dark:shadow-none' :
+                                                                    'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100 dark:shadow-none'
                                                             }`}
                                                     >
                                                         {column.id === 'pending' ? 'Agendar' :
-                                                            column.id === 'scheduled' ? 'Iniciar' : 'Concluir'}
-                                                        <CheckCircle2 size={14} />
+                                                            column.id === 'scheduled' ? 'Iniciar Operação' : 'Finalizar Serviço'}
+                                                        <ChevronRight size={16} className="animate-pulse" />
                                                     </button>
                                                 )}
                                             </div>
+
                                         </div>
                                     </div>
                                 ))
