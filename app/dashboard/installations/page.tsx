@@ -142,6 +142,26 @@ export default function InstallationsPage() {
         }
     }
 
+    async function handleDeleteInstallation(id: string) {
+        if (!confirm('Deseja realmente excluir esta instalação? Esta ação não pode ser desfeita.')) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('installations')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            toast.success('Instalação excluída com sucesso!');
+            loadInstallations();
+        } catch (error: any) {
+            console.error('Erro ao excluir:', error);
+            toast.error('Erro ao excluir instalação');
+        }
+    }
+
     const filteredInstallations = installations.filter(i => {
         const matchesSearch = (i.title?.toLowerCase().includes(search.toLowerCase()) || '') ||
             (i.location_address?.toLowerCase().includes(search.toLowerCase()) || '') ||
@@ -766,6 +786,7 @@ export default function InstallationsPage() {
                                     setShowForm(true);
                                 }}
                                 onStatusChange={handleStatusChange}
+                                onDelete={handleDeleteInstallation}
                                 onViewDocuments={(item) => {
                                     setSelectedInstallation(item);
                                     setShowDocuments(true);
@@ -903,6 +924,7 @@ export default function InstallationsPage() {
                         setShowForm(false);
                         loadInstallations();
                     }}
+                    onDelete={handleDeleteInstallation}
                 />
             )}
 

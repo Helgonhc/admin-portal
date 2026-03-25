@@ -9,6 +9,7 @@ interface InstallationFormProps {
     installation?: any;
     onClose: () => void;
     onSuccess: () => void;
+    onDelete?: (id: string) => void;
 }
 
 const STATUS_OPTIONS = [
@@ -73,7 +74,7 @@ interface InstallationFormData {
     cep: string;
 }
 
-export default function InstallationForm({ installation, onClose, onSuccess }: InstallationFormProps) {
+export default function InstallationForm({ installation, onClose, onSuccess, onDelete }: InstallationFormProps) {
     const [loading, setLoading] = useState(false);
     const [clients, setClients] = useState<any[]>([]);
     const [isNewClient, setIsNewClient] = useState(!installation?.client_id);
@@ -1040,6 +1041,21 @@ export default function InstallationForm({ installation, onClose, onSuccess }: I
                         >
                             Descartar
                         </button>
+
+                        {installation?.id && onDelete && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onDelete(installation.id);
+                                }}
+                                className="px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-all flex items-center gap-2"
+                                title="Excluir este registro permanentemente"
+                            >
+                                <Trash2 size={18} />
+                                <span className="hidden sm:inline">Excluir</span>
+                            </button>
+                        )}
+
                         <button
                             onClick={handleSubmit}
                             disabled={loading}

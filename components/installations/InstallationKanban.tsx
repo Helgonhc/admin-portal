@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, User, Clock, MoreVertical, Plus, CheckCircle2, AlertCircle, FileText, Building2, Clipboard, Plane, Droplets, ChevronRight, LayoutList, Calendar, ExternalLink } from 'lucide-react';
+import { MapPin, User, Clock, MoreVertical, Plus, CheckCircle2, AlertCircle, FileText, Building2, Clipboard, Plane, Droplets, ChevronRight, LayoutList, Calendar, ExternalLink, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -12,6 +12,7 @@ interface InstallationKanbanProps {
     onEdit: (installation: any) => void;
     onStatusChange: (id: string, newStatus: string) => void;
     onViewDocuments: (installation: any) => void;
+    onDelete: (id: string) => void;
     onExportPDF?: (installation: any) => void;
 }
 
@@ -23,7 +24,7 @@ const COLUMNS = [
     { id: 'cancelada', title: 'Canceladas', subtitle: 'Serviços cancelados', color: 'red', iconColor: 'text-red-600', bgColor: 'bg-red-50', darkBg: 'dark:bg-red-900/20', borderColor: 'border-red-200' },
 ];
 
-export default function InstallationKanban({ installations, selectedIds, onToggleSelection, onEdit, onStatusChange, onViewDocuments, onExportPDF }: InstallationKanbanProps) {
+export default function InstallationKanban({ installations, selectedIds, onToggleSelection, onEdit, onStatusChange, onViewDocuments, onDelete, onExportPDF }: InstallationKanbanProps) {
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
         pendente: true,
         agendada: true,
@@ -212,6 +213,14 @@ export default function InstallationKanban({ installations, selectedIds, onToggl
                                                     title="Ajustar"
                                                 >
                                                     <MoreVertical size={20} />
+                                                </button>
+
+                                                <button
+                                                    onClick={() => onDelete(item.id)}
+                                                    className="p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-400 hover:text-red-500 hover:border-red-200 rounded-2xl shadow-sm transition-all active:scale-90 group/trash"
+                                                    title="Excluir"
+                                                >
+                                                    <Trash2 size={20} className="group-hover/trash:scale-110 transition-transform" />
                                                 </button>
 
                                                 <div className="w-[1px] h-10 bg-slate-100 dark:bg-slate-800 mx-1 hidden lg:block" />
